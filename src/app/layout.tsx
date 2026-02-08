@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
+import Image from "next/image";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -34,8 +35,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode;
+  modal: React.ReactNode;
 }>) {
   return (
     <html lang="en" className="light" suppressHydrationWarning>
@@ -43,7 +46,8 @@ export default function RootLayout({
         <ThemeProvider>
           <header className="border-b border-zinc-800 dark:border-zinc-800 light:border-zinc-200 sticky top-0 bg-zinc-950/95 dark:bg-zinc-950/95 light:bg-white/95 backdrop-blur z-50">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-              <Link href="/" className="text-xl font-bold text-white dark:text-white light:text-zinc-900 hover:text-red-400 transition-colors">
+              <Link href="/" className="flex items-center gap-2 text-xl font-bold text-white dark:text-white light:text-zinc-900 hover:text-red-400 transition-colors">
+                <Image src="/favicon.svg" alt="OP Card List Logo" width={32} height={32} className="rounded" />
                 OP Card List
               </Link>
               <div className="flex items-center gap-4">
@@ -57,6 +61,7 @@ export default function RootLayout({
           <main className="max-w-7xl mx-auto px-4 py-8">
             {children}
           </main>
+          {modal}
           <footer className="border-t border-zinc-800 dark:border-zinc-800 light:border-zinc-200 mt-16">
             <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm">
               <p>One Piece TCG Card List is a fan-made database. One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
