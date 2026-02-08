@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import type { Card, CardColor, CardType, Rarity, ArtStyle } from "@/types/card";
+import { CardThumbnail } from "./card/CardThumbnail";
 
 interface CardGridProps {
   cards: Card[];
@@ -379,63 +379,14 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
       </div>
 
       {/* Card Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {filteredCards.map((card) => (
           <Link
             key={card.id}
             href={`/card/${card.id.toLowerCase()}`}
-            className="group block"
+            className="block"
           >
-            <div className="aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-900 dark:bg-zinc-900 light:bg-zinc-100 border border-zinc-800 dark:border-zinc-800 light:border-zinc-200 group-hover:border-zinc-600 dark:group-hover:border-zinc-600 light:group-hover:border-zinc-400 transition-all">
-              <Image
-                src={card.imageUrl}
-                alt={card.name}
-                fill
-                sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                className="object-cover"
-                unoptimized
-              />
-              {card.isParallel && (
-                <span className={`absolute top-1 right-1 px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                  card.artStyle === 'wanted' ? 'bg-orange-500 text-black' :
-                  card.artStyle === 'manga' ? 'bg-pink-500 text-black' :
-                  'bg-amber-500 text-black'
-                }`}>
-                  {card.artStyle === 'wanted' ? 'WANTED' :
-                   card.artStyle === 'manga' ? 'MANGA' :
-                   'ALT'}
-                </span>
-              )}
-            </div>
-            <div className="mt-2">
-              <p className="text-xs text-zinc-500">{card.id}</p>
-              <p className="text-sm font-medium truncate group-hover:text-red-400 transition-colors">
-                {card.name}
-              </p>
-              <div className="flex items-center justify-between mt-1">
-                <div className="flex items-center gap-1">
-                  {card.colors.map((color) => (
-                    <span
-                      key={color}
-                      className={`w-3 h-3 rounded-full ${
-                        color === "Red" ? "bg-red-500" :
-                        color === "Green" ? "bg-green-500" :
-                        color === "Blue" ? "bg-blue-500" :
-                        color === "Purple" ? "bg-purple-500" :
-                        color === "Black" ? "bg-zinc-500" :
-                        "bg-yellow-500"
-                      }`}
-                    />
-                  ))}
-                  <span className="text-xs text-zinc-500 ml-1">{card.rarity}</span>
-                </div>
-                {card.price?.marketPrice != null && (
-                  <span className="text-xs font-medium text-green-400">
-                    ${card.price.marketPrice.toFixed(2)}
-                  </span>
-                )}
-              </div>
-            </div>
+            <CardThumbnail card={card} />
           </Link>
         ))}
       </div>
