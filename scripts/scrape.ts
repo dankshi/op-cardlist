@@ -138,6 +138,7 @@ const WANTED_CARDS = new Set<string>([
 
 // Known manga art cards
 const MANGA_CARDS = new Set<string>([
+  'OP07-051_p2', // Boa Hancock manga parallel
   // Add manga card IDs as discovered
 ]);
 
