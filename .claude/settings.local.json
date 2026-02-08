@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "Read",
+      "WebFetch",
+      "Bash(npm run build:*)",
+      "Bash(npm run scrape:*)",
+      "Bash(node -e:*)",
+      "Bash(npx kill-port:*)"
+    ]
+  }
+}
