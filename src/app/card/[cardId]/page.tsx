@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
 import Image from "next/image";
 import { getCardById, getAllCards } from "@/lib/cards";
+import CardModalClient from "./CardModalClient";
 
 interface PageProps {
   params: Promise<{ cardId: string }>;
@@ -41,7 +41,7 @@ const colorClasses: Record<string, string> = {
   Green: "bg-green-500",
   Blue: "bg-blue-500",
   Purple: "bg-purple-500",
-  Black: "bg-zinc-500",
+  Black: "bg-zinc-600",
   Yellow: "bg-yellow-500",
 };
 
@@ -54,136 +54,150 @@ export default async function CardPage({ params }: PageProps) {
   }
 
   return (
-    <div>
-      {/* Breadcrumb */}
-      <nav className="text-sm text-zinc-500 mb-6">
-        <Link href="/" className="hover:text-white transition-colors">
-          Home
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/${card.setId}`} className="hover:text-white transition-colors">
-          {card.setId.toUpperCase()}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-white">{card.id}</span>
-      </nav>
-
-      <div className="grid md:grid-cols-[300px,1fr] lg:grid-cols-[400px,1fr] gap-8">
-        {/* Card Image */}
-        <div className="aspect-[2.5/3.5] relative rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
-          <Image
-            src={card.imageUrl}
-            alt={card.name}
-            fill
-            sizes="(max-width: 768px) 100vw, 400px"
-            className="object-cover"
-            priority
-            unoptimized
-          />
-        </div>
-
-        {/* Card Details */}
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-zinc-500">{card.id}</span>
-            <span className="px-2 py-0.5 bg-zinc-800 rounded text-sm">{card.rarity}</span>
-            <span className="px-2 py-0.5 bg-zinc-800 rounded text-sm">{card.type}</span>
-          </div>
-
-          <h1 className="text-3xl font-bold mb-4">{card.name}</h1>
-
-          {/* Colors */}
-          <div className="flex items-center gap-2 mb-6">
-            {card.colors.map((color) => (
-              <span
-                key={color}
-                className={`px-3 py-1 rounded-full text-sm ${colorClasses[color]} text-white`}
-              >
-                {color}
-              </span>
-            ))}
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            {card.type === "LEADER" ? (
-              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-                <p className="text-xs text-zinc-500 uppercase">Life</p>
-                <p className="text-2xl font-bold">{card.life ?? "-"}</p>
+    <CardModalClient>
+      <div className="flex flex-col md:flex-row max-h-[90vh]">
+            {/* Card Image - Left Side */}
+            <div className="flex-shrink-0 bg-zinc-950 light:bg-zinc-100 p-4 md:p-6 flex items-center justify-center md:w-[340px] lg:w-[400px]">
+              <div className="relative w-[200px] h-[280px] md:w-[280px] md:h-[392px] lg:w-[320px] lg:h-[448px]">
+                <Image
+                  src={card.imageUrl}
+                  alt={card.name}
+                  fill
+                  sizes="(max-width: 768px) 200px, 320px"
+                  className="object-contain rounded-lg"
+                  priority
+                  unoptimized
+                />
               </div>
-            ) : (
-              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-                <p className="text-xs text-zinc-500 uppercase">Cost</p>
-                <p className="text-2xl font-bold">{card.cost ?? "-"}</p>
-              </div>
-            )}
-            <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-              <p className="text-xs text-zinc-500 uppercase">Power</p>
-              <p className="text-2xl font-bold">{card.power?.toLocaleString() ?? "-"}</p>
             </div>
-            <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-              <p className="text-xs text-zinc-500 uppercase">Counter</p>
-              <p className="text-2xl font-bold">{card.counter?.toLocaleString() ?? "-"}</p>
-            </div>
-            {card.attribute && (
-              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-                <p className="text-xs text-zinc-500 uppercase">Attribute</p>
-                <p className="text-2xl font-bold">{card.attribute}</p>
-              </div>
-            )}
-          </div>
 
-          {/* Traits */}
-          {card.traits.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-xs text-zinc-500 uppercase mb-2">Type</h2>
-              <div className="flex flex-wrap gap-2">
-                {card.traits.map((trait) => (
-                  <span
-                    key={trait}
-                    className="px-3 py-1 bg-zinc-800 rounded-full text-sm"
-                  >
-                    {trait}
-                  </span>
+            {/* Card Details - Right Side */}
+            <div className="flex-1 p-5 md:p-6 overflow-y-auto">
+              {/* Header Row */}
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-zinc-400 light:text-zinc-600 font-mono">{card.id}</span>
+                    <span className="px-2 py-0.5 bg-zinc-800 light:bg-zinc-200 rounded text-xs font-medium">{card.rarity}</span>
+                    <span className="px-2 py-0.5 bg-zinc-800 light:bg-zinc-200 rounded text-xs">{card.type}</span>
+                    {card.isParallel && (
+                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-xs font-medium">
+                        {card.artStyle === 'wanted' ? 'WANTED' : card.artStyle === 'manga' ? 'MANGA' : 'ALT'}
+                      </span>
+                    )}
+                  </div>
+                  <h1 className="text-2xl md:text-3xl font-bold">{card.name}</h1>
+                </div>
+              </div>
+
+              {/* Colors */}
+              <div className="flex items-center gap-2 mb-4">
+                {card.colors.map((color) => (
+                  <div key={color} className="flex items-center gap-1.5">
+                    <span className={`w-4 h-4 rounded-full ${colorClasses[color]}`} />
+                    <span className="text-sm text-zinc-400 light:text-zinc-600">{color}</span>
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
 
-          {/* Effect */}
-          <div className="mb-6">
-            <h2 className="text-xs text-zinc-500 uppercase mb-2">Effect</h2>
-            <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-              <p className="text-zinc-300 leading-relaxed whitespace-pre-wrap">
-                {card.effect || "No effect."}
-              </p>
-            </div>
-          </div>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-4 gap-3 mb-5">
+                <div className="bg-zinc-800/50 light:bg-zinc-100 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">{card.type === "LEADER" ? "Life" : "Cost"}</p>
+                  <p className="text-xl font-bold">{card.type === "LEADER" ? (card.life ?? "-") : (card.cost ?? "-")}</p>
+                </div>
+                <div className="bg-zinc-800/50 light:bg-zinc-100 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Power</p>
+                  <p className="text-xl font-bold">{card.power?.toLocaleString() ?? "-"}</p>
+                </div>
+                <div className="bg-zinc-800/50 light:bg-zinc-100 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Counter</p>
+                  <p className="text-xl font-bold">{card.counter ? `+${card.counter.toLocaleString()}` : "-"}</p>
+                </div>
+                <div className="bg-zinc-800/50 light:bg-zinc-100 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Attribute</p>
+                  <p className="text-lg font-bold truncate">{card.attribute ?? "-"}</p>
+                </div>
+              </div>
 
-          {/* Trigger */}
-          {card.trigger && (
-            <div className="mb-6">
-              <h2 className="text-xs text-zinc-500 uppercase mb-2">Trigger</h2>
-              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
-                <p className="text-zinc-300 leading-relaxed">{card.trigger}</p>
+              {/* Traits */}
+              {card.traits.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {card.traits.map((trait) => (
+                    <span key={trait} className="px-2.5 py-1 bg-zinc-800 light:bg-zinc-200 rounded-full text-xs text-zinc-300 light:text-zinc-700">
+                      {trait}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Effect */}
+              <div className="mb-4">
+                <h3 className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Effect</h3>
+                <p className="text-sm text-zinc-300 light:text-zinc-700 leading-relaxed">
+                  {card.effect || "No effect."}
+                </p>
+              </div>
+
+              {/* Trigger */}
+              {card.trigger && (
+                <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                  <h3 className="text-xs text-amber-400 uppercase tracking-wide mb-1">Trigger</h3>
+                  <p className="text-sm text-zinc-300 light:text-zinc-700">{card.trigger}</p>
+                </div>
+              )}
+
+              {/* Price Section */}
+              {card.price && (card.price.marketPrice != null || card.price.tcgplayerUrl) && (
+                <div className="p-4 bg-zinc-800/50 light:bg-zinc-100 rounded-lg border border-zinc-700/50 light:border-zinc-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      {card.price.marketPrice != null && (
+                        <div>
+                          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Market Price</p>
+                          <p className="text-2xl font-bold text-green-400">${card.price.marketPrice.toFixed(2)}</p>
+                        </div>
+                      )}
+                      {card.price.lowPrice != null && (
+                        <div>
+                          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Low</p>
+                          <p className="text-lg font-semibold">${card.price.lowPrice.toFixed(2)}</p>
+                        </div>
+                      )}
+                      {card.price.highPrice != null && (
+                        <div>
+                          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">High</p>
+                          <p className="text-lg font-semibold">${card.price.highPrice.toFixed(2)}</p>
+                        </div>
+                      )}
+                    </div>
+                    {card.price.tcgplayerUrl && (
+                      <a
+                        href={card.price.tcgplayerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        Buy on TCGPlayer
+                      </a>
+                    )}
+                  </div>
+                  {card.price.lastUpdated && (
+                    <p className="text-[10px] text-zinc-500 mt-2">
+                      Updated {new Date(card.price.lastUpdated).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Set Info */}
+              <div className="mt-4 pt-4 border-t border-zinc-800 light:border-zinc-200">
+                <p className="text-xs text-zinc-500">
+                  Set: <span className="text-zinc-300 light:text-zinc-700 font-medium">{card.setId.toUpperCase()}</span>
+                </p>
               </div>
             </div>
-          )}
-
-          {/* Set Info */}
-          <div className="pt-4 border-t border-zinc-800">
-            <p className="text-sm text-zinc-500">
-              From{" "}
-              <Link
-                href={`/${card.setId}`}
-                className="text-red-400 hover:text-red-300 transition-colors"
-              >
-                {card.setId.toUpperCase()}
-              </Link>
-            </p>
           </div>
-        </div>
-      </div>
 
       {/* JSON-LD Structured Data */}
       <script
@@ -201,9 +215,18 @@ export default async function CardPage({ params }: PageProps) {
               name: "One Piece TCG",
             },
             category: "Trading Card",
+            ...(card.price?.marketPrice != null && {
+              offers: {
+                "@type": "Offer",
+                price: card.price.marketPrice,
+                priceCurrency: "USD",
+                availability: "https://schema.org/InStock",
+                url: card.price.tcgplayerUrl,
+              },
+            }),
           }),
         }}
       />
-    </div>
+    </CardModalClient>
   );
 }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -32,28 +34,31 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans antialiased bg-zinc-950 text-zinc-100 min-h-screen`}>
-        <header className="border-b border-zinc-800 sticky top-0 bg-zinc-950/95 backdrop-blur z-50">
-          <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold text-white hover:text-red-400 transition-colors">
-              OP Card List
-            </Link>
-            <div className="flex items-center gap-6">
-              <Link href="/" className="text-zinc-400 hover:text-white transition-colors">
-                Sets
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className={`${inter.variable} font-sans antialiased bg-zinc-950 dark:bg-zinc-950 light:bg-zinc-50 text-zinc-100 dark:text-zinc-100 light:text-zinc-900 min-h-screen`}>
+        <ThemeProvider>
+          <header className="border-b border-zinc-800 dark:border-zinc-800 light:border-zinc-200 sticky top-0 bg-zinc-950/95 dark:bg-zinc-950/95 light:bg-white/95 backdrop-blur z-50">
+            <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+              <Link href="/" className="text-xl font-bold text-white dark:text-white light:text-zinc-900 hover:text-red-400 transition-colors">
+                OP Card List
               </Link>
+              <div className="flex items-center gap-4">
+                <Link href="/" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors">
+                  Sets
+                </Link>
+                <ThemeToggle />
+              </div>
+            </nav>
+          </header>
+          <main className="max-w-7xl mx-auto px-4 py-8">
+            {children}
+          </main>
+          <footer className="border-t border-zinc-800 dark:border-zinc-800 light:border-zinc-200 mt-16">
+            <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm">
+              <p>One Piece TCG Card List is a fan-made database. One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
             </div>
-          </nav>
-        </header>
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          {children}
-        </main>
-        <footer className="border-t border-zinc-800 mt-16">
-          <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm">
-            <p>One Piece TCG Card List is a fan-made database. One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
-          </div>
-        </footer>
+          </footer>
+        </ThemeProvider>
       </body>
     </html>
   );

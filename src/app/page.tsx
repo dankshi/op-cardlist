@@ -10,7 +10,7 @@ export default function Home() {
     <div>
       <section className="mb-12">
         <h1 className="text-4xl font-bold mb-4">One Piece TCG Card List</h1>
-        <p className="text-zinc-400 text-lg mb-6">
+        <p className="text-zinc-400 light:text-zinc-600 text-lg mb-6">
           Browse {totalCards.toLocaleString()} cards across {sets.length} set{sets.length !== 1 ? 's' : ''}.
           Fast, mobile-friendly, and always up-to-date.
         </p>
@@ -26,18 +26,18 @@ export default function Home() {
             <Link
               key={set.id}
               href={`/${set.id}`}
-              className="block p-6 bg-zinc-900 rounded-lg border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 transition-all group"
+              className="block p-6 bg-zinc-900 light:bg-white rounded-lg border border-zinc-800 light:border-zinc-200 hover:border-zinc-700 light:hover:border-zinc-300 hover:bg-zinc-800/50 light:hover:bg-zinc-50 transition-all group"
             >
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-semibold text-lg group-hover:text-red-400 transition-colors">
                     {set.id.toUpperCase()}
                   </h3>
-                  <p className="text-zinc-400 text-sm mt-1 line-clamp-2">
+                  <p className="text-zinc-400 light:text-zinc-600 text-sm mt-1 line-clamp-2">
                     {set.name}
                   </p>
                 </div>
-                <span className="text-zinc-500 text-sm bg-zinc-800 px-2 py-1 rounded">
+                <span className="text-zinc-500 text-sm bg-zinc-800 light:bg-zinc-100 px-2 py-1 rounded">
                   {set.cardCount} cards
                 </span>
               </div>

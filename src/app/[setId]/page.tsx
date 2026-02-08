@@ -56,40 +56,40 @@ export default async function SetPage({ params }: PageProps) {
     <div>
       {/* Breadcrumb */}
       <nav className="text-sm text-zinc-500 mb-6">
-        <Link href="/" className="hover:text-white transition-colors">
+        <Link href="/" className="hover:text-white light:hover:text-zinc-900 transition-colors">
           Home
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-white">{set.id.toUpperCase()}</span>
+        <span className="text-white light:text-zinc-900">{set.id.toUpperCase()}</span>
       </nav>
 
       {/* Header */}
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{set.id.toUpperCase()} Card List</h1>
-        <p className="text-zinc-400 mb-4">{set.name}</p>
+        <p className="text-zinc-400 light:text-zinc-600 mb-4">{set.name}</p>
 
         {/* Quick Stats */}
         <div className="flex flex-wrap gap-4 text-sm">
-          <span className="px-3 py-1 bg-zinc-800 rounded-full">
+          <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
             {set.cardCount} cards
           </span>
           {leaders > 0 && (
-            <span className="px-3 py-1 bg-zinc-800 rounded-full">
+            <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
               {leaders} Leaders
             </span>
           )}
           {characters > 0 && (
-            <span className="px-3 py-1 bg-zinc-800 rounded-full">
+            <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
               {characters} Characters
             </span>
           )}
           {events > 0 && (
-            <span className="px-3 py-1 bg-zinc-800 rounded-full">
+            <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
               {events} Events
             </span>
           )}
           {stages > 0 && (
-            <span className="px-3 py-1 bg-zinc-800 rounded-full">
+            <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
               {stages} Stages
             </span>
           )}

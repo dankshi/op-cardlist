@@ -4,6 +4,9 @@
   --font-sans: var(--font-inter);
 }
 
+/* Custom light variant for Tailwind */
+@custom-variant light (&:where(.light, .light *));
+
 * {
   box-sizing: border-box;
 }
@@ -25,21 +28,44 @@ img[data-loaded="false"] {
   opacity: 0;
 }
 
-/* Custom scrollbar for webkit browsers */
+/* Custom scrollbar for webkit browsers - dark mode */
+.dark::-webkit-scrollbar,
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
+.dark::-webkit-scrollbar-track,
 ::-webkit-scrollbar-track {
   background: #27272a;
 }
 
+.dark::-webkit-scrollbar-thumb,
 ::-webkit-scrollbar-thumb {
   background: #52525b;
   border-radius: 4px;
 }
 
+.dark::-webkit-scrollbar-thumb:hover,
 ::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
+}
+
+/* Custom scrollbar for light mode */
+.light::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.light::-webkit-scrollbar-track {
+  background: #f4f4f5;
+}
+
+.light::-webkit-scrollbar-thumb {
+  background: #a1a1aa;
+  border-radius: 4px;
+}
+
+.light::-webkit-scrollbar-thumb:hover {
   background: #71717a;
 }

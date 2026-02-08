@@ -47056,7 +47056,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 110.74,
-            "lastUpdated": "2026-02-08T03:58:20.519Z",
+            "lastUpdated": "2026-02-08T06:30:11.155Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/659982/MonkeyDLuffy OP11 058 TR",
             "tcgplayerProductId": 659982
           }
@@ -47084,7 +47084,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-001.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 0.15,
+            "lastUpdated": "2026-02-08T06:30:11.788Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657250/MonkeyDLuffy 001",
+            "tcgplayerProductId": 657250
+          }
         },
         {
           "id": "OP13-001_p1",
@@ -47110,7 +47116,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-001_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 84.62,
+            "lastUpdated": "2026-02-08T06:30:12.294Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657251/MonkeyDLuffy 001 Alternate Art",
+            "tcgplayerProductId": 657251
+          }
         },
         {
           "id": "OP13-002",
@@ -47134,7 +47146,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-002.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 0.15,
+            "lastUpdated": "2026-02-08T06:30:12.824Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657252/PortgasDAce 002",
+            "tcgplayerProductId": 657252
+          }
         },
         {
           "id": "OP13-002_p1",
@@ -47159,7 +47177,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-002_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 65.83,
+            "lastUpdated": "2026-02-08T06:30:13.411Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657253/PortgasDAce 002 Alternate Art",
+            "tcgplayerProductId": 657253
+          }
         },
         {
           "id": "OP13-003",
@@ -47184,7 +47208,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-003.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 0.17,
+            "lastUpdated": "2026-02-08T06:30:13.842Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657254/GolDRoger 003",
+            "tcgplayerProductId": 657254
+          }
         },
         {
           "id": "OP13-003_p1",
@@ -47210,7 +47240,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-003_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 47.12,
+            "lastUpdated": "2026-02-08T06:30:14.339Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657255/GolDRoger 003 Alternate Art",
+            "tcgplayerProductId": 657255
+          }
         },
         {
           "id": "OP13-004",
@@ -47235,7 +47271,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-004.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 0.17,
+            "lastUpdated": "2026-02-08T06:30:14.844Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657256/Sabo 004",
+            "tcgplayerProductId": 657256
+          }
         },
         {
           "id": "OP13-004_p1",
@@ -47261,7 +47303,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-004_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 33.75,
+            "lastUpdated": "2026-02-08T06:30:15.575Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657257/Sabo 004 Alternate Art",
+            "tcgplayerProductId": 657257
+          }
         },
         {
           "id": "OP13-005",
@@ -47332,8 +47380,8 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 1.59,
-            "lastUpdated": "2026-02-08T03:58:25.681Z",
+            "marketPrice": 1.62,
+            "lastUpdated": "2026-02-08T06:30:17.624Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657260/Ace and Sabo and Luffy",
             "tcgplayerProductId": 657260
           }
@@ -47362,8 +47410,8 @@
           "variant": "p1",
           "isParallel": true,
           "price": {
-            "marketPrice": 36.21,
-            "lastUpdated": "2026-02-08T03:58:26.111Z",
+            "marketPrice": 35.93,
+            "lastUpdated": "2026-02-08T06:30:18.124Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657261/Ace and Sabo and Luffy Alternate Art",
             "tcgplayerProductId": 657261
           }
@@ -47439,7 +47487,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.25,
-            "lastUpdated": "2026-02-08T03:58:27.500Z",
+            "lastUpdated": "2026-02-08T06:30:19.788Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/661375/Lord of the Coast",
             "tcgplayerProductId": 661375
           }
@@ -47677,7 +47725,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.13,
-            "lastUpdated": "2026-02-08T03:58:32.248Z",
+            "lastUpdated": "2026-02-08T06:30:25.795Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657274/But Ace Here Said You Deserved It",
             "tcgplayerProductId": 657274
           }
@@ -47729,7 +47777,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.08,
-            "lastUpdated": "2026-02-08T03:58:33.197Z",
+            "lastUpdated": "2026-02-08T06:30:27.203Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657276/Gum Gum Gatling Gun",
             "tcgplayerProductId": 657276
           }
@@ -47947,7 +47995,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-028.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 0.78,
+            "lastUpdated": "2026-02-08T06:30:32.388Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657285/Shanks 028",
+            "tcgplayerProductId": 657285
+          }
         },
         {
           "id": "OP13-028_p1",
@@ -47973,7 +48027,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-028_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 16.03,
+            "lastUpdated": "2026-02-08T06:30:32.824Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657286/Shanks 028 Alternate Art",
+            "tcgplayerProductId": 657286
+          }
         },
         {
           "id": "OP13-029",
@@ -48221,7 +48281,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.09,
-            "lastUpdated": "2026-02-08T03:58:43.021Z",
+            "lastUpdated": "2026-02-08T06:30:38.442Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657296/Gum Gum Elephant Gun",
             "tcgplayerProductId": 657296
           }
@@ -48251,10 +48311,10 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.52,
-            "lastUpdated": "2026-02-08T03:58:43.459Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/661386/Gum Gum Snake Shot",
-            "tcgplayerProductId": 661386
+            "marketPrice": 0.06,
+            "lastUpdated": "2026-02-08T06:30:38.881Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657297/Gum Gum Snake Shot",
+            "tcgplayerProductId": 657297
           }
         },
         {
@@ -48281,8 +48341,8 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.18,
-            "lastUpdated": "2026-02-08T03:58:43.893Z",
+            "marketPrice": 0.1836,
+            "lastUpdated": "2026-02-08T06:30:39.351Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657298/I Know Youre Strong So Ill Go All Out from the Very Start",
             "tcgplayerProductId": 657298
           }
@@ -48757,7 +48817,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.12,
-            "lastUpdated": "2026-02-08T03:58:53.147Z",
+            "lastUpdated": "2026-02-08T06:30:51.228Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657318/If I Bowed Down to Power Whats the Point in Living",
             "tcgplayerProductId": 657318
           }
@@ -48926,7 +48986,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-064.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 0.45,
+            "lastUpdated": "2026-02-08T06:30:55.472Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657325/GolDRoger 064",
+            "tcgplayerProductId": 657325
+          }
         },
         {
           "id": "OP13-064_p1",
@@ -48951,7 +49017,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-064_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 37.78,
+            "lastUpdated": "2026-02-08T06:30:55.917Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657326/GolDRoger 064 Alternate Art",
+            "tcgplayerProductId": 657326
+          }
         },
         {
           "id": "OP13-065",
@@ -48974,7 +49046,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-065.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 0.16,
+            "lastUpdated": "2026-02-08T06:30:56.352Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657327/Shanks 065",
+            "tcgplayerProductId": 657327
+          }
         },
         {
           "id": "OP13-065_p1",
@@ -48998,7 +49076,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-065_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 13.75,
+            "lastUpdated": "2026-02-08T06:30:56.781Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657328/Shanks 065 Alternate Art",
+            "tcgplayerProductId": 657328
+          }
         },
         {
           "id": "OP13-066",
@@ -49262,7 +49346,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 12.02,
-            "lastUpdated": "2026-02-08T03:59:03.172Z",
+            "lastUpdated": "2026-02-08T06:31:03.697Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/661436/Guess Well Have Another Scrap You Can Only Risk Death While Youre Still Alive",
             "tcgplayerProductId": 661436
           }
@@ -49339,8 +49423,8 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.0656,
-            "lastUpdated": "2026-02-08T03:59:04.563Z",
+            "marketPrice": 0.07,
+            "lastUpdated": "2026-02-08T06:31:05.409Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657342/Go All the Way to the Top",
             "tcgplayerProductId": 657342
           }
@@ -49440,7 +49524,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.52,
-            "lastUpdated": "2026-02-08T03:59:06.492Z",
+            "lastUpdated": "2026-02-08T06:31:07.872Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657346/St Ethanbaron V Nusjuro",
             "tcgplayerProductId": 657346
           }
@@ -49470,10 +49554,10 @@
           "variant": "p1",
           "isParallel": true,
           "price": {
-            "marketPrice": 545.42,
-            "lastUpdated": "2026-02-08T03:59:06.972Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/657348/St Ethanbaron V Nusjuro Parallel",
-            "tcgplayerProductId": 657348
+            "marketPrice": 31.69,
+            "lastUpdated": "2026-02-08T06:31:08.308Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657347/St Ethanbaron V Nusjuro Alternate Art",
+            "tcgplayerProductId": 657347
           }
         },
         {
@@ -49502,7 +49586,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 545.42,
-            "lastUpdated": "2026-02-08T03:59:07.449Z",
+            "lastUpdated": "2026-02-08T06:31:08.754Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657348/St Ethanbaron V Nusjuro Parallel",
             "tcgplayerProductId": 657348
           }
@@ -49604,8 +49688,8 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.5,
-            "lastUpdated": "2026-02-08T03:59:09.250Z",
+            "marketPrice": 0.49,
+            "lastUpdated": "2026-02-08T06:31:10.918Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657352/St Jaygarcia Saturn",
             "tcgplayerProductId": 657352
           }
@@ -49636,7 +49720,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 28.76,
-            "lastUpdated": "2026-02-08T03:59:09.686Z",
+            "lastUpdated": "2026-02-08T06:31:11.510Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657353/St Jaygarcia Saturn Alternate Art",
             "tcgplayerProductId": 657353
           }
@@ -49667,7 +49751,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 28.76,
-            "lastUpdated": "2026-02-08T03:59:10.122Z",
+            "lastUpdated": "2026-02-08T06:31:11.938Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657353/St Jaygarcia Saturn Alternate Art",
             "tcgplayerProductId": 657353
           }
@@ -49696,8 +49780,8 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.59,
-            "lastUpdated": "2026-02-08T03:59:10.608Z",
+            "marketPrice": 0.58,
+            "lastUpdated": "2026-02-08T06:31:12.424Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657355/St Shepherd Ju Peter",
             "tcgplayerProductId": 657355
           }
@@ -49728,7 +49812,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 31.72,
-            "lastUpdated": "2026-02-08T03:59:11.058Z",
+            "lastUpdated": "2026-02-08T06:31:12.908Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657356/St Shepherd Ju Peter Alternate Art",
             "tcgplayerProductId": 657356
           }
@@ -49758,10 +49842,10 @@
           "variant": "p2",
           "isParallel": true,
           "price": {
-            "marketPrice": 502.76,
-            "lastUpdated": "2026-02-08T03:59:11.475Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/657357/St Shepherd Ju Peter Parallel",
-            "tcgplayerProductId": 657357
+            "marketPrice": 31.72,
+            "lastUpdated": "2026-02-08T06:31:13.347Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657356/St Shepherd Ju Peter Alternate Art",
+            "tcgplayerProductId": 657356
           }
         },
         {
@@ -49881,7 +49965,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.68,
-            "lastUpdated": "2026-02-08T03:59:13.730Z",
+            "lastUpdated": "2026-02-08T06:31:16.320Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657362/St Topman Warcury",
             "tcgplayerProductId": 657362
           }
@@ -49912,7 +49996,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 463.03,
-            "lastUpdated": "2026-02-08T03:59:14.161Z",
+            "lastUpdated": "2026-02-08T06:31:16.768Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657364/St Topman Warcury Parallel",
             "tcgplayerProductId": 657364
           }
@@ -49943,7 +50027,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 463.03,
-            "lastUpdated": "2026-02-08T03:59:14.772Z",
+            "lastUpdated": "2026-02-08T06:31:17.200Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657364/St Topman Warcury Parallel",
             "tcgplayerProductId": 657364
           }
@@ -49997,8 +50081,8 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.54,
-            "lastUpdated": "2026-02-08T03:59:15.702Z",
+            "marketPrice": 0.55,
+            "lastUpdated": "2026-02-08T06:31:18.196Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657366/St Marcus Mars",
             "tcgplayerProductId": 657366
           }
@@ -50029,7 +50113,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 512.08,
-            "lastUpdated": "2026-02-08T03:59:16.144Z",
+            "lastUpdated": "2026-02-08T06:31:18.635Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657368/St Marcus Mars Parallel",
             "tcgplayerProductId": 657368
           }
@@ -50059,10 +50143,10 @@
           "variant": "p2",
           "isParallel": true,
           "price": {
-            "marketPrice": 512.08,
-            "lastUpdated": "2026-02-08T03:59:16.584Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/657368/St Marcus Mars Parallel",
-            "tcgplayerProductId": 657368
+            "marketPrice": 32.9,
+            "lastUpdated": "2026-02-08T06:31:19.062Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657367/St Marcus Mars Alternate Art",
+            "tcgplayerProductId": 657367
           }
         },
         {
@@ -50182,8 +50266,8 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.6,
-            "lastUpdated": "2026-02-08T03:59:18.865Z",
+            "marketPrice": 0.58,
+            "lastUpdated": "2026-02-08T06:31:22.108Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657373/The Five Elders Are at Your Service",
             "tcgplayerProductId": 657373
           }
@@ -50212,10 +50296,10 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.08,
-            "lastUpdated": "2026-02-08T03:59:19.293Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/657374/The Worlds Equilibrium Cannot Be Maintained Forever",
-            "tcgplayerProductId": 657374
+            "marketPrice": 3.16,
+            "lastUpdated": "2026-02-08T06:31:22.582Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/661409/The Worlds Equilibrium Cannot Be Maintained Forever",
+            "tcgplayerProductId": 661409
           }
         },
         {
@@ -50242,10 +50326,10 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.42,
-            "lastUpdated": "2026-02-08T03:59:20.402Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/657375/Never Existed in the First Place",
-            "tcgplayerProductId": 657375
+            "marketPrice": 21.5,
+            "lastUpdated": "2026-02-08T06:31:23.005Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/661441/Never Existed in the First Place",
+            "tcgplayerProductId": 661441
           }
         },
         {
@@ -50272,7 +50356,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.05,
-            "lastUpdated": "2026-02-08T03:59:20.856Z",
+            "lastUpdated": "2026-02-08T06:31:23.429Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657376/The Empty Throne",
             "tcgplayerProductId": 657376
           }
@@ -50302,7 +50386,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.1,
-            "lastUpdated": "2026-02-08T03:59:21.305Z",
+            "lastUpdated": "2026-02-08T06:31:23.890Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657377/Jewelry Bonney 100",
             "tcgplayerProductId": 657377
           }
@@ -50333,7 +50417,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 22.32,
-            "lastUpdated": "2026-02-08T03:59:21.776Z",
+            "lastUpdated": "2026-02-08T06:31:24.329Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657378/Jewelry Bonney 100 Alternate Art",
             "tcgplayerProductId": 657378
           }
@@ -50528,8 +50612,8 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 3.8,
-            "lastUpdated": "2026-02-08T03:59:25.416Z",
+            "marketPrice": 3.86,
+            "lastUpdated": "2026-02-08T06:31:29.006Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657386/Jewelry Bonney 108",
             "tcgplayerProductId": 657386
           }
@@ -50560,7 +50644,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 62.88,
-            "lastUpdated": "2026-02-08T03:59:25.857Z",
+            "lastUpdated": "2026-02-08T06:31:29.449Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657387/Jewelry Bonney 108 Alternate Art",
             "tcgplayerProductId": 657387
           }
@@ -50590,7 +50674,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.06,
-            "lastUpdated": "2026-02-08T03:59:26.289Z",
+            "lastUpdated": "2026-02-08T06:31:29.885Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657388/Jewelry Bonney 109",
             "tcgplayerProductId": 657388
           }
@@ -50814,10 +50898,10 @@
           "setId": "op-13",
           "isParallel": false,
           "price": {
-            "marketPrice": 0.34,
-            "lastUpdated": "2026-02-08T03:59:30.512Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/661416/Paper Art Afterimage",
-            "tcgplayerProductId": 661416
+            "marketPrice": 0.07,
+            "lastUpdated": "2026-02-08T06:31:35.858Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657397/Paper Art Afterimage",
+            "tcgplayerProductId": 657397
           }
         },
         {
@@ -50845,7 +50929,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.11,
-            "lastUpdated": "2026-02-08T03:59:30.940Z",
+            "lastUpdated": "2026-02-08T06:31:36.663Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657398/The One Who Is the Most Free Is the Pirate King",
             "tcgplayerProductId": 657398
           }
@@ -50876,7 +50960,7 @@
           "isParallel": false,
           "price": {
             "marketPrice": 0.14,
-            "lastUpdated": "2026-02-08T03:59:31.366Z",
+            "lastUpdated": "2026-02-08T06:31:37.133Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657399/Gum Gum Dawn Stamp",
             "tcgplayerProductId": 657399
           }
@@ -50904,7 +50988,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-118.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 19.32,
+            "lastUpdated": "2026-02-08T06:31:37.684Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657400/MonkeyDLuffy 118",
+            "tcgplayerProductId": 657400
+          }
         },
         {
           "id": "OP13-118_p1",
@@ -50930,7 +51020,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-118_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 135.61,
+            "lastUpdated": "2026-02-08T06:31:38.199Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657403/MonkeyDLuffy 118 Parallel",
+            "tcgplayerProductId": 657403
+          }
         },
         {
           "id": "OP13-118_p2",
@@ -50956,7 +51052,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-118_p2.png?260130",
           "setId": "op-13",
           "variant": "p2",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 1948.92,
+            "lastUpdated": "2026-02-08T06:31:38.673Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657402/MonkeyDLuffy 118 Super Alternate Art",
+            "tcgplayerProductId": 657402
+          }
         },
         {
           "id": "OP13-118_p3",
@@ -50982,7 +51084,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-118_p3.png?260130",
           "setId": "op-13",
           "variant": "p3",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 8489.98,
+            "lastUpdated": "2026-02-08T06:31:39.191Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657401/MonkeyDLuffy 118 Red Super Alternate Art",
+            "tcgplayerProductId": 657401
+          }
         },
         {
           "id": "OP13-119",
@@ -51005,7 +51113,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-119.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 3.93,
+            "lastUpdated": "2026-02-08T06:31:39.680Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657405/PortgasDAce 119",
+            "tcgplayerProductId": 657405
+          }
         },
         {
           "id": "OP13-119_p1",
@@ -51029,7 +51143,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-119_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 47.32,
+            "lastUpdated": "2026-02-08T06:31:40.158Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657408/PortgasDAce 119 Parallel",
+            "tcgplayerProductId": 657408
+          }
         },
         {
           "id": "OP13-119_p2",
@@ -51053,7 +51173,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-119_p2.png?260130",
           "setId": "op-13",
           "variant": "p2",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 1197.99,
+            "lastUpdated": "2026-02-08T06:31:40.640Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657407/PortgasDAce 119 Super Alternate Art",
+            "tcgplayerProductId": 657407
+          }
         },
         {
           "id": "OP13-119_p3",
@@ -51077,7 +51203,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-119_p3.png?260130",
           "setId": "op-13",
           "variant": "p3",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 4420.37,
+            "lastUpdated": "2026-02-08T06:31:41.100Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657406/PortgasDAce 119 Red Super Alternate Art",
+            "tcgplayerProductId": 657406
+          }
         },
         {
           "id": "OP13-120",
@@ -51101,7 +51233,13 @@
           "trigger": null,
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-120.png?260130",
           "setId": "op-13",
-          "isParallel": false
+          "isParallel": false,
+          "price": {
+            "marketPrice": 7.23,
+            "lastUpdated": "2026-02-08T06:31:41.566Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657410/Sabo 120",
+            "tcgplayerProductId": 657410
+          }
         },
         {
           "id": "OP13-120_p1",
@@ -51126,7 +51264,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-120_p1.png?260130",
           "setId": "op-13",
           "variant": "p1",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 39.89,
+            "lastUpdated": "2026-02-08T06:31:42.014Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657413/Sabo 120 Parallel",
+            "tcgplayerProductId": 657413
+          }
         },
         {
           "id": "OP13-120_p2",
@@ -51151,7 +51295,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-120_p2.png?260130",
           "setId": "op-13",
           "variant": "p2",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 850.14,
+            "lastUpdated": "2026-02-08T06:31:42.441Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657412/Sabo 120 Super Alternate Art",
+            "tcgplayerProductId": 657412
+          }
         },
         {
           "id": "OP13-120_p3",
@@ -51176,7 +51326,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-120_p3.png?260130",
           "setId": "op-13",
           "variant": "p3",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 4749.98,
+            "lastUpdated": "2026-02-08T06:31:42.907Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657411/Sabo 120 Red Super Alternate Art",
+            "tcgplayerProductId": 657411
+          }
         },
         {
           "id": "EB02-028_p1",
@@ -51204,7 +51360,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 268.81,
-            "lastUpdated": "2026-02-08T03:59:37.472Z",
+            "lastUpdated": "2026-02-08T06:31:43.324Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/654923/PortgasDAce EB02 028 SP",
             "tcgplayerProductId": 654923
           }
@@ -51235,7 +51391,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 93.44,
-            "lastUpdated": "2026-02-08T03:59:37.910Z",
+            "lastUpdated": "2026-02-08T06:31:43.755Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/655081/Lilith OP07 111 SP",
             "tcgplayerProductId": 655081
           }
@@ -51265,7 +51421,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 183.95,
-            "lastUpdated": "2026-02-08T03:59:38.343Z",
+            "lastUpdated": "2026-02-08T06:31:44.213Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/655082/Sabo OP07 118 SP",
             "tcgplayerProductId": 655082
           }
@@ -51295,10 +51451,10 @@
           "variant": "p5",
           "isParallel": true,
           "price": {
-            "marketPrice": 0.48,
-            "lastUpdated": "2026-02-08T03:59:38.786Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/656025/Shanks OP09 004 Reprint",
-            "tcgplayerProductId": 656025
+            "marketPrice": 27.97,
+            "lastUpdated": "2026-02-08T06:31:44.667Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/596926/Shanks 004 Alternate Art",
+            "tcgplayerProductId": 596926
           }
         },
         {
@@ -51326,10 +51482,10 @@
           "variant": "p6",
           "isParallel": true,
           "price": {
-            "marketPrice": 0.48,
-            "lastUpdated": "2026-02-08T03:59:39.214Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/656025/Shanks OP09 004 Reprint",
-            "tcgplayerProductId": 656025
+            "marketPrice": 27.97,
+            "lastUpdated": "2026-02-08T06:31:45.151Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/596926/Shanks 004 Alternate Art",
+            "tcgplayerProductId": 596926
           }
         },
         {
@@ -51382,7 +51538,7 @@
           "isParallel": true,
           "price": {
             "marketPrice": 293.39,
-            "lastUpdated": "2026-02-08T03:59:40.068Z",
+            "lastUpdated": "2026-02-08T06:31:46.470Z",
             "tcgplayerUrl": "https://www.tcgplayer.com/product/657446/GolDRoger OP09 118 SP Wanted Poster",
             "tcgplayerProductId": 657446
           }
@@ -51411,10 +51567,10 @@
           "variant": "p3",
           "isParallel": true,
           "price": {
-            "marketPrice": 575.13,
-            "lastUpdated": "2026-02-08T03:59:40.498Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/657448/MonkeyDLuffy OP09 119 SP",
-            "tcgplayerProductId": 657448
+            "marketPrice": 53.45,
+            "lastUpdated": "2026-02-08T06:31:46.950Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/597069/MonkeyDLuffy 119 Alternate Art",
+            "tcgplayerProductId": 597069
           }
         },
         {
@@ -51442,10 +51598,10 @@
           "variant": "p2",
           "isParallel": true,
           "price": {
-            "marketPrice": 95.8,
-            "lastUpdated": "2026-02-08T03:59:40.931Z",
-            "tcgplayerUrl": "https://www.tcgplayer.com/product/657449/Smoker OP10 030 SP",
-            "tcgplayerProductId": 657449
+            "marketPrice": 15.44,
+            "lastUpdated": "2026-02-08T06:31:47.387Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/617067/Smoker 030 Parallel",
+            "tcgplayerProductId": 617067
           }
         },
         {
@@ -51472,7 +51628,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-118_p4.png?260130",
           "setId": "op-13",
           "variant": "p4",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 473.42,
+            "lastUpdated": "2026-02-08T06:31:47.851Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657404/MonkeyDLuffy 118 Wanted Poster",
+            "tcgplayerProductId": 657404
+          }
         },
         {
           "id": "OP13-119_p4",
@@ -51496,7 +51658,13 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-119_p4.png?260130",
           "setId": "op-13",
           "variant": "p4",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 688.48,
+            "lastUpdated": "2026-02-08T06:31:48.308Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657409/PortgasDAce 119 Wanted Poster",
+            "tcgplayerProductId": 657409
+          }
         },
         {
           "id": "OP13-120_p4",
@@ -51521,10 +51689,16 @@
           "imageUrl": "https://en.onepiece-cardgame.com/images/cardlist/card/OP13-120_p4.png?260130",
           "setId": "op-13",
           "variant": "p4",
-          "isParallel": true
+          "isParallel": true,
+          "price": {
+            "marketPrice": 160.18,
+            "lastUpdated": "2026-02-08T06:31:48.742Z",
+            "tcgplayerUrl": "https://www.tcgplayer.com/product/657414/Sabo 120 Wanted Poster",
+            "tcgplayerProductId": 657414
+          }
         }
       ]
     }
   ],
-  "lastUpdated": "2026-02-08T03:59:42.633Z"
+  "lastUpdated": "2026-02-08T06:31:48.998Z"
 }
