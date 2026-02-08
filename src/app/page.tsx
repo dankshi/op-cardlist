@@ -14,7 +14,8 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  const sets = getAllSets().sort((a, b) => b.id.localeCompare(a.id));
+  // Sort by release date (newest first), already sorted in cards.json
+  const sets = getAllSets();
   const lastUpdated = getLastUpdated();
   const totalCards = sets.reduce((sum, set) => sum + set.cardCount, 0);
   const setImages = getAllSetImages();
