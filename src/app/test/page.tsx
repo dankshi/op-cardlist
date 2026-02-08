@@ -30,6 +30,7 @@ export default function TestPage() {
   const [cards, setCards] = useState<CardWithPrice[]>([]);
   const [prices, setPrices] = useState<Record<string, CardPrice>>({});
   const [mappings, setMappings] = useState<Record<string, CardMapping>>({});
+  const [artStyleChanges, setArtStyleChanges] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<'all' | 'with-price' | 'has-variants' | 'mapped' | 'unmapped'>('has-variants');
   const [selectedSet, setSelectedSet] = useState<string>('all');
   const [sets, setSets] = useState<string[]>([]);
@@ -64,7 +65,25 @@ export default function TestPage() {
     if (savedMappings) {
       setMappings(JSON.parse(savedMappings));
     }
+
+    const savedArtStyles = localStorage.getItem('artstyle-changes');
+    if (savedArtStyles) {
+      setArtStyleChanges(JSON.parse(savedArtStyles));
+    }
   }, []);
+
+  // Toggle manga status for a card
+  const toggleManga = (cardId: string, currentArtStyle: string) => {
+    const newArtStyle = currentArtStyle === 'manga' ? 'alternate' : 'manga';
+    const newChanges = { ...artStyleChanges, [cardId]: newArtStyle };
+    setArtStyleChanges(newChanges);
+    localStorage.setItem('artstyle-changes', JSON.stringify(newChanges));
+  };
+
+  // Get effective art style (considering pending changes)
+  const getEffectiveArtStyle = (card: CardWithPrice): string => {
+    return artStyleChanges[card.id] || card.artStyle || 'standard';
+  };
 
   // Group cards by baseId
   const cardGroups = useMemo(() => {
@@ -235,12 +254,20 @@ export default function TestPage() {
   };
 
   const applyMappingsToData = async () => {
-    if (Object.keys(mappings).length === 0) {
-      alert('No mappings to apply.');
+    const hasMappings = Object.keys(mappings).length > 0;
+    const hasArtStyleChanges = Object.keys(artStyleChanges).length > 0;
+
+    if (!hasMappings && !hasArtStyleChanges) {
+      alert('No changes to apply.');
       return;
     }
 
-    if (!confirm(`Apply ${Object.keys(mappings).length} mappings to prices.json?`)) {
+    const confirmMsg = [
+      hasMappings ? `${Object.keys(mappings).length} price mappings` : null,
+      hasArtStyleChanges ? `${Object.keys(artStyleChanges).length} artStyle changes` : null,
+    ].filter(Boolean).join(' and ');
+
+    if (!confirm(`Apply ${confirmMsg}?`)) {
       return;
     }
 
@@ -251,18 +278,26 @@ export default function TestPage() {
       const res = await fetch('/api/apply-mappings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mappings }),
+        body: JSON.stringify({ mappings, artStyleChanges }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        setSaveStatus(`Success! Applied ${data.updated} mappings.`);
+        setSaveStatus(`Success! Applied ${data.updated} mappings, ${data.artStyleUpdated} artStyle changes.`);
+        // Refresh prices
         const pricesRes = await fetch('/api/prices');
         const pricesData = await pricesRes.json();
         setPrices(pricesData.prices || {});
+        // Refresh cards to get updated artStyles
+        const cardsRes = await fetch('/api/cards');
+        const cardsData = await cardsRes.json();
+        setCards(cardsData.cards || []);
+        // Clear local state
         setMappings({});
+        setArtStyleChanges({});
         localStorage.removeItem('tcgplayer-mappings');
+        localStorage.removeItem('artstyle-changes');
       } else {
         setSaveStatus(`Error: ${data.error}`);
       }
@@ -311,10 +346,10 @@ export default function TestPage() {
         <div className="flex gap-3 mb-6">
           <button
             onClick={applyMappingsToData}
-            disabled={saving || Object.keys(mappings).length === 0}
+            disabled={saving || (Object.keys(mappings).length === 0 && Object.keys(artStyleChanges).length === 0)}
             className="px-6 py-3 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-lg text-lg font-medium"
           >
-            {saving ? 'Saving...' : `Save ${Object.keys(mappings).length} Fixes to Database`}
+            {saving ? 'Saving...' : `Save ${Object.keys(mappings).length + Object.keys(artStyleChanges).length} Changes`}
           </button>
           <button
             onClick={exportMappings}
@@ -567,16 +602,21 @@ export default function TestPage() {
                       {/* Card ID and Type */}
                       <div className="text-center mb-3">
                         <div className="text-lg font-mono font-bold">{card.id}</div>
-                        {card.isParallel && (
-                          <span className={`inline-block mt-1 px-3 py-1 rounded text-sm font-bold ${
-                            card.artStyle === 'manga' ? 'bg-pink-500 text-black' :
-                            card.artStyle === 'wanted' ? 'bg-orange-500 text-black' :
-                            'bg-amber-500 text-black'
-                          }`}>
-                            {card.artStyle === 'manga' ? 'MANGA VERSION' :
-                             card.artStyle === 'wanted' ? 'WANTED POSTER' : 'ALTERNATE ART'}
-                          </span>
-                        )}
+                        {card.isParallel && (() => {
+                          const effectiveStyle = getEffectiveArtStyle(card);
+                          const hasChange = artStyleChanges[card.id];
+                          return (
+                            <span className={`inline-block mt-1 px-3 py-1 rounded text-sm font-bold ${
+                              effectiveStyle === 'manga' ? 'bg-pink-500 text-black' :
+                              effectiveStyle === 'wanted' ? 'bg-orange-500 text-black' :
+                              'bg-amber-500 text-black'
+                            } ${hasChange ? 'ring-2 ring-white' : ''}`}>
+                              {effectiveStyle === 'manga' ? 'MANGA VERSION' :
+                               effectiveStyle === 'wanted' ? 'WANTED POSTER' : 'ALTERNATE ART'}
+                              {hasChange && ' (changed)'}
+                            </span>
+                          );
+                        })()}
                         {!card.isParallel && (
                           <span className="inline-block mt-1 px-3 py-1 rounded text-sm font-bold bg-zinc-600">
                             STANDARD
@@ -648,6 +688,20 @@ export default function TestPage() {
                             }`}
                           >
                             {isActive ? 'Now click a product below ↓' : 'Select to Fix This'}
+                          </button>
+                        )}
+
+                        {/* Manga toggle - only for parallel cards */}
+                        {card.isParallel && (
+                          <button
+                            onClick={() => toggleManga(card.id, getEffectiveArtStyle(card))}
+                            className={`w-full py-2 rounded-lg font-medium ${
+                              getEffectiveArtStyle(card) === 'manga'
+                                ? 'bg-pink-600 hover:bg-pink-500 text-white'
+                                : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'
+                            }`}
+                          >
+                            {getEffectiveArtStyle(card) === 'manga' ? '✓ Marked as Manga' : 'Mark as Manga'}
                           </button>
                         )}
                       </div>
