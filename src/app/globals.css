@@ -69,3 +69,47 @@ img[data-loaded="false"] {
 .light::-webkit-scrollbar-thumb:hover {
   background: #71717a;
 }
+
+/* 3D Card Preview Effects */
+@property --glare-angle {
+  syntax: '<number>';
+  initial-value: 0;
+  inherits: false;
+}
+
+/* Animated holographic shimmer for idle state */
+@keyframes holo-shimmer {
+  0% { --glare-angle: 0; }
+  100% { --glare-angle: 360; }
+}
+
+.holo-animated {
+  animation: holo-shimmer 8s linear infinite;
+}
+
+/* Card entrance animation */
+@keyframes card-entrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) rotateX(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotateX(0deg);
+  }
+}
+
+.card-3d-enter {
+  animation: card-entrance 0.4s ease-out forwards;
+}
+
+/* Disable all 3D effects for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .holo-animated {
+    animation: none !important;
+  }
+
+  .card-3d-enter {
+    animation: none !important;
+  }
+}

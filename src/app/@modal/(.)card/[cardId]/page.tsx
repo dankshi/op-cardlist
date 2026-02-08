@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useCallback, useState } from "react";
-import Image from "next/image";
 import { getCardById } from "@/lib/cards";
 import type { Card } from "@/types/card";
 import { use } from "react";
+import { Card3DPreview } from "@/components/card/Card3DPreview";
 
 interface PageProps {
   params: Promise<{ cardId: string }>;
@@ -27,7 +27,7 @@ export default function CardModal({ params }: PageProps) {
 
   useEffect(() => {
     const foundCard = getCardById(cardId.toUpperCase());
-    setCard(foundCard);
+    setCard(foundCard ?? null);
   }, [cardId]);
 
   const handleClose = useCallback(() => {
@@ -91,19 +91,13 @@ export default function CardModal({ params }: PageProps) {
         </button>
 
         <div className="flex flex-col md:flex-row max-h-[90vh]">
-          {/* Card Image - Left Side */}
+          {/* Card Image - Left Side with 3D Preview */}
           <div className="flex-shrink-0 bg-zinc-950 light:bg-zinc-100 p-4 md:p-6 flex items-center justify-center md:w-[340px] lg:w-[400px]">
-            <div className="relative w-[200px] h-[280px] md:w-[280px] md:h-[392px] lg:w-[320px] lg:h-[448px]">
-              <Image
-                src={card.imageUrl}
-                alt={card.name}
-                fill
-                sizes="(max-width: 768px) 200px, 320px"
-                className="object-contain rounded-lg"
-                priority
-                unoptimized
-              />
-            </div>
+            <Card3DPreview
+              card={card}
+              className="w-[200px] h-[280px] md:w-[280px] md:h-[392px] lg:w-[320px] lg:h-[448px]"
+              priority
+            />
           </div>
 
           {/* Card Details - Right Side */}
