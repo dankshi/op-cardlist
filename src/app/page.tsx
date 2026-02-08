@@ -1,6 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
-import { getAllSets, getLastUpdated } from "@/lib/cards";
+import { getAllSets, getLastUpdated, getAllSetImages } from "@/lib/cards";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, BASE_KEYWORDS } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function Home() {
   const sets = getAllSets().sort((a, b) => b.id.localeCompare(a.id));
   const lastUpdated = getLastUpdated();
   const totalCards = sets.reduce((sum, set) => sum + set.cardCount, 0);
+  const setImages = getAllSetImages();
 
   return (
     <div>
@@ -39,28 +41,38 @@ export default function Home() {
 
       <section>
         <h2 className="text-2xl font-semibold mb-6">All Sets</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sets.map((set) => (
-            <Link
-              key={set.id}
-              href={`/${set.id}`}
-              className="block p-6 bg-zinc-900 light:bg-white rounded-lg border border-zinc-800 light:border-zinc-200 hover:border-zinc-700 light:hover:border-zinc-300 hover:bg-zinc-800/50 light:hover:bg-zinc-50 transition-all group"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-lg group-hover:text-red-400 transition-colors">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {sets.map((set) => {
+            const setImage = setImages[set.id];
+            return (
+              <Link
+                key={set.id}
+                href={`/${set.id}`}
+                className="block bg-zinc-900 light:bg-white rounded-lg border border-zinc-800 light:border-zinc-200 hover:border-zinc-700 light:hover:border-zinc-300 hover:bg-zinc-800/50 light:hover:bg-zinc-50 transition-all group overflow-hidden"
+              >
+                {setImage?.boosterBoxImageUrl && (
+                  <div className="relative w-full aspect-[4/3] bg-white">
+                    <img
+                      src={setImage.boosterBoxImageUrl}
+                      alt={`${set.name} Booster Box`}
+                      className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                )}
+                <div className="p-3">
+                  <h3 className="font-semibold text-sm group-hover:text-red-400 transition-colors">
                     {set.id.toUpperCase()}
                   </h3>
-                  <p className="text-zinc-400 light:text-zinc-600 text-sm mt-1 line-clamp-2">
+                  <p className="text-zinc-400 light:text-zinc-600 text-xs mt-0.5 line-clamp-1">
                     {set.name}
                   </p>
+                  <span className="text-zinc-500 text-xs mt-1 block">
+                    {set.cardCount} cards
+                  </span>
                 </div>
-                <span className="text-zinc-500 text-sm bg-zinc-800 light:bg-zinc-100 px-2 py-1 rounded">
-                  {set.cardCount} cards
-                </span>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </section>
 

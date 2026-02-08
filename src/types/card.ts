@@ -50,3 +50,17 @@ export interface CardDatabase {
   sets: CardSet[];
   lastUpdated: string;
 }
+
+export interface SetImageData {
+  setId: string;
+  setName: string;
+  boosterBoxImageUrl: string | null;
+  tcgplayerUrl: string | null;
+  tcgplayerProductId: number | null;
+  lastUpdated: string;
+}
+
+export interface SetImagesDatabase {
+  sets: Record<string, SetImageData>;
+  lastUpdated: string;
+}

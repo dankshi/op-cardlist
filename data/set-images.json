@@ -1,0 +1,149 @@
+{
+  "sets": {
+    "op-13": {
+      "setId": "op-13",
+      "setName": "Carrying on His Will",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/628352_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/628352/Carrying On His Will Booster Box",
+      "tcgplayerProductId": 628352,
+      "lastUpdated": "2026-02-08T07:45:31.126Z"
+    },
+    "op-01": {
+      "setId": "op-01",
+      "setName": "Romance Dawn",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/557280_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/557280/Romance Dawn Booster Box Wave 2 White",
+      "tcgplayerProductId": 557280,
+      "lastUpdated": "2026-02-08T07:45:23.231Z"
+    },
+    "op-02": {
+      "setId": "op-02",
+      "setName": "Paramount War",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/455866_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/455866/Paramount War Booster Box",
+      "tcgplayerProductId": 455866,
+      "lastUpdated": "2026-02-08T07:45:23.730Z"
+    },
+    "op-03": {
+      "setId": "op-03",
+      "setName": "Pillars of Strength",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/477176_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/477176/Pillars of Strength Booster Box",
+      "tcgplayerProductId": 477176,
+      "lastUpdated": "2026-02-08T07:45:24.554Z"
+    },
+    "op-04": {
+      "setId": "op-04",
+      "setName": "Kingdoms of Intrigue",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/485833_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/485833/Kingdoms of Intrigue Booster Box",
+      "tcgplayerProductId": 485833,
+      "lastUpdated": "2026-02-08T07:45:25.358Z"
+    },
+    "op-05": {
+      "setId": "op-05",
+      "setName": "Awakening of the New Era",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/498734_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/498734/Awakening of the New Era Booster Box",
+      "tcgplayerProductId": 498734,
+      "lastUpdated": "2026-02-08T07:45:26.001Z"
+    },
+    "op-06": {
+      "setId": "op-06",
+      "setName": "Wings of the Captain",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/515080_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/515080/Wings of the Captain Booster Box",
+      "tcgplayerProductId": 515080,
+      "lastUpdated": "2026-02-08T07:45:26.688Z"
+    },
+    "op-07": {
+      "setId": "op-07",
+      "setName": "500 Years in the Future",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/532106_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/532106/500 Years in the Future Booster Box",
+      "tcgplayerProductId": 532106,
+      "lastUpdated": "2026-02-08T07:45:27.371Z"
+    },
+    "op-08": {
+      "setId": "op-08",
+      "setName": "Two Legends",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/542504_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/542504/Two Legends Booster Box",
+      "tcgplayerProductId": 542504,
+      "lastUpdated": "2026-02-08T07:45:27.867Z"
+    },
+    "op-09": {
+      "setId": "op-09",
+      "setName": "Emperors in the New World",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/563834_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/563834/Emperors in the New World Booster Box",
+      "tcgplayerProductId": 563834,
+      "lastUpdated": "2026-02-08T07:45:28.572Z"
+    },
+    "op-10": {
+      "setId": "op-10",
+      "setName": "Royal Blood",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/586671_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/586671/Royal Blood Booster Box",
+      "tcgplayerProductId": 586671,
+      "lastUpdated": "2026-02-08T07:45:29.063Z"
+    },
+    "op-12": {
+      "setId": "op-12",
+      "setName": "A Fist of Divine Speed",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/620180_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/620180/A Fist of Divine Speed Booster Box",
+      "tcgplayerProductId": 620180,
+      "lastUpdated": "2026-02-08T07:45:30.453Z"
+    },
+    "eb-01": {
+      "setId": "eb-01",
+      "setName": "Memorial Collection",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/521161_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/521161/Memorial Collection Booster Box",
+      "tcgplayerProductId": 521161,
+      "lastUpdated": "2026-02-08T07:45:31.817Z"
+    },
+    "eb-04": {
+      "setId": "eb-04",
+      "setName": "Azure Sea Seven",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/665598_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/665598/The Azure Seas Seven Booster Box",
+      "tcgplayerProductId": 665598,
+      "lastUpdated": "2026-02-08T07:45:33.519Z"
+    },
+    "prb-01": {
+      "setId": "prb-01",
+      "setName": "Premium One Piece Card The Best",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/545399_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/545399/Premium Booster Booster Box",
+      "tcgplayerProductId": 545399,
+      "lastUpdated": "2026-02-08T07:45:34.270Z"
+    },
+    "op-11": {
+      "setId": "op-11",
+      "setName": "Legacy of the Master",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/628346_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/628346/Legacy of the Master Booster Box",
+      "tcgplayerProductId": 628346,
+      "lastUpdated": "2026-02-08T07:45:29.764Z"
+    },
+    "eb-02": {
+      "setId": "eb-02",
+      "setName": "Anime 25th Collection",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/594069_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/594069/Extra Booster Anime 25th Collection Box",
+      "tcgplayerProductId": 594069,
+      "lastUpdated": "2026-02-08T07:45:32.466Z"
+    },
+    "eb-03": {
+      "setId": "eb-03",
+      "setName": "Heroines Edition",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/666891_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/666891/Extra Booster One Piece Heroines Edition Box",
+      "tcgplayerProductId": 666891,
+      "lastUpdated": "2026-02-08T07:45:33.030Z"
+    }
+  },
+  "lastUpdated": "2026-02-08T07:45:34.573Z"
+}
