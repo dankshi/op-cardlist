@@ -28,53 +28,79 @@ Open [http://localhost:3000](http://localhost:3000) to view the site.
 
 ## Scraping Card Data
 
-The card data is scraped from the official One Piece Card Game website.
+The card data is scraped from the official One Piece Card Game website using [Cheerio](https://cheerio.js.org/) for HTML parsing.
 
-### Scrape All Sets (Including Parallel Arts)
+### How It Works
+
+The scraper fetches card data from:
+```
+https://en.onepiece-cardgame.com/cardlist/?series={SERIES_ID}
+```
+
+For each card, it extracts:
+| Field | Description | Example |
+|-------|-------------|---------|
+| `id` | Unique card identifier | `OP13-118` or `OP13-118_p1` |
+| `baseId` | Base card ID (without variant) | `OP13-118` |
+| `name` | Card name | `Monkey.D.Luffy` |
+| `type` | Card type | `LEADER`, `CHARACTER`, `EVENT`, `STAGE` |
+| `colors` | Card color(s) | `["Red"]`, `["Red", "Green"]` |
+| `rarity` | Rarity | `L`, `SEC`, `SP`, `SR`, `R`, `UC`, `C` |
+| `cost` | Play cost (null for leaders) | `6` |
+| `power` | Power value | `7000` |
+| `counter` | Counter value | `1000` or `null` |
+| `life` | Life (leaders only) | `4` |
+| `attribute` | Attack attribute | `Strike`, `Slash`, `Special`, `Wisdom`, `Ranged` |
+| `traits` | Character traits | `["Straw Hat Crew", "Supernovas"]` |
+| `effect` | Card effect text | `[On Play] Draw 2 cards...` |
+| `trigger` | Trigger effect | `Draw 1 card` or `null` |
+| `imageUrl` | Official image URL | `https://en.onepiece-cardgame.com/images/...` |
+| `variant` | Parallel variant | `p1`, `p2`, `p3`, `p4` |
+| `isParallel` | Is alternate art | `true` or `false` |
+| `artStyle` | Art style category | `standard`, `alternate`, `wanted`, `manga` |
+
+### Quick Start
 
 ```bash
+# Scrape all sets
 npm run scrape
+
+# Scrape only OP-13
+npm run scrape:op13
+
+# Scrape a specific set by series ID
+npx tsx scripts/scrape.ts 569113
 ```
 
-This scrapes all booster sets (OP-01 through OP-13) and includes:
-- Base cards (e.g., `OP13-118`)
-- Parallel art versions (e.g., `OP13-118_p1`, `OP13-118_p2`, etc.)
-- All rarities: L, SEC, SP, SR, R, UC, C
-
-### Scrape a Single Set
-
-```bash
-npm run scrape:op13    # Scrapes only OP-13
-```
-
-Or pass any series ID directly:
-
-```bash
-npx tsx scripts/scrape.ts 569113   # OP-13
-npx tsx scripts/scrape.ts 569101   # OP-01
-```
+Output is saved to `data/cards.json`.
 
 ### Series IDs Reference
 
-| Set | Series ID |
-|-----|-----------|
-| OP-01 | 569101 |
-| OP-02 | 569102 |
-| OP-03 | 569103 |
-| OP-04 | 569104 |
-| OP-05 | 569105 |
-| OP-06 | 569106 |
-| OP-07 | 569107 |
-| OP-08 | 569108 |
-| OP-09 | 569109 |
-| OP-10 | 569110 |
-| OP-11 | 569111 |
-| OP-12 | 569112 |
-| OP-13 | 569113 |
+| Set | Series ID | How to Find |
+|-----|-----------|-------------|
+| OP-01 | 569101 | URL parameter on official site |
+| OP-02 | 569102 | |
+| OP-03 | 569103 | |
+| OP-04 | 569104 | |
+| OP-05 | 569105 | |
+| OP-06 | 569106 | |
+| OP-07 | 569107 | |
+| OP-08 | 569108 | |
+| OP-09 | 569109 | |
+| OP-10 | 569110 | |
+| OP-11 | 569111 | |
+| OP-12 | 569112 | |
+| OP-13 | 569113 | |
+
+**Finding a new series ID:**
+1. Go to https://en.onepiece-cardgame.com/cardlist/
+2. Select the set from the dropdown
+3. Look at the URL: `?series=XXXXXX`
+4. The number after `series=` is the series ID
 
 ### Adding New Sets
 
-When a new set releases, add its series ID to `scripts/scrape.ts`:
+Edit `scripts/scrape.ts` and add to the `SETS` object:
 
 ```typescript
 const SETS: Record<string, { id: string; name: string }> = {
@@ -83,19 +109,29 @@ const SETS: Record<string, { id: string; name: string }> = {
 };
 ```
 
-Then run `npm run scrape` to fetch all cards.
+Then run:
+```bash
+npm run scrape
+```
 
-### Adding Special Art Cards (Wanted/Manga)
+### Special Art Detection (Wanted/Manga)
 
-The scraper detects special art styles (Wanted poster art, Manga art) using known card ID lists in `scripts/scrape.ts`:
+The scraper categorizes parallel cards into art styles:
+- **standard** - Base card artwork
+- **alternate** - Regular parallel/alternate art
+- **wanted** - Wanted poster style art
+- **manga** - Manga panel style art
+
+Since art styles can't be auto-detected from the website, they're identified by card ID in `scripts/scrape.ts`:
 
 ```typescript
 // Known wanted poster cards
 const WANTED_CARDS = new Set<string>([
   'OP01-016_p4',
+  'OP03-112_p4',
+  'OP05-067_p4',
   'OP13-118_p4',
   'OP13-119_p4',
-  // Add more card IDs here
 ]);
 
 // Known manga art cards
@@ -104,7 +140,20 @@ const MANGA_CARDS = new Set<string>([
 ]);
 ```
 
-After adding new IDs, re-run `npm run scrape` to update the data.
+**To add new special art cards:**
+1. Find the card ID (e.g., `OP09-011_p3`)
+2. Add it to `WANTED_CARDS` or `MANGA_CARDS` in `scripts/scrape.ts`
+3. Run `npm run scrape` to update
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Missing cards | Check if the official site has them listed |
+| Missing parallels | Parallels use `_p1`, `_p2` suffixes in their ID |
+| Wrong art style | Add card ID to `WANTED_CARDS` or `MANGA_CARDS` |
+| Fetch errors | Check internet connection, official site may be down |
+| Rate limiting | Scraper has 500ms delay between sets |
 
 ## Data Structure
 
