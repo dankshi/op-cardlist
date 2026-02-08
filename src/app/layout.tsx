@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
-import Image from "next/image";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -23,10 +22,6 @@ export const metadata: Metadata = {
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
-  icons: {
-    icon: "/favicon.svg",
-    apple: "/logo.svg",
-  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -99,9 +94,10 @@ export default function RootLayout({
         <ThemeProvider>
           <header className="border-b border-zinc-800 dark:border-zinc-800 light:border-zinc-200 sticky top-0 bg-zinc-950/95 dark:bg-zinc-950/95 light:bg-white/95 backdrop-blur z-50">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-              <Link href="/" className="flex items-center gap-2 text-xl font-bold text-white dark:text-white light:text-zinc-900 hover:text-red-400 transition-colors">
-                <Image src="/favicon.svg" alt="OP Card List Logo" width={32} height={32} className="rounded" />
-                OP Card List
+              <Link href="/" className="group flex items-baseline gap-0.5 hover:opacity-90 transition-opacity">
+                <span className="text-2xl font-black italic text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]">OP</span>
+                <span className="text-xl font-bold text-white dark:text-white light:text-zinc-900 tracking-tight">Card</span>
+                <span className="text-xl font-bold text-zinc-400 dark:text-zinc-400 light:text-zinc-500 tracking-tight">list</span>
               </Link>
               <div className="flex items-center gap-4">
                 <Link href="/" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors">
