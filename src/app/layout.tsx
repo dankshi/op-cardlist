@@ -103,6 +103,10 @@ export default function RootLayout({
                 <Link href="/" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors">
                   Sets
                 </Link>
+                <Link href="/hot" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors flex items-center gap-1">
+                  <span className="text-orange-400">🔥</span>
+                  Hot
+                </Link>
                 <ThemeToggle />
               </div>
             </nav>

@@ -90,11 +90,11 @@
     },
     "op-12": {
       "setId": "op-12",
-      "setName": "A Fist of Divine Speed",
-      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/620180_400w.jpg",
-      "tcgplayerUrl": "https://www.tcgplayer.com/product/620180/A Fist of Divine Speed Booster Box",
-      "tcgplayerProductId": 620180,
-      "lastUpdated": "2026-02-08T07:45:30.453Z"
+      "setName": "Legacy of the Master",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/628346_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/628346/Legacy of the Master Booster Box",
+      "tcgplayerProductId": 628346,
+      "lastUpdated": "2026-02-08T08:58:40.874Z"
     },
     "eb-01": {
       "setId": "eb-01",
@@ -104,8 +104,8 @@
       "tcgplayerProductId": 521161,
       "lastUpdated": "2026-02-08T07:45:31.817Z"
     },
-    "eb-04": {
-      "setId": "eb-04",
+    "op14-eb04": {
+      "setId": "op14-eb04",
       "setName": "Azure Sea Seven",
       "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/665598_400w.jpg",
       "tcgplayerUrl": "https://www.tcgplayer.com/product/665598/The Azure Seas Seven Booster Box",
@@ -122,11 +122,11 @@
     },
     "op-11": {
       "setId": "op-11",
-      "setName": "Legacy of the Master",
-      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/628346_400w.jpg",
-      "tcgplayerUrl": "https://www.tcgplayer.com/product/628346/Legacy of the Master Booster Box",
-      "tcgplayerProductId": 628346,
-      "lastUpdated": "2026-02-08T07:45:29.764Z"
+      "setName": "A Fist of Divine Speed",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/620180_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/620180/A Fist of Divine Speed Booster Box",
+      "tcgplayerProductId": 620180,
+      "lastUpdated": "2026-02-08T08:58:40.874Z"
     },
     "eb-02": {
       "setId": "eb-02",

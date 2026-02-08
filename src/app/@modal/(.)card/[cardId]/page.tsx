@@ -6,6 +6,7 @@ import { getCardById } from "@/lib/cards";
 import type { Card } from "@/types/card";
 import { use } from "react";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
+import { ShareButtons } from "@/components/ShareButtons";
 
 interface PageProps {
   params: Promise<{ cardId: string }>;
@@ -176,48 +177,37 @@ export default function CardModal({ params }: PageProps) {
               </div>
             )}
 
-            {/* Price Section */}
-            {card.price && (card.price.marketPrice != null || card.price.tcgplayerUrl) && (
-              <div className="p-4 bg-zinc-800/50 light:bg-zinc-100 rounded-lg border border-zinc-700/50 light:border-zinc-200">
+            {/* Price */}
+            {card.price?.marketPrice != null && (
+              <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <h3 className="text-xs text-green-400 uppercase tracking-wide mb-1">TCGPlayer Price</h3>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-6">
-                    {card.price.marketPrice != null && (
-                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Market Price</p>
-                        <p className="text-2xl font-bold text-green-400">${card.price.marketPrice.toFixed(2)}</p>
-                      </div>
-                    )}
-                    {card.price.lowPrice != null && (
-                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Low</p>
-                        <p className="text-lg font-semibold">${card.price.lowPrice.toFixed(2)}</p>
-                      </div>
-                    )}
-                    {card.price.highPrice != null && (
-                      <div>
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wide">High</p>
-                        <p className="text-lg font-semibold">${card.price.highPrice.toFixed(2)}</p>
-                      </div>
-                    )}
-                  </div>
+                  <span className="text-xl font-bold text-green-400">${card.price.marketPrice.toFixed(2)}</span>
                   {card.price.tcgplayerUrl && (
                     <a
                       href={card.price.tcgplayerUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors"
+                      className="text-xs text-green-400 hover:text-green-300 underline"
                     >
-                      Buy on TCGPlayer
+                      View on TCGPlayer
                     </a>
                   )}
                 </div>
-                {card.price.lastUpdated && (
-                  <p className="text-[10px] text-zinc-500 mt-2">
-                    Updated {new Date(card.price.lastUpdated).toLocaleDateString()}
+                {(card.price.lowPrice != null || card.price.highPrice != null) && (
+                  <p className="text-xs text-zinc-500 mt-1">
+                    {card.price.lowPrice != null && `Low: $${card.price.lowPrice.toFixed(2)}`}
+                    {card.price.lowPrice != null && card.price.highPrice != null && ' • '}
+                    {card.price.highPrice != null && `High: $${card.price.highPrice.toFixed(2)}`}
                   </p>
                 )}
               </div>
             )}
+
+            {/* Share Buttons */}
+            <div className="mb-4">
+              <ShareButtons card={card} />
+            </div>
 
             {/* Set Info */}
             <div className="mt-4 pt-4 border-t border-zinc-800 light:border-zinc-200">

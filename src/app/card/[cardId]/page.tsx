@@ -4,6 +4,7 @@ import { getCardById, getAllCards } from "@/lib/cards";
 import CardModalClient from "./CardModalClient";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
+import { ShareButtons } from "@/components/ShareButtons";
 
 interface PageProps {
   params: Promise<{ cardId: string }>;
@@ -29,7 +30,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const setUpper = card.setId.toUpperCase();
   const pageUrl = `${SITE_URL}/card/${card.id.toLowerCase()}`;
 
-  // Build comprehensive description
+  // Build comprehensive description with price for virality
+  const price = card.price?.marketPrice;
+  const priceText = price != null
+    ? price >= 1000
+      ? `$${(price / 1000).toFixed(1)}k`
+      : `$${price.toFixed(2)}`
+    : null;
+
   const stats = [
     card.type,
     card.power ? `${card.power} Power` : null,
@@ -37,36 +45,36 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     card.counter ? `+${card.counter} Counter` : null,
   ].filter(Boolean).join(' | ');
 
-  const priceInfo = card.price?.marketPrice != null
-    ? ` Market price: $${card.price.marketPrice.toFixed(2)}.`
-    : '';
+  const pricePrefix = priceText ? `${priceText} - ` : '';
+  const description = `${pricePrefix}${card.name} (${card.id}) from ${setUpper}. ${stats}. ${card.effect.slice(0, 100)}...`;
 
-  const description = `${card.name} (${card.id}) from ${setUpper}. ${stats}.${priceInfo} ${card.effect.slice(0, 120)}...`;
+  // Dynamic OG image with price overlay
+  const ogImageUrl = `${SITE_URL}/api/og/${card.id.toLowerCase()}`;
 
   return {
     title: `${card.name} (${card.id}) - ${setUpper} | One Piece TCG`,
     description,
     keywords: getCardKeywords(card.name, card.id, card.setId),
     openGraph: {
-      title: `${card.name} - ${card.id} | One Piece TCG Card`,
-      description: `${stats}.${priceInfo} ${card.effect.slice(0, 150)}`,
+      title: priceText ? `${card.name} - ${priceText}` : `${card.name} - ${card.id}`,
+      description: `${stats}. ${card.effect.slice(0, 150)}`,
       url: pageUrl,
       siteName: SITE_NAME,
       type: "website",
       images: [
         {
-          url: card.imageUrl,
-          width: 245,
-          height: 342,
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
           alt: `${card.name} - ${card.id} One Piece TCG Card`,
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${card.name} (${card.id}) - One Piece TCG`,
-      description: `${stats}.${priceInfo}`,
-      images: [card.imageUrl],
+      title: priceText ? `${card.name} - ${priceText}` : `${card.name} (${card.id})`,
+      description: priceText ? `Currently at ${priceText}! ${stats}` : stats,
+      images: [ogImageUrl],
     },
     alternates: {
       canonical: pageUrl,
@@ -179,48 +187,37 @@ export default async function CardPage({ params }: PageProps) {
                 </div>
               )}
 
-              {/* Price Section */}
-              {card.price && (card.price.marketPrice != null || card.price.tcgplayerUrl) && (
-                <div className="p-4 bg-zinc-800/50 light:bg-zinc-100 rounded-lg border border-zinc-700/50 light:border-zinc-200">
+              {/* Price */}
+              {card.price?.marketPrice != null && (
+                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <h3 className="text-xs text-green-400 uppercase tracking-wide mb-1">TCGPlayer Price</h3>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      {card.price.marketPrice != null && (
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Market Price</p>
-                          <p className="text-2xl font-bold text-green-400">${card.price.marketPrice.toFixed(2)}</p>
-                        </div>
-                      )}
-                      {card.price.lowPrice != null && (
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Low</p>
-                          <p className="text-lg font-semibold">${card.price.lowPrice.toFixed(2)}</p>
-                        </div>
-                      )}
-                      {card.price.highPrice != null && (
-                        <div>
-                          <p className="text-[10px] text-zinc-500 uppercase tracking-wide">High</p>
-                          <p className="text-lg font-semibold">${card.price.highPrice.toFixed(2)}</p>
-                        </div>
-                      )}
-                    </div>
+                    <span className="text-xl font-bold text-green-400">${card.price.marketPrice.toFixed(2)}</span>
                     {card.price.tcgplayerUrl && (
                       <a
                         href={card.price.tcgplayerUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors"
+                        className="text-xs text-green-400 hover:text-green-300 underline"
                       >
-                        Buy on TCGPlayer
+                        View on TCGPlayer
                       </a>
                     )}
                   </div>
-                  {card.price.lastUpdated && (
-                    <p className="text-[10px] text-zinc-500 mt-2">
-                      Updated {new Date(card.price.lastUpdated).toLocaleDateString()}
+                  {(card.price.lowPrice != null || card.price.highPrice != null) && (
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {card.price.lowPrice != null && `Low: $${card.price.lowPrice.toFixed(2)}`}
+                      {card.price.lowPrice != null && card.price.highPrice != null && ' • '}
+                      {card.price.highPrice != null && `High: $${card.price.highPrice.toFixed(2)}`}
                     </p>
                   )}
                 </div>
               )}
+
+              {/* Share Buttons */}
+              <div className="mb-4">
+                <ShareButtons card={card} />
+              </div>
 
               {/* Set Info */}
               <div className="mt-4 pt-4 border-t border-zinc-800 light:border-zinc-200">
@@ -291,21 +288,6 @@ export default async function CardPage({ params }: PageProps) {
                 value: card.colors.join(", "),
               }] : []),
             ],
-            ...(card.price?.marketPrice != null && {
-              offers: {
-                "@type": "AggregateOffer",
-                priceCurrency: "USD",
-                lowPrice: card.price.lowPrice ?? card.price.marketPrice,
-                highPrice: card.price.highPrice ?? card.price.marketPrice,
-                offerCount: 1,
-                availability: "https://schema.org/InStock",
-                url: card.price.tcgplayerUrl,
-                seller: {
-                  "@type": "Organization",
-                  name: "TCGPlayer",
-                },
-              },
-            }),
           }),
         }}
       />

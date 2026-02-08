@@ -91,8 +91,10 @@ export function CardThumbnail({ card }: CardThumbnailProps) {
            'ALT'}
         </span>
       )}
+
+      {/* Price badge */}
       {card.price?.marketPrice != null && (
-        <span className="absolute bottom-1 right-1 z-10 px-1.5 py-0.5 text-xs font-medium bg-black/70 text-green-400 rounded">
+        <span className="absolute bottom-1.5 left-1.5 z-10 px-2 py-1 text-sm font-bold rounded-md bg-green-600 text-white shadow-lg">
           ${card.price.marketPrice.toFixed(2)}
         </span>
       )}

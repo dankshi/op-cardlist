@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import type { Card, CardColor, CardType, Rarity, ArtStyle } from "@/types/card";
+import type { Card, CardColor, CardType, Rarity } from "@/types/card";
 import { CardThumbnail } from "./card/CardThumbnail";
 
 interface CardGridProps {
@@ -28,7 +28,7 @@ const colorClassesSelected: Record<CardColor, string> = {
 const selectedClass = "bg-blue-600 text-white border-blue-600";
 const unselectedClass = "bg-zinc-800 dark:bg-zinc-800 light:bg-zinc-100 text-zinc-400 dark:text-zinc-400 light:text-zinc-600 border-zinc-700 dark:border-zinc-700 light:border-zinc-300 hover:border-zinc-500 dark:hover:border-zinc-500 light:hover:border-zinc-400";
 
-type SortOption = 'price-desc' | 'price-asc' | 'name-asc' | 'id-asc';
+type SortOption = 'price-desc' | 'name-asc' | 'id-asc';
 
 export default function CardGrid({ cards, setId }: CardGridProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,9 +36,7 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
   const [selectedTypes, setSelectedTypes] = useState<CardType[]>([]);
   const [selectedRarities, setSelectedRarities] = useState<Rarity[]>([]);
   const [artFilter, setArtFilter] = useState<'all' | 'base' | 'parallels'>('all');
-  const [selectedArtStyles, setSelectedArtStyles] = useState<ArtStyle[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>('price-desc');
-  const [priceFilter, setPriceFilter] = useState<'all' | 'has-price'>('all');
 
   const filteredCards = useMemo(() => {
     const filtered = cards.filter((card) => {
@@ -77,19 +75,6 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
         return false;
       }
 
-      // Art style filter (wanted, manga, etc.)
-      if (selectedArtStyles.length > 0) {
-        const cardArtStyle = card.artStyle || (card.isParallel ? 'alternate' : 'standard');
-        if (!selectedArtStyles.includes(cardArtStyle)) {
-          return false;
-        }
-      }
-
-      // Price filter
-      if (priceFilter === 'has-price' && card.price?.marketPrice == null) {
-        return false;
-      }
-
       return true;
     });
 
@@ -97,13 +82,9 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
     return filtered.sort((a, b) => {
       switch (sortBy) {
         case 'price-desc':
-          const priceA = a.price?.marketPrice ?? -1;
-          const priceB = b.price?.marketPrice ?? -1;
+          const priceA = a.price?.marketPrice ?? 0;
+          const priceB = b.price?.marketPrice ?? 0;
           return priceB - priceA;
-        case 'price-asc':
-          const priceAscA = a.price?.marketPrice ?? Infinity;
-          const priceAscB = b.price?.marketPrice ?? Infinity;
-          return priceAscA - priceAscB;
         case 'name-asc':
           return a.name.localeCompare(b.name);
         case 'id-asc':
@@ -112,7 +93,7 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
           return 0;
       }
     });
-  }, [cards, searchQuery, selectedColors, selectedTypes, selectedRarities, artFilter, selectedArtStyles, sortBy, priceFilter]);
+  }, [cards, searchQuery, selectedColors, selectedTypes, selectedRarities, artFilter, sortBy]);
 
   const toggleFilter = <T,>(
     value: T,
@@ -130,13 +111,11 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
     setSelectedTypes([]);
     setSelectedRarities([]);
     setArtFilter('all');
-    setSelectedArtStyles([]);
     setSortBy('price-desc');
-    setPriceFilter('all');
   };
 
   const hasActiveFilters =
-    searchQuery || selectedColors.length > 0 || selectedTypes.length > 0 || selectedRarities.length > 0 || artFilter !== 'all' || selectedArtStyles.length > 0 || priceFilter !== 'all';
+    searchQuery || selectedColors.length > 0 || selectedTypes.length > 0 || selectedRarities.length > 0 || artFilter !== 'all';
 
   return (
     <div>
@@ -260,60 +239,6 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
             </div>
           </div>
 
-          {/* Special Art Styles */}
-          <div>
-            <h4 className="text-xs font-medium text-zinc-500 uppercase mb-2">Special Art</h4>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => toggleFilter('wanted' as ArtStyle, selectedArtStyles, setSelectedArtStyles)}
-                className={`px-3 py-1 text-sm rounded border transition-all ${
-                  selectedArtStyles.includes('wanted')
-                    ? "bg-orange-500 text-white border-orange-500"
-                    : unselectedClass
-                }`}
-              >
-                Wanted
-              </button>
-              <button
-                onClick={() => toggleFilter('manga' as ArtStyle, selectedArtStyles, setSelectedArtStyles)}
-                className={`px-3 py-1 text-sm rounded border transition-all ${
-                  selectedArtStyles.includes('manga')
-                    ? "bg-pink-500 text-white border-pink-500"
-                    : unselectedClass
-                }`}
-              >
-                Manga
-              </button>
-            </div>
-          </div>
-
-          {/* Price Filter */}
-          <div>
-            <h4 className="text-xs font-medium text-zinc-500 uppercase mb-2">Price</h4>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setPriceFilter('all')}
-                className={`px-3 py-1 text-sm rounded border transition-all ${
-                  priceFilter === 'all'
-                    ? selectedClass
-                    : unselectedClass
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setPriceFilter('has-price')}
-                className={`px-3 py-1 text-sm rounded border transition-all ${
-                  priceFilter === 'has-price'
-                    ? "bg-green-600 text-white border-green-600"
-                    : unselectedClass
-                }`}
-              >
-                Has Price
-              </button>
-            </div>
-          </div>
-
           {/* Sort */}
           <div>
             <h4 className="text-xs font-medium text-zinc-500 uppercase mb-2">Sort By</h4>
@@ -326,17 +251,7 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
                     : unselectedClass
                 }`}
               >
-                Price High
-              </button>
-              <button
-                onClick={() => setSortBy('price-asc')}
-                className={`px-3 py-1 text-sm rounded border transition-all ${
-                  sortBy === 'price-asc'
-                    ? "bg-green-600 text-white border-green-600"
-                    : unselectedClass
-                }`}
-              >
-                Price Low
+                Price
               </button>
               <button
                 onClick={() => setSortBy('name-asc')}

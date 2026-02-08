@@ -38,13 +38,13 @@ const SET_SEARCH_CONFIG: Record<string, { query: string; matchKeyword?: string }
   'op-08': { query: 'Two Legends Booster Box' },
   'op-09': { query: 'Emperors in the New World Booster Box' },
   'op-10': { query: 'Royal Blood Booster Box' },
-  'op-11': { query: 'Legacy of the Master Booster Box', matchKeyword: 'legacy' },
-  'op-12': { query: 'A Fist of Divine Speed Booster Box', matchKeyword: 'divine speed' },
+  'op-11': { query: 'A Fist of Divine Speed Booster Box', matchKeyword: 'divine speed' },
+  'op-12': { query: 'Legacy of the Master Booster Box', matchKeyword: 'legacy' },
   'op-13': { query: 'Carrying on His Will Booster Box' },
   'eb-01': { query: 'Memorial Collection Booster Box' },
   'eb-02': { query: 'Anime 25th Collection Booster Box', matchKeyword: 'anime 25th' },
   'eb-03': { query: 'Heroines Edition Booster Box', matchKeyword: 'heroines' },
-  'eb-04': { query: 'Azure Sea Seven Booster Box' },
+  'op14-eb04': { query: 'Azure Sea Seven Booster Box' },
   'prb-01': { query: 'Premium Booster One Piece Card The Best' },
 };
 

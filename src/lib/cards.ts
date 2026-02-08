@@ -34,17 +34,27 @@ export function getAllSets(): CardSet[] {
   return database.sets;
 }
 
+// Helper to return set with merged prices on cards
+function setWithMergedPrices(set: CardSet): CardSet {
+  return {
+    ...set,
+    cards: set.cards.map(mergePrice),
+  };
+}
+
 export function getSetById(setId: string): CardSet | undefined {
-  return database.sets.find(set => set.id === setId);
+  const set = database.sets.find(set => set.id === setId);
+  return set ? setWithMergedPrices(set) : undefined;
 }
 
 export function getSetBySlug(slug: string): CardSet | undefined {
   // Support both 'op-13' and 'op13' formats
   const normalizedSlug = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return database.sets.find(set => {
+  const set = database.sets.find(set => {
     const normalizedSetId = set.id.toLowerCase().replace(/[^a-z0-9]/g, '');
     return normalizedSetId === normalizedSlug;
   });
+  return set ? setWithMergedPrices(set) : undefined;
 }
 
 export function getAllCards(): Card[] {
