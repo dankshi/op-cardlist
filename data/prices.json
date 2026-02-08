@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-02-08T09:06:08.836Z",
+  "lastUpdated": "2026-02-08T09:23:18.884Z",
   "prices": {
     "EB01-003": {
       "marketPrice": 3.4592,
@@ -4099,10 +4099,10 @@
       "tcgplayerProductId": 530122
     },
     "OP05-119_p2": {
-      "marketPrice": 294.12,
-      "lastUpdated": "2026-02-08T08:18:33.333Z",
-      "tcgplayerUrl": "https://www.tcgplayer.com/product/530122/MonkeyDLuffy 119 Alternate Art",
-      "tcgplayerProductId": 530122
+      "marketPrice": 4692.69,
+      "lastUpdated": "2026-02-08T09:23:18.884Z",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/527026/MonkeyDLuffy 119 Alternate Art Manga",
+      "tcgplayerProductId": 527026
     },
     "ST01-012_p2": {
       "marketPrice": 40.47,
@@ -4423,10 +4423,10 @@
       "tcgplayerProductId": 541659
     },
     "OP06-118_p2": {
-      "marketPrice": 113.65,
-      "lastUpdated": "2026-02-08T08:18:36.168Z",
-      "tcgplayerUrl": "https://www.tcgplayer.com/product/541659/Roronoa Zoro Alternate Art",
-      "tcgplayerProductId": 541659
+      "marketPrice": 1875.75,
+      "lastUpdated": "2026-02-08T09:22:20.878Z",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/541660/Roronoa Zoro Alternate Art Manga",
+      "tcgplayerProductId": 541660
     },
     "OP06-119": {
       "marketPrice": 8.38,
@@ -4633,9 +4633,11 @@
       "tcgplayerProductId": 545840
     },
     "OP07-051_p2": {
-      "marketPrice": null,
-      "lastUpdated": "2026-02-08T08:18:38.929Z",
-      "tcgplayerUrl": "https://www.tcgplayer.com/product/545841/Boa Hancock 051 Parallel Manga",
+      "marketPrice": 1825.00,
+      "lowPrice": 51.99,
+      "highPrice": 3500.00,
+      "lastUpdated": "2026-02-08T12:00:00.000Z",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/545841/one-piece-card-game-500-years-in-the-future-boa-hancock-051-parallel-manga",
       "tcgplayerProductId": 545841
     },
     "OP07-053": {
