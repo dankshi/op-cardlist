@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   },
   description: "The fastest, most comprehensive One Piece TCG card database. Browse all cards, sets, and filter by color, type, rarity and more.",
   keywords: ["One Piece", "TCG", "card list", "OP-13", "card game", "Luffy", "Ace", "deck building"],
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/logo.svg",
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -34,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="light" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased bg-zinc-950 dark:bg-zinc-950 light:bg-zinc-50 text-zinc-100 dark:text-zinc-100 light:text-zinc-900 min-h-screen`}>
         <ThemeProvider>
           <header className="border-b border-zinc-800 dark:border-zinc-800 light:border-zinc-200 sticky top-0 bg-zinc-950/95 dark:bg-zinc-950/95 light:bg-white/95 backdrop-blur z-50">
