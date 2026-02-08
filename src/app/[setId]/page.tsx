@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getSetBySlug, getAllSets } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
+import { SITE_URL, SITE_NAME, getSetKeywords, getBreadcrumbSchema } from "@/lib/seo";
 
 interface PageProps {
   params: Promise<{ setId: string }>;
@@ -25,15 +26,43 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const setName = set.id.toUpperCase();
+  const setUpper = set.id.toUpperCase();
+  const setNoHyphen = set.id.replace('-', '').toUpperCase();
+  const pageUrl = `${SITE_URL}/${set.id}`;
+
+  // Get first card with an image for OG
+  const firstCard = set.cards[0];
+  const ogImage = firstCard?.imageUrl;
 
   return {
-    title: `${setName} Card List - All ${set.cardCount} Cards`,
-    description: `Complete ${setName} card list for One Piece TCG. Browse all ${set.cardCount} cards from ${set.name} with images, stats, and effects.`,
-    keywords: [setName, "One Piece TCG", "card list", "spoilers", set.name],
+    title: `${setUpper} Card List - All ${set.cardCount} Cards with Prices`,
+    description: `Complete ${setUpper} (${setNoHyphen}) card list for One Piece TCG. Browse all ${set.cardCount} cards from ${set.name} with images, prices, stats, and effects. Updated daily.`,
+    keywords: getSetKeywords(set.id, set.name),
     openGraph: {
-      title: `${setName} Card List - One Piece TCG`,
-      description: `All ${set.cardCount} cards from ${set.name}`,
+      title: `${setUpper} Card List - ${set.cardCount} Cards | One Piece TCG`,
+      description: `Browse all ${set.cardCount} cards from ${set.name}. Complete ${setUpper} spoilers, card images, and TCGPlayer prices.`,
+      url: pageUrl,
+      siteName: SITE_NAME,
+      type: "website",
+      ...(ogImage && {
+        images: [
+          {
+            url: ogImage,
+            width: 245,
+            height: 342,
+            alt: `${setUpper} Card List - One Piece TCG`,
+          },
+        ],
+      }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${setUpper} Card List - ${set.cardCount} Cards`,
+      description: `Complete ${setUpper} card list for One Piece TCG. ${set.cardCount} cards with prices.`,
+      ...(ogImage && { images: [ogImage] }),
+    },
+    alternates: {
+      canonical: pageUrl,
     },
   };
 }
@@ -99,25 +128,50 @@ export default async function SetPage({ params }: PageProps) {
       {/* Card Grid with Filters */}
       <CardGrid cards={set.cards} setId={set.id} />
 
-      {/* JSON-LD Structured Data */}
+      {/* BreadcrumbList Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(getBreadcrumbSchema([
+            { name: "Home", url: SITE_URL },
+            { name: `${set.id.toUpperCase()} Card List`, url: `${SITE_URL}/${set.id}` },
+          ])),
+        }}
+      />
+
+      {/* ItemList Schema - Enhanced with more cards */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "ItemList",
-            name: `${set.id.toUpperCase()} Card List`,
-            description: `All ${set.cardCount} cards from ${set.name}`,
+            name: `${set.id.toUpperCase()} Card List - One Piece TCG`,
+            description: `Complete card list of all ${set.cardCount} cards from ${set.name} (${set.id.toUpperCase()}) for One Piece Trading Card Game`,
             numberOfItems: set.cardCount,
-            itemListElement: set.cards.slice(0, 10).map((card, index) => ({
+            itemListElement: set.cards.slice(0, 50).map((card, index) => ({
               "@type": "ListItem",
               position: index + 1,
+              url: `${SITE_URL}/card/${card.id.toLowerCase()}`,
               item: {
                 "@type": "Product",
                 name: card.name,
-                description: card.effect,
+                description: card.effect || `${card.name} from ${set.id.toUpperCase()}`,
                 image: card.imageUrl,
                 sku: card.id,
+                brand: {
+                  "@type": "Brand",
+                  name: "One Piece TCG",
+                },
+                ...(card.price?.marketPrice != null && {
+                  offers: {
+                    "@type": "Offer",
+                    price: card.price.marketPrice,
+                    priceCurrency: "USD",
+                    availability: "https://schema.org/InStock",
+                    url: card.price.tcgplayerUrl,
+                  },
+                }),
               },
             })),
           }),

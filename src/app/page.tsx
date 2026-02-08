@@ -1,13 +1,31 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getAllSets, getLastUpdated } from "@/lib/cards";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, BASE_KEYWORDS } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "One Piece TCG Card List - Complete Database with Prices | All Sets",
+  description: `${SITE_DESCRIPTION} Browse OP-13, EB-03, and all One Piece TCG sets with TCGPlayer market prices.`,
+  keywords: [...BASE_KEYWORDS, "all sets", "complete database", "OP-13", "EB-03", "price guide"],
+  alternates: {
+    canonical: SITE_URL,
+  },
+};
 
 export default function Home() {
-  const sets = getAllSets();
+  const sets = getAllSets().sort((a, b) => b.id.localeCompare(a.id));
   const lastUpdated = getLastUpdated();
   const totalCards = sets.reduce((sum, set) => sum + set.cardCount, 0);
 
   return (
     <div>
+      {/* Construction Banner */}
+      <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+        <p className="text-amber-500 text-center">
+          <span className="font-semibold">Under Construction</span> — We're still building things out, so you may encounter some errors. Feel free to take a look around!
+        </p>
+      </div>
+
       <section className="mb-12">
         <h1 className="text-4xl font-bold mb-4">One Piece TCG Card List</h1>
         <p className="text-zinc-400 light:text-zinc-600 text-lg mb-6">
@@ -45,6 +63,32 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* CollectionPage Schema for homepage */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: "One Piece TCG Card List - All Sets",
+            description: `Complete database of ${totalCards} One Piece TCG cards across ${sets.length} sets with prices`,
+            url: SITE_URL,
+            mainEntity: {
+              "@type": "ItemList",
+              name: "One Piece TCG Sets",
+              numberOfItems: sets.length,
+              itemListElement: sets.map((set, index) => ({
+                "@type": "ListItem",
+                position: index + 1,
+                url: `${SITE_URL}/${set.id}`,
+                name: `${set.id.toUpperCase()} - ${set.name}`,
+                description: `${set.cardCount} cards`,
+              })),
+            },
+          }),
+        }}
+      />
     </div>
   );
 }

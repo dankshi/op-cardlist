@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Image from "next/image";
 import { getCardById, getAllCards } from "@/lib/cards";
 import CardModalClient from "./CardModalClient";
+import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
+import { Card3DPreview } from "@/components/card/Card3DPreview";
 
 interface PageProps {
   params: Promise<{ cardId: string }>;
@@ -25,13 +26,50 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
+  const setUpper = card.setId.toUpperCase();
+  const pageUrl = `${SITE_URL}/card/${card.id.toLowerCase()}`;
+
+  // Build comprehensive description
+  const stats = [
+    card.type,
+    card.power ? `${card.power} Power` : null,
+    card.cost != null ? `Cost ${card.cost}` : null,
+    card.counter ? `+${card.counter} Counter` : null,
+  ].filter(Boolean).join(' | ');
+
+  const priceInfo = card.price?.marketPrice != null
+    ? ` Market price: $${card.price.marketPrice.toFixed(2)}.`
+    : '';
+
+  const description = `${card.name} (${card.id}) from ${setUpper}. ${stats}.${priceInfo} ${card.effect.slice(0, 120)}...`;
+
   return {
-    title: `${card.name} (${card.id}) - One Piece TCG`,
-    description: `${card.name} from ${card.setId.toUpperCase()}. ${card.type} card with ${card.power ? card.power + ' power' : ''}. ${card.effect.slice(0, 150)}...`,
+    title: `${card.name} (${card.id}) - ${setUpper} | One Piece TCG`,
+    description,
+    keywords: getCardKeywords(card.name, card.id, card.setId),
     openGraph: {
-      title: `${card.name} - One Piece TCG`,
-      description: card.effect.slice(0, 200),
+      title: `${card.name} - ${card.id} | One Piece TCG Card`,
+      description: `${stats}.${priceInfo} ${card.effect.slice(0, 150)}`,
+      url: pageUrl,
+      siteName: SITE_NAME,
+      type: "website",
+      images: [
+        {
+          url: card.imageUrl,
+          width: 245,
+          height: 342,
+          alt: `${card.name} - ${card.id} One Piece TCG Card`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${card.name} (${card.id}) - One Piece TCG`,
+      description: `${stats}.${priceInfo}`,
       images: [card.imageUrl],
+    },
+    alternates: {
+      canonical: pageUrl,
     },
   };
 }
@@ -56,19 +94,13 @@ export default async function CardPage({ params }: PageProps) {
   return (
     <CardModalClient>
       <div className="flex flex-col md:flex-row max-h-[90vh]">
-            {/* Card Image - Left Side */}
+            {/* Card Image - Left Side with 3D Preview */}
             <div className="flex-shrink-0 bg-zinc-950 light:bg-zinc-100 p-4 md:p-6 flex items-center justify-center md:w-[340px] lg:w-[400px]">
-              <div className="relative w-[200px] h-[280px] md:w-[280px] md:h-[392px] lg:w-[320px] lg:h-[448px]">
-                <Image
-                  src={card.imageUrl}
-                  alt={card.name}
-                  fill
-                  sizes="(max-width: 768px) 200px, 320px"
-                  className="object-contain rounded-lg"
-                  priority
-                  unoptimized
-                />
-              </div>
+              <Card3DPreview
+                card={card}
+                className="w-[200px] h-[280px] md:w-[280px] md:h-[392px] lg:w-[320px] lg:h-[448px]"
+                priority
+              />
             </div>
 
             {/* Card Details - Right Side */}
@@ -199,29 +231,79 @@ export default async function CardPage({ params }: PageProps) {
             </div>
           </div>
 
-      {/* JSON-LD Structured Data */}
+      {/* BreadcrumbList Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(getBreadcrumbSchema([
+            { name: "Home", url: SITE_URL },
+            { name: `${card.setId.toUpperCase()} Cards`, url: `${SITE_URL}/${card.setId}` },
+            { name: card.name, url: `${SITE_URL}/card/${card.id.toLowerCase()}` },
+          ])),
+        }}
+      />
+
+      {/* Enhanced Product Schema */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Product",
-            name: card.name,
-            description: card.effect,
+            name: `${card.name} (${card.id})`,
+            description: card.effect || `${card.name} - ${card.type} card from ${card.setId.toUpperCase()} One Piece TCG`,
             image: card.imageUrl,
             sku: card.id,
+            mpn: card.id,
             brand: {
               "@type": "Brand",
               name: "One Piece TCG",
             },
-            category: "Trading Card",
+            manufacturer: {
+              "@type": "Organization",
+              name: "Bandai",
+            },
+            category: "Trading Card Games > One Piece TCG",
+            additionalProperty: [
+              {
+                "@type": "PropertyValue",
+                name: "Card Type",
+                value: card.type,
+              },
+              {
+                "@type": "PropertyValue",
+                name: "Rarity",
+                value: card.rarity,
+              },
+              {
+                "@type": "PropertyValue",
+                name: "Set",
+                value: card.setId.toUpperCase(),
+              },
+              ...(card.power != null ? [{
+                "@type": "PropertyValue",
+                name: "Power",
+                value: card.power.toString(),
+              }] : []),
+              ...(card.colors.length > 0 ? [{
+                "@type": "PropertyValue",
+                name: "Color",
+                value: card.colors.join(", "),
+              }] : []),
+            ],
             ...(card.price?.marketPrice != null && {
               offers: {
-                "@type": "Offer",
-                price: card.price.marketPrice,
+                "@type": "AggregateOffer",
                 priceCurrency: "USD",
+                lowPrice: card.price.lowPrice ?? card.price.marketPrice,
+                highPrice: card.price.highPrice ?? card.price.marketPrice,
+                offerCount: 1,
                 availability: "https://schema.org/InStock",
                 url: card.price.tcgplayerUrl,
+                seller: {
+                  "@type": "Organization",
+                  name: "TCGPlayer",
+                },
               },
             }),
           }),
