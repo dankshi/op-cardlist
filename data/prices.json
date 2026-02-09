@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-02-09T00:36:25.537Z",
+  "lastUpdated": "2026-02-09T00:38:06.735Z",
   "prices": {
     "EB01-003": {
       "marketPrice": 3.4592,
@@ -1248,9 +1248,9 @@
       "tcgplayerProductId": 672740
     },
     "EB03-003": {
-      "lastUpdated": "2026-02-08T08:14:58.039Z",
-      "tcgplayerUrl": "https://www.tcgplayer.com/product/672820/Uta 003 SP",
-      "tcgplayerProductId": 672820
+      "lastUpdated": "2026-02-09T00:38:06.735Z",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/672742/Uta 003",
+      "tcgplayerProductId": 672742
     },
     "EB03-003_p1": {
       "lastUpdated": "2026-02-08T08:14:58.039Z",
@@ -1343,9 +1343,9 @@
       "tcgplayerProductId": 672817
     },
     "EB03-003_p2": {
-      "lastUpdated": "2026-02-08T08:14:58.046Z",
-      "tcgplayerUrl": "https://www.tcgplayer.com/product/672743/Uta 003 Alternate Art",
-      "tcgplayerProductId": 672743
+      "lastUpdated": "2026-02-09T00:38:06.735Z",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/672820/Uta 003 SP",
+      "tcgplayerProductId": 672820
     },
     "EB03-024_p2": {
       "lastUpdated": "2026-02-08T08:14:58.046Z",

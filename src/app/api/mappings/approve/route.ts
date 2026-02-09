@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase';
 // POST /api/mappings/approve - Approve pending mappings (admin only)
 export async function POST(request: Request) {
   try {
+    if (!supabase) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
     const adminKey = request.headers.get('x-admin-key');
 
     if (adminKey !== process.env.ADMIN_KEY) {
@@ -57,6 +61,10 @@ export async function POST(request: Request) {
 // GET /api/mappings/approve - Get pending mappings count (admin only)
 export async function GET(request: Request) {
   try {
+    if (!supabase) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
     const adminKey = request.headers.get('x-admin-key');
 
     if (adminKey !== process.env.ADMIN_KEY) {

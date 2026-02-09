@@ -4,6 +4,10 @@ import { supabase, type MappingSubmission } from '@/lib/supabase';
 // GET /api/mappings - Get all mappings (approved only for public, all for admin)
 export async function GET(request: Request) {
   try {
+    if (!supabase) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     const includeUnapproved = searchParams.get('all') === 'true';
     const adminKey = request.headers.get('x-admin-key');
@@ -56,6 +60,10 @@ export async function GET(request: Request) {
 // POST /api/mappings - Submit new mapping(s)
 export async function POST(request: Request) {
   try {
+    if (!supabase) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+    }
+
     const body = await request.json();
     const submissions: MappingSubmission[] = Array.isArray(body) ? body : [body];
     const submittedBy = body.submittedBy || 'anonymous';
