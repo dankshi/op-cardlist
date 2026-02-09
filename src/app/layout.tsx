@@ -107,10 +107,7 @@ export default function RootLayout({
                   <span className="text-orange-400">🔥</span>
                   Hot
                 </Link>
-                <Link href="/test" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors flex items-center gap-1">
-                  <span className="text-yellow-400">🔧</span>
-                  Fix
-                </Link>
+                {/* Fix link hidden from prod - access directly via /test */}
                 <ThemeToggle />
               </div>
             </nav>

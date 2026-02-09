@@ -18,29 +18,20 @@ interface TCGProduct {
   imageUrl: string;
 }
 
-// Encouraging messages for Melody
-const ENCOURAGEMENT_MESSAGES = [
-  "Amazing work, Melody!",
-  "You're on fire!",
-  "Crushing it!",
-  "Another one fixed!",
-  "Fantastic job!",
-  "Unstoppable!",
-  "You're a wizard!",
-  "So proud of you!",
-  "You're incredible!",
-  "Another card saved!",
-  "MVP!",
-  "Great job!",
-];
-
-const MILESTONE_MESSAGES: Record<number, string> = {
-  1: "First card fixed! Welcome to the team!",
-  5: "5 cards! You're getting the hang of this!",
-  10: "Double digits! 10 cards!",
-  25: "25 cards! You're a pro!",
-  50: "FIFTY cards! Incredible!",
-  100: "100 CARDS! Legend!",
+// Milestone messages based on total DB fixes
+const MILESTONE_MESSAGES: Record<number, { message: string; celebrate: boolean }> = {
+  50: { message: "50 cards fixed!", celebrate: false },
+  100: { message: "100 CARDS! Century club!", celebrate: true },
+  150: { message: "150 cards!", celebrate: false },
+  200: { message: "200 cards! Double century!", celebrate: true },
+  250: { message: "250 cards!", celebrate: false },
+  300: { message: "300 cards! Triple century!", celebrate: true },
+  400: { message: "400 cards!", celebrate: false },
+  500: { message: "500 CARDS! HALF A THOUSAND!", celebrate: true },
+  750: { message: "750 cards!", celebrate: false },
+  1000: { message: "1000 CARDS! LEGENDARY!", celebrate: true },
+  1500: { message: "1500 cards!", celebrate: true },
+  2000: { message: "2000 CARDS! UNSTOPPABLE!", celebrate: true },
 };
 
 // Type for database mappings
@@ -53,11 +44,21 @@ interface DbMapping {
   approved: boolean;
 }
 
+// Type for reported problems
+interface CardProblem {
+  id: number;
+  card_id: string;
+  reason: string;
+  reported_by: string;
+  created_at: string;
+}
+
 export default function TestPage() {
   const [cards, setCards] = useState<CardWithPrice[]>([]);
   const [prices, setPrices] = useState<Record<string, CardPrice>>({});
   const [dbMappings, setDbMappings] = useState<Record<string, DbMapping>>({}); // Mappings from Supabase
-  const [filter, setFilter] = useState<'issues' | 'all' | 'fixed'>('issues');
+  const [problems, setProblems] = useState<CardProblem[]>([]); // Reported problems
+  const [filter, setFilter] = useState<'issues' | 'all' | 'fixed' | 'problems'>('issues');
   const [selectedSet, setSelectedSet] = useState<string>('all');
   const [sets, setSets] = useState<string[]>([]);
 
@@ -75,6 +76,7 @@ export default function TestPage() {
   const [contributorName, setContributorName] = useState<string>('');
   const [sessionFixes, setSessionFixes] = useState(0);
   const [encouragement, setEncouragement] = useState<string | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [hideJollyRogerWarning, setHideJollyRogerWarning] = useState(false);
   const [showJollyRogerExpanded, setShowJollyRogerExpanded] = useState(false);
@@ -125,10 +127,19 @@ export default function TestPage() {
       .then(res => res.json())
       .then(data => setCustomProblemReasons(data.reasons || []))
       .catch(console.error);
+
+    // Fetch reported problems
+    fetch('/api/problems')
+      .then(res => res.json())
+      .then(data => setProblems(data.problems || []))
+      .catch(console.error);
   }, []);
 
   // Cards are "fixed" if they have a row in the database
   const fixedCards = useMemo(() => new Set(Object.keys(dbMappings)), [dbMappings]);
+
+  // Cards with reported problems
+  const problemCardIds = useMemo(() => new Set(problems.map(p => p.card_id)), [problems]);
 
   // Build lookup of base card IDs that have PRB-01 (Jolly Roger) variants
   const jollyRogerCards = useMemo(() => {
@@ -188,11 +199,14 @@ export default function TestPage() {
     // Filter by type
     switch (filter) {
       case 'issues':
-        // Exclude fixed cards from issues view
-        result = result.filter(c => cardIssues[c.id] && !fixedCards.has(c.id));
+        // Exclude fixed cards and problem cards from issues view
+        result = result.filter(c => cardIssues[c.id] && !fixedCards.has(c.id) && !problemCardIds.has(c.id));
         break;
       case 'fixed':
         result = result.filter(c => fixedCards.has(c.id));
+        break;
+      case 'problems':
+        result = result.filter(c => problemCardIds.has(c.id));
         break;
     }
 
@@ -202,7 +216,7 @@ export default function TestPage() {
       const bIsDupe = cardIssues[b.id]?.isDuplicate ? 1 : 0;
       return bIsDupe - aIsDupe;
     });
-  }, [cards, selectedSet, filter, cardIssues, fixedCards]);
+  }, [cards, selectedSet, filter, cardIssues, fixedCards, problemCardIds]);
 
   // Navigation
   const currentIndex = selectedCard ? filteredCards.findIndex(c => c.id === selectedCard.id) : -1;
@@ -292,16 +306,27 @@ export default function TestPage() {
     return null;
   };
 
-  const showEncouragement = (newTotal: number) => {
-    const msg = MILESTONE_MESSAGES[newTotal] ||
-      ENCOURAGEMENT_MESSAGES[Math.floor(Math.random() * ENCOURAGEMENT_MESSAGES.length)];
-    setEncouragement(msg);
-    setTimeout(() => setEncouragement(null), 3000);
+  const checkMilestone = (newDbTotal: number) => {
+    const milestone = MILESTONE_MESSAGES[newDbTotal];
+    if (milestone) {
+      setEncouragement(milestone.message);
+      if (milestone.celebrate) {
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 4000);
+      }
+      setTimeout(() => setEncouragement(null), 4000);
+    }
   };
 
   const assignProduct = async (product: TCGProduct) => {
     if (!selectedCard || saving) return;
     setAssignError(null);
+
+    // Capture next card BEFORE updating state (since card will be removed from filtered list)
+    // Important: check currentIndex >= 0 to avoid going back to first card when index is -1
+    const nextCard = currentIndex >= 0 && currentIndex < filteredCards.length - 1
+      ? filteredCards[currentIndex + 1]
+      : null;
 
     setSaving(true);
     const name = contributorName || 'Melody';
@@ -351,11 +376,13 @@ export default function TestPage() {
         const newSession = sessionFixes + 1;
         setSessionFixes(newSession);
 
-        showEncouragement(newSession);
+        // Check for milestones based on total DB fixes
+        const newDbTotal = fixedCards.size + 1;
+        checkMilestone(newDbTotal);
 
-        // Auto-advance to next card after a brief delay
-        if (currentIndex < filteredCards.length - 1) {
-          setTimeout(() => openCard(filteredCards[currentIndex + 1]), 800);
+        // Auto-advance to next card (using captured reference)
+        if (nextCard) {
+          setTimeout(() => openCard(nextCard), 800);
         } else {
           setSelectedCard(null);
         }
@@ -381,6 +408,12 @@ export default function TestPage() {
       console.error('No existing mapping to confirm');
       return;
     }
+
+    // Capture next card BEFORE updating state (since card will be removed from filtered list)
+    // Important: check currentIndex >= 0 to avoid going back to first card when index is -1
+    const nextCard = currentIndex >= 0 && currentIndex < filteredCards.length - 1
+      ? filteredCards[currentIndex + 1]
+      : null;
 
     setSaving(true);
     const name = contributorName || 'Melody';
@@ -418,12 +451,15 @@ export default function TestPage() {
 
         const newSession = sessionFixes + 1;
         setSessionFixes(newSession);
-        showEncouragement(newSession);
 
-        // If modal is open, advance to next
+        // Check for milestones based on total DB fixes
+        const newDbTotal = fixedCards.size + 1;
+        checkMilestone(newDbTotal);
+
+        // If modal is open, advance to next (using captured reference)
         if (selectedCard && selectedCard.id === card.id) {
-          if (currentIndex < filteredCards.length - 1) {
-            setTimeout(() => openCard(filteredCards[currentIndex + 1]), 800);
+          if (nextCard) {
+            setTimeout(() => openCard(nextCard), 800);
           } else {
             setSelectedCard(null);
           }
@@ -436,9 +472,65 @@ export default function TestPage() {
     }
   };
 
+  // Quick report with a preset reason
+  const quickReportProblem = async (reason: string) => {
+    if (!selectedCard || saving) return;
+
+    // Capture next card BEFORE updating state (since card will be removed from list)
+    // Important: check currentIndex >= 0 to avoid going back to first card when index is -1
+    const nextCard = currentIndex >= 0 && currentIndex < filteredCards.length - 1
+      ? filteredCards[currentIndex + 1]
+      : null;
+
+    setSaving(true);
+    const name = contributorName || 'Melody';
+
+    try {
+      const res = await fetch('/api/problems', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cardId: selectedCard.id,
+          reason: reason,
+          reportedBy: name,
+        }),
+      });
+
+      if (res.ok) {
+        // Add to local problems state so card is immediately removed from issues
+        setProblems(prev => [{
+          id: Date.now(),
+          card_id: selectedCard.id,
+          reason: reason,
+          reported_by: name,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
+
+        // Advance to next card (using captured reference)
+        if (nextCard) {
+          setTimeout(() => openCard(nextCard), 300);
+        } else {
+          setSelectedCard(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to report problem:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Report a problem with a card
   const reportProblem = async () => {
     if (!selectedCard || saving || !problemReason.trim()) return;
+
+    // Capture next card BEFORE updating state (since card will be removed from list)
+    // Important: check currentIndex >= 0 to avoid going back to first card when index is -1
+    const nextCard = currentIndex >= 0 && currentIndex < filteredCards.length - 1
+      ? filteredCards[currentIndex + 1]
+      : null;
 
     setSaving(true);
     const name = contributorName || 'Melody';
@@ -457,18 +549,47 @@ export default function TestPage() {
       });
 
       if (res.ok) {
+        // Add to local problems state so card is immediately removed from issues
+        setProblems(prev => [{
+          id: Date.now(), // Temporary ID
+          card_id: selectedCard.id,
+          reason: problemReason.trim(),
+          reported_by: name,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
+
         setShowProblemInput(false);
         setProblemReason('');
 
-        // Advance to next card
-        if (currentIndex < filteredCards.length - 1) {
-          setTimeout(() => openCard(filteredCards[currentIndex + 1]), 500);
+        // Advance to next card (using captured reference)
+        if (nextCard) {
+          setTimeout(() => openCard(nextCard), 500);
         } else {
           setSelectedCard(null);
         }
       }
     } catch (error) {
       console.error('Failed to report problem:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Dismiss a reported problem
+  const dismissProblem = async (problemId: number, cardId: string) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/problems/${problemId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        // Remove from local state
+        setProblems(prev => prev.filter(p => p.card_id !== cardId));
+      }
+    } catch (error) {
+      console.error('Failed to dismiss problem:', error);
     } finally {
       setSaving(false);
     }
@@ -562,30 +683,57 @@ export default function TestPage() {
           </div>
         </div>
 
-        {/* Floating Encouragement Overlay */}
+        {/* Milestone Toast */}
         {encouragement && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-            <div className="p-6 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl shadow-2xl animate-bounce">
-              <span className="text-2xl font-bold text-white drop-shadow-lg">{encouragement}</span>
+          <div className="fixed bottom-4 right-4 z-[100] pointer-events-none">
+            <div className={`px-5 py-3 rounded-lg shadow-xl ${
+              showCelebration
+                ? 'bg-gradient-to-r from-yellow-500 via-pink-500 to-purple-500 animate-pulse'
+                : 'bg-gradient-to-r from-pink-600/90 to-purple-600/90'
+            }`}>
+              <span className={`font-bold text-white ${showCelebration ? 'text-lg' : 'text-sm'}`}>
+                {showCelebration && '🎉 '}{encouragement}{showCelebration && ' 🎉'}
+              </span>
             </div>
+          </div>
+        )}
+
+        {/* Celebration Fireworks Overlay */}
+        {showCelebration && (
+          <div className="fixed inset-0 z-[99] pointer-events-none overflow-hidden">
+            {[...Array(20)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute animate-ping"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 2}s`,
+                  animationDuration: `${1 + Math.random()}s`,
+                }}
+              >
+                <span className="text-2xl">{['🎆', '🎇', '✨', '🌟', '💫'][Math.floor(Math.random() * 5)]}</span>
+              </div>
+            ))}
           </div>
         )}
 
         {/* Filters */}
         <div className="mb-6 flex flex-wrap gap-4 items-center">
           <div className="flex gap-2">
-            {(['issues', 'fixed', 'all'] as const).map(f => (
+            {(['issues', 'fixed', 'problems', 'all'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg font-medium ${
                   filter === f
-                    ? f === 'issues' ? 'bg-red-600' : 'bg-blue-600'
+                    ? f === 'issues' ? 'bg-red-600' : f === 'problems' ? 'bg-orange-600' : 'bg-blue-600'
                     : 'bg-zinc-800 hover:bg-zinc-700'
                 }`}
               >
-                {f === 'issues' ? `Issues (${issueCards.length})` :
-                 f === 'fixed' ? `Fixed (${fixedCards.size})` : 'All'}
+                {f === 'issues' ? `Issues (${issueCards.filter(c => !problemCardIds.has(c.id)).length})` :
+                 f === 'fixed' ? `Fixed (${fixedCards.size})` :
+                 f === 'problems' ? `Problems (${problems.length})` : 'All'}
               </button>
             ))}
           </div>
@@ -613,6 +761,7 @@ export default function TestPage() {
             const issue = cardIssues[card.id];
             const cardPrice = prices[card.id];
             const dbMapping = dbMappings[card.id];
+            const cardProblem = problems.find(p => p.card_id === card.id);
             // Prefer db mapping (source of truth after fixing) over initial prices data
             const productId = dbMapping?.tcgProductId ?? cardPrice?.tcgplayerProductId;
             const marketPrice = dbMapping?.price ?? cardPrice?.marketPrice;
@@ -623,6 +772,7 @@ export default function TestPage() {
                 onClick={() => openCard(card)}
                 className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.02] hover:shadow-xl ${
                   isFixed ? 'border-green-500 bg-green-500/5' :
+                  cardProblem ? 'border-orange-500 bg-orange-500/5' :
                   issue?.isDuplicate ? 'border-red-500 bg-red-500/5' :
                   issue?.isUnmapped ? 'border-orange-500 bg-orange-500/5' :
                   'border-zinc-700 bg-zinc-900'
@@ -635,10 +785,13 @@ export default function TestPage() {
                     {isFixed && (
                       <span className="px-2 py-0.5 bg-green-600 rounded text-xs font-bold">FIXED</span>
                     )}
-                    {issue?.isDuplicate && !isFixed && (
+                    {cardProblem && (
+                      <span className="px-2 py-0.5 bg-orange-600 rounded text-xs font-bold">PROBLEM</span>
+                    )}
+                    {issue?.isDuplicate && !isFixed && !cardProblem && (
                       <span className="px-2 py-0.5 bg-red-600 rounded text-xs font-bold">DUP</span>
                     )}
-                    {issue?.isUnmapped && !isFixed && (
+                    {issue?.isUnmapped && !isFixed && !cardProblem && (
                       <span className="px-2 py-0.5 bg-orange-600 rounded text-xs font-bold">NO LINK</span>
                     )}
                   </div>
@@ -714,6 +867,28 @@ export default function TestPage() {
                       className="w-full px-3 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500 disabled:bg-zinc-700 rounded text-xs font-bold transition-colors text-red-300 hover:text-white"
                     >
                       ↩ Revert
+                    </button>
+                  </div>
+                )}
+
+                {/* Problem info - only show for problem cards */}
+                {cardProblem && (
+                  <div className="px-3 pb-3">
+                    <div className="text-xs text-orange-300 mb-2 truncate" title={cardProblem.reason}>
+                      ⚠️ {cardProblem.reason}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mb-2">
+                      by {cardProblem.reported_by}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismissProblem(cardProblem.id, card.id);
+                      }}
+                      disabled={saving}
+                      className="w-full px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 rounded text-xs font-bold transition-colors"
+                    >
+                      ✕ Dismiss
                     </button>
                   </div>
                 )}
@@ -901,30 +1076,27 @@ export default function TestPage() {
               Skip
             </button>
 
-            {/* Report Problem */}
+            {/* Report Problem - always visible */}
             {!showProblemInput ? (
-              <button
-                onClick={() => setShowProblemInput(true)}
-                className="px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500 rounded-lg text-sm text-orange-300"
-              >
-                ⚠️ Report Problem
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-500">Problem?</span>
+                <button
+                  onClick={() => quickReportProblem('Our image is wrong/missing')}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded text-xs font-medium bg-orange-600/20 hover:bg-orange-600 border border-orange-500 text-orange-300 hover:text-white transition-colors"
+                >
+                  Bad image
+                </button>
+                <button
+                  onClick={() => setShowProblemInput(true)}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded text-xs font-medium bg-zinc-700 hover:bg-zinc-600 text-zinc-300 transition-colors"
+                >
+                  Other...
+                </button>
+              </div>
             ) : (
-              <div className="flex items-center gap-2 flex-1">
-                <div className="flex flex-wrap gap-1">
-                  {[...PRESET_REASONS, ...customProblemReasons].slice(0, 4).map((reason) => (
-                    <button
-                      key={reason}
-                      onClick={() => {
-                        setProblemReason(reason);
-                        reportProblem();
-                      }}
-                      className="px-2 py-1 rounded text-xs font-medium bg-zinc-800 hover:bg-orange-600 text-zinc-300 hover:text-white transition-colors"
-                    >
-                      {reason}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex items-center gap-2">
                 <input
                   type="text"
                   value={problemReason}
@@ -934,9 +1106,17 @@ export default function TestPage() {
                       reportProblem();
                     }
                   }}
-                  placeholder="Custom reason..."
-                  className="w-40 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-sm"
+                  placeholder="What's the problem?"
+                  autoFocus
+                  className="w-48 px-3 py-1.5 bg-zinc-800 border border-orange-500 rounded text-sm"
                 />
+                <button
+                  onClick={() => reportProblem()}
+                  disabled={saving || !problemReason.trim()}
+                  className="px-3 py-1.5 rounded text-xs font-medium bg-orange-600 hover:bg-orange-500 disabled:bg-zinc-700 text-white transition-colors"
+                >
+                  Submit
+                </button>
                 <button
                   onClick={() => {
                     setShowProblemInput(false);
