@@ -43,10 +43,20 @@ const MILESTONE_MESSAGES: Record<number, string> = {
   100: "100 CARDS! Legend!",
 };
 
+// Type for database mappings
+interface DbMapping {
+  tcgProductId: number;
+  tcgUrl: string;
+  tcgName: string;
+  price: number | null;
+  artStyle: string | null;
+  approved: boolean;
+}
+
 export default function TestPage() {
   const [cards, setCards] = useState<CardWithPrice[]>([]);
   const [prices, setPrices] = useState<Record<string, CardPrice>>({});
-  const [fixedCards, setFixedCards] = useState<Set<string>>(new Set());
+  const [dbMappings, setDbMappings] = useState<Record<string, DbMapping>>({}); // Mappings from Supabase
   const [filter, setFilter] = useState<'issues' | 'all' | 'fixed'>('issues');
   const [selectedSet, setSelectedSet] = useState<string>('all');
   const [sets, setSets] = useState<string[]>([]);
@@ -62,16 +72,16 @@ export default function TestPage() {
   const [adminKey, setAdminKey] = useState<string>('');
   const [contributorName, setContributorName] = useState<string>('');
   const [sessionFixes, setSessionFixes] = useState(0);
-  const [totalFixes, setTotalFixes] = useState(0);
   const [encouragement, setEncouragement] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [hideJollyRogerWarning, setHideJollyRogerWarning] = useState(false);
+  const [showJollyRogerExpanded, setShowJollyRogerExpanded] = useState(false);
 
   useEffect(() => {
     const savedAdminKey = localStorage.getItem('admin-key');
     const savedContributor = localStorage.getItem('contributor-name');
-    const savedTotalFixes = localStorage.getItem('total-fixes');
     if (savedAdminKey) setAdminKey(savedAdminKey);
     if (savedContributor) setContributorName(savedContributor);
-    if (savedTotalFixes) setTotalFixes(parseInt(savedTotalFixes) || 0);
   }, []);
 
   useEffect(() => {
@@ -89,21 +99,45 @@ export default function TestPage() {
       .then(data => setPrices(data.prices || {}))
       .catch(console.error);
 
-    const savedFixed = localStorage.getItem('fixed-cards');
-    if (savedFixed) {
-      setFixedCards(new Set(JSON.parse(savedFixed)));
-    }
+    // Fetch mappings from database
+    fetch('/api/mappings')
+      .then(res => res.json())
+      .then(data => setDbMappings(data.mappings || {}))
+      .catch(console.error);
   }, []);
 
-  // Detect issues
-  const { cardIssues, issueCards } = useMemo(() => {
+  // Cards are "fixed" if they have a row in the database
+  const fixedCards = useMemo(() => new Set(Object.keys(dbMappings)), [dbMappings]);
+
+  // Build lookup of base card IDs that have PRB-01 (Jolly Roger) variants
+  const jollyRogerCards = useMemo(() => {
+    const prbCards = new Set<string>();
+    cards.forEach(card => {
+      if (card.setId === 'prb-01') {
+        // Extract the original card ID pattern (e.g., OP01-041 from PRB-01 version)
+        // PRB-01 cards reprint cards from other sets
+        const baseMatch = card.baseId.match(/^([A-Z]+-?\d+)-(\d+)/);
+        if (baseMatch) {
+          prbCards.add(`${baseMatch[1]}-${baseMatch[2]}`); // e.g., "OP01-041"
+        }
+      }
+    });
+    return prbCards;
+  }, [cards]);
+
+  // Detect issues and build reverse lookup
+  const { cardIssues, issueCards, productToCard } = useMemo(() => {
     const productIdUsage: Record<number, string[]> = {};
+    const prodToCard: Record<number, string> = {}; // productId -> first cardId that uses it
     const issues: Record<string, { isDuplicate: boolean; isUnmapped: boolean }> = {};
 
     cards.forEach(card => {
       const productId = prices[card.id]?.tcgplayerProductId;
       if (productId) {
-        if (!productIdUsage[productId]) productIdUsage[productId] = [];
+        if (!productIdUsage[productId]) {
+          productIdUsage[productId] = [];
+          prodToCard[productId] = card.id; // Store first card using this productId
+        }
         productIdUsage[productId].push(card.id);
       } else {
         issues[card.id] = { isDuplicate: false, isUnmapped: true };
@@ -120,7 +154,7 @@ export default function TestPage() {
     });
 
     const cardsWithIssues = cards.filter(c => issues[c.id]);
-    return { cardIssues: issues, issueCards: cardsWithIssues };
+    return { cardIssues: issues, issueCards: cardsWithIssues, productToCard: prodToCard };
   }, [cards, prices]);
 
   // Filter cards
@@ -135,7 +169,8 @@ export default function TestPage() {
     // Filter by type
     switch (filter) {
       case 'issues':
-        result = result.filter(c => cardIssues[c.id]);
+        // Exclude fixed cards from issues view
+        result = result.filter(c => cardIssues[c.id] && !fixedCards.has(c.id));
         break;
       case 'fixed':
         result = result.filter(c => fixedCards.has(c.id));
@@ -181,6 +216,8 @@ export default function TestPage() {
     setSearchResults([]);
     setSearching(true);
     setManualUrl('');
+    setAssignError(null);
+    // Don't reset hideJollyRogerWarning - keep user preference across cards
 
     const cardNum = card.baseId.match(/-(\d+)$/)?.[1] || '';
 
@@ -223,8 +260,19 @@ export default function TestPage() {
 
   const assignProduct = async (product: TCGProduct) => {
     if (!selectedCard || saving) return;
-    setSaving(true);
+    setAssignError(null);
 
+    // Check if this product is already mapped to another card
+    const existingCardId = productToCard[product.productId];
+    if (existingCardId && existingCardId !== selectedCard.id) {
+      setAssignError(
+        `This TCGPlayer product is already mapped to ${existingCardId}. ` +
+        `You need to fix that card first! Check the borders - is one a Full Art or Alternate Art version?`
+      );
+      return;
+    }
+
+    setSaving(true);
     const name = contributorName || 'Melody';
 
     try {
@@ -245,22 +293,38 @@ export default function TestPage() {
       });
 
       if (res.ok) {
-        const newFixed = new Set(fixedCards);
-        newFixed.add(selectedCard.id);
-        setFixedCards(newFixed);
-        localStorage.setItem('fixed-cards', JSON.stringify([...newFixed]));
+        // Update prices state immediately so the UI reflects the new mapping
+        setPrices(prev => ({
+          ...prev,
+          [selectedCard.id]: {
+            ...prev[selectedCard.id],
+            tcgplayerProductId: product.productId,
+            tcgplayerUrl: product.url,
+            marketPrice: product.marketPrice,
+          }
+        }));
+
+        // Update dbMappings so "FIXED" status updates
+        setDbMappings(prev => ({
+          ...prev,
+          [selectedCard.id]: {
+            tcgProductId: product.productId,
+            tcgUrl: product.url,
+            tcgName: product.productName,
+            price: product.marketPrice,
+            artStyle: null,
+            approved: true,
+          }
+        }));
 
         const newSession = sessionFixes + 1;
-        const newTotal = totalFixes + 1;
         setSessionFixes(newSession);
-        setTotalFixes(newTotal);
-        localStorage.setItem('total-fixes', String(newTotal));
 
-        showEncouragement(newTotal);
+        showEncouragement(newSession);
 
-        // Auto-advance to next card
+        // Auto-advance to next card after a brief delay
         if (currentIndex < filteredCards.length - 1) {
-          setTimeout(() => openCard(filteredCards[currentIndex + 1]), 500);
+          setTimeout(() => openCard(filteredCards[currentIndex + 1]), 800);
         } else {
           setSelectedCard(null);
         }
@@ -274,6 +338,71 @@ export default function TestPage() {
 
   const getTcgplayerImageUrl = (productId: number) => {
     return `https://product-images.tcgplayer.com/fit-in/400x558/${productId}.jpg`;
+  };
+
+  // Quick confirm - use existing TCG mapping from prices data
+  const confirmLooksRight = async (card: CardWithPrice, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation(); // Don't open modal when clicking button
+    if (saving) return;
+
+    const cardPrice = prices[card.id];
+    if (!cardPrice?.tcgplayerProductId || !cardPrice?.tcgplayerUrl) {
+      console.error('No existing mapping to confirm');
+      return;
+    }
+
+    setSaving(true);
+    const name = contributorName || 'Melody';
+
+    try {
+      const res = await fetch('/api/mappings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminKey && { 'x-admin-key': adminKey }),
+        },
+        body: JSON.stringify([{
+          cardId: card.id,
+          tcgProductId: cardPrice.tcgplayerProductId,
+          tcgUrl: cardPrice.tcgplayerUrl,
+          tcgName: card.name,
+          price: cardPrice.marketPrice,
+          submittedBy: name,
+        }]),
+      });
+
+      if (res.ok) {
+        // Update dbMappings so "FIXED" status updates
+        setDbMappings(prev => ({
+          ...prev,
+          [card.id]: {
+            tcgProductId: cardPrice.tcgplayerProductId!,
+            tcgUrl: cardPrice.tcgplayerUrl!,
+            tcgName: card.name,
+            price: cardPrice.marketPrice ?? null,
+            artStyle: null,
+            approved: true,
+          }
+        }));
+
+        const newSession = sessionFixes + 1;
+        setSessionFixes(newSession);
+        showEncouragement(newSession);
+
+        // If modal is open, advance to next
+        if (selectedCard && selectedCard.id === card.id) {
+          if (currentIndex < filteredCards.length - 1) {
+            setTimeout(() => openCard(filteredCards[currentIndex + 1]), 800);
+          } else {
+            setSelectedCard(null);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to confirm:', error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -315,16 +444,22 @@ export default function TestPage() {
               <div className="text-xs text-zinc-500">Session</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-400">{totalFixes}</div>
-              <div className="text-xs text-zinc-500">Total</div>
+              <div className="text-2xl font-bold text-blue-400">{fixedCards.size}</div>
+              <div className="text-xs text-zinc-500">In DB</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-400">{Object.keys(prices).length}</div>
+              <div className="text-xs text-zinc-500">Prices</div>
             </div>
           </div>
         </div>
 
-        {/* Encouragement */}
+        {/* Floating Encouragement Overlay */}
         {encouragement && (
-          <div className="mb-4 p-4 bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-400/50 rounded-lg text-center">
-            <span className="text-xl font-bold text-pink-300">{encouragement}</span>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+            <div className="p-6 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl shadow-2xl animate-bounce">
+              <span className="text-2xl font-bold text-white drop-shadow-lg">{encouragement}</span>
+            </div>
           </div>
         )}
 
@@ -368,7 +503,11 @@ export default function TestPage() {
           {filteredCards.map(card => {
             const isFixed = fixedCards.has(card.id);
             const issue = cardIssues[card.id];
-            const productId = prices[card.id]?.tcgplayerProductId;
+            const cardPrice = prices[card.id];
+            const dbMapping = dbMappings[card.id];
+            // Prefer db mapping (source of truth after fixing) over initial prices data
+            const productId = dbMapping?.tcgProductId ?? cardPrice?.tcgplayerProductId;
+            const marketPrice = dbMapping?.price ?? cardPrice?.marketPrice;
 
             return (
               <div
@@ -433,10 +572,30 @@ export default function TestPage() {
                   </div>
                 </div>
 
-                {/* Card name */}
+                {/* Card name and price */}
                 <div className="px-3 pb-2">
                   <div className="text-xs text-zinc-400 truncate">{card.name}</div>
+                  <div className="text-sm font-bold mt-1">
+                    {marketPrice != null && marketPrice !== undefined ? (
+                      <span className="text-green-400">${Number(marketPrice).toFixed(2)}</span>
+                    ) : (
+                      <span className="text-zinc-600">No price</span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Quick confirm button - only show if card has TCG mapping but not fixed */}
+                {!isFixed && productId && (
+                  <div className="px-3 pb-3">
+                    <button
+                      onClick={(e) => confirmLooksRight(card, e)}
+                      disabled={saving}
+                      className="w-full px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 rounded text-xs font-bold transition-colors"
+                    >
+                      ✓ Looks Right
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -483,12 +642,111 @@ export default function TestPage() {
             </div>
           </div>
 
+          {/* Jolly Roger Warning */}
+          {!hideJollyRogerWarning && (selectedCard.setId === 'prb-01' || jollyRogerCards.has(selectedCard.baseId)) && (
+            <div className="mx-4 mt-2 p-4 bg-purple-500/20 border border-purple-500 rounded-lg relative">
+              <div className="absolute top-2 right-2 flex gap-2">
+                <button
+                  onClick={() => setShowJollyRogerExpanded(true)}
+                  className="text-purple-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-purple-500/30"
+                >
+                  🔍 Expand
+                </button>
+                <button
+                  onClick={() => setHideJollyRogerWarning(true)}
+                  className="text-purple-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-purple-500/30"
+                >
+                  ✕ Hide
+                </button>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">☠️</span>
+                <div className="text-purple-200 text-sm flex-1">
+                  {selectedCard.setId === 'prb-01' ? (
+                    <strong className="text-purple-100">This COULD be a Jolly Roger Foil! Look for &quot;Jolly Roger Foil&quot; in the TCGPlayer product name.</strong>
+                  ) : (
+                    <strong className="text-purple-100">This card has a Jolly Roger Foil version! Check the borders carefully.</strong>
+                  )}
+                  <div className="mt-3 p-3 bg-zinc-900 rounded-lg cursor-pointer hover:bg-zinc-800" onClick={() => setShowJollyRogerExpanded(true)}>
+                    <p className="text-xs text-zinc-400 mb-3">How to tell the difference - look at the WHITE BORDER on Jolly Roger: <span className="text-purple-400">(click to expand)</span></p>
+                    <div className="flex justify-center gap-6">
+                      <div className="text-center">
+                        <p className="text-xs text-green-400 font-bold mb-2">✓ Regular Card</p>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="https://product-images.tcgplayer.com/fit-in/200x279/454565.jpg"
+                          alt="Regular card example"
+                          className="w-24 h-auto rounded border-2 border-green-500"
+                        />
+                        <p className="text-[10px] text-zinc-500 mt-1">Colored border</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-purple-400 font-bold mb-2">☠️ Jolly Roger Foil</p>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="https://product-images.tcgplayer.com/fit-in/200x279/586590.jpg"
+                          alt="Jolly Roger Foil example"
+                          className="w-24 h-auto rounded border-2 border-purple-500"
+                        />
+                        <p className="text-[10px] text-purple-300 mt-1">WHITE border</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Expanded Jolly Roger Comparison Modal */}
+          {showJollyRogerExpanded && (
+            <div
+              className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-8"
+              onClick={() => setShowJollyRogerExpanded(false)}
+            >
+              <div className="bg-zinc-900 rounded-2xl p-8 max-w-4xl" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-purple-300">☠️ Jolly Roger Foil vs Regular Card</h2>
+                  <button
+                    onClick={() => setShowJollyRogerExpanded(false)}
+                    className="text-zinc-400 hover:text-white text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p className="text-zinc-300 mb-6 text-center">Look at the card borders - Jolly Roger Foils have a distinctive WHITE border!</p>
+                <div className="flex justify-center gap-12">
+                  <div className="text-center">
+                    <p className="text-lg text-green-400 font-bold mb-4">✓ Regular Card</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="https://product-images.tcgplayer.com/fit-in/400x558/454565.jpg"
+                      alt="Regular card example"
+                      className="w-64 h-auto rounded-lg border-4 border-green-500 shadow-xl"
+                    />
+                    <p className="text-sm text-zinc-400 mt-3">Colored border (matches card frame)</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg text-purple-400 font-bold mb-4">☠️ Jolly Roger Foil</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="https://product-images.tcgplayer.com/fit-in/400x558/586590.jpg"
+                      alt="Jolly Roger Foil example"
+                      className="w-64 h-auto rounded-lg border-4 border-purple-500 shadow-xl"
+                    />
+                    <p className="text-sm text-purple-300 mt-3">WHITE border around the card</p>
+                  </div>
+                </div>
+                <p className="text-center text-zinc-500 mt-6 text-sm">Click anywhere outside or the ✕ to close</p>
+              </div>
+            </div>
+          )}
+
           {/* Main content - side by side */}
           <div className="flex-1 flex overflow-hidden">
             {/* Left side - Our card */}
-            <div className="w-80 shrink-0 p-6 border-r border-zinc-800 flex flex-col items-center">
-              <h3 className="text-green-400 font-bold mb-4">Our Image (Correct)</h3>
-              <div className="w-64 aspect-[2.5/3.5] relative rounded-lg overflow-hidden ring-4 ring-green-500 bg-zinc-800">
+            <div className="w-80 shrink-0 p-6 border-r border-zinc-800 flex flex-col items-center overflow-y-auto">
+              <h3 className="text-green-400 font-bold mb-2">Our Image (Correct)</h3>
+              <div className="w-48 aspect-[2.5/3.5] relative rounded-lg overflow-hidden ring-4 ring-green-500 bg-zinc-800">
                 <Image
                   src={selectedCard.imageUrl}
                   alt={selectedCard.name}
@@ -497,10 +755,10 @@ export default function TestPage() {
                   unoptimized
                 />
               </div>
-              <div className="mt-4 text-center">
+              <div className="mt-2 text-center">
                 <div className="font-mono text-lg">{selectedCard.id}</div>
                 {selectedCard.isParallel && (
-                  <span className={`inline-block mt-2 px-3 py-1 rounded text-sm font-bold ${
+                  <span className={`inline-block mt-1 px-3 py-1 rounded text-sm font-bold ${
                     selectedCard.artStyle === 'manga' ? 'bg-pink-500 text-black' :
                     selectedCard.artStyle === 'wanted' ? 'bg-orange-500 text-black' :
                     'bg-amber-500 text-black'
@@ -511,9 +769,69 @@ export default function TestPage() {
                 )}
               </div>
 
+              {/* Current TCG Mapping */}
+              <div className="mt-4 pt-4 border-t border-zinc-700 w-full flex flex-col items-center">
+                <h3 className="text-yellow-400 font-bold mb-2">Current TCG Mapping</h3>
+                {(() => {
+                  // Prefer dbMappings (source of truth) over prices
+                  const currentProductId = dbMappings[selectedCard.id]?.tcgProductId ?? prices[selectedCard.id]?.tcgplayerProductId;
+                  return currentProductId ? (
+                    <>
+                      <div className="w-48 aspect-[2.5/3.5] relative rounded-lg overflow-hidden ring-4 ring-yellow-500 bg-zinc-800">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={getTcgplayerImageUrl(currentProductId)}
+                          alt="Current TCG"
+                          className="absolute inset-0 w-full h-full object-contain"
+                        />
+                      </div>
+                      <div className="mt-2 text-xs text-zinc-400">
+                        Product ID: {currentProductId}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-48 aspect-[2.5/3.5] rounded-lg bg-zinc-800 ring-4 ring-red-500 flex items-center justify-center">
+                      <span className="text-red-400 text-sm font-bold">NOT MAPPED</span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Looks Right button - show if has TCG mapping and not yet fixed */}
+              {prices[selectedCard.id]?.tcgplayerProductId && !fixedCards.has(selectedCard.id) && (
+                <button
+                  onClick={() => confirmLooksRight(selectedCard)}
+                  disabled={saving}
+                  className="mt-4 w-full px-4 py-3 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 rounded-lg font-bold text-lg transition-colors"
+                >
+                  ✓ Looks Right - Confirm Match
+                </button>
+              )}
+
               {saving && (
                 <div className="mt-4 text-yellow-400 animate-pulse">Saving...</div>
               )}
+
+              {assignError && (
+                <div className="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-sm">
+                  {assignError}
+                </div>
+              )}
+
+              {/* Skip button for missing images */}
+              <button
+                onClick={() => {
+                  // Just skip to next card
+                  if (currentIndex < filteredCards.length - 1) {
+                    openCard(filteredCards[currentIndex + 1]);
+                  } else {
+                    setSelectedCard(null);
+                  }
+                }}
+                className="mt-4 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm text-zinc-300"
+              >
+                Skip → Our image is missing
+              </button>
             </div>
 
             {/* Right side - TCGPlayer products */}

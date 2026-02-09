@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       market_price: sub.price ?? null,
       art_style: sub.artStyle ?? null,
       submitted_by: submittedBy,
-      approved: isAdmin, // Auto-approve if admin
+      approved: true, // Always auto-approve
     }));
 
     // Upsert to handle updates to existing mappings
@@ -99,10 +99,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       saved: data?.length || 0,
-      approved: isAdmin,
-      message: isAdmin
-        ? `Saved and approved ${data?.length} mapping(s)`
-        : `Submitted ${data?.length} mapping(s) for approval`
+      approved: true,
+      message: `Saved and approved ${data?.length} mapping(s)`
     });
   } catch (error) {
     console.error('Error saving mappings:', error);
