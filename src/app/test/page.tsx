@@ -26,10 +26,40 @@ interface TCGProduct {
   imageUrl: string;
 }
 
+// Encouraging messages for Melody
+const ENCOURAGEMENT_MESSAGES = [
+  "Amazing work, Melody! You're making this database so much better!",
+  "You're on fire! Keep going, superstar!",
+  "Melody, you're absolutely crushing it!",
+  "Another one fixed! You're the best!",
+  "Look at you go! The cards are so lucky to have you!",
+  "Fantastic job! You're making such a difference!",
+  "Melody's fixing machine! Unstoppable!",
+  "Every fix makes the site better. Thank you, Melody!",
+  "You're a card-fixing wizard!",
+  "So proud of you! Keep being awesome!",
+  "The One Piece community thanks you, Melody!",
+  "You're doing incredible work!",
+  "Another card saved! You're a hero!",
+  "Melody = MVP of card fixing!",
+  "That was a tricky one, but you got it!",
+];
+
+const MILESTONE_MESSAGES: Record<number, string> = {
+  1: "You fixed your first card! Welcome to the team, Melody!",
+  5: "5 cards fixed! You're getting the hang of this!",
+  10: "Double digits! 10 cards fixed!",
+  25: "25 cards! You're officially a pro!",
+  50: "FIFTY cards! Melody, you're incredible!",
+  100: "100 CARDS! You're a legend!",
+  200: "200 cards?! Melody, you're unstoppable!",
+  500: "500 CARDS! You deserve a trophy!",
+};
+
 export default function TestPage() {
   const [cards, setCards] = useState<CardWithPrice[]>([]);
   const [prices, setPrices] = useState<Record<string, CardPrice>>({});
-  const [mappings, setMappings] = useState<Record<string, CardMapping>>({});
+  const [fixedCards, setFixedCards] = useState<Set<string>>(new Set());
   const [artStyleChanges, setArtStyleChanges] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<'all' | 'with-price' | 'has-variants' | 'mapped' | 'unmapped' | 'issues'>('issues');
   const [selectedSet, setSelectedSet] = useState<string>('all');
@@ -41,10 +71,26 @@ export default function TestPage() {
   const [searching, setSearching] = useState(false);
   const [manualUrl, setManualUrl] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   // Which card we're currently assigning a product to
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+
+  // Contributor tracking
+  const [adminKey, setAdminKey] = useState<string>('');
+  const [contributorName, setContributorName] = useState<string>('');
+  const [sessionFixes, setSessionFixes] = useState(0);
+  const [totalFixes, setTotalFixes] = useState(0);
+  const [encouragement, setEncouragement] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load saved admin key and contributor name
+    const savedAdminKey = localStorage.getItem('admin-key');
+    const savedContributor = localStorage.getItem('contributor-name');
+    const savedTotalFixes = localStorage.getItem('total-fixes');
+    if (savedAdminKey) setAdminKey(savedAdminKey);
+    if (savedContributor) setContributorName(savedContributor);
+    if (savedTotalFixes) setTotalFixes(parseInt(savedTotalFixes) || 0);
+  }, []);
 
   useEffect(() => {
     fetch('/api/cards')
@@ -61,23 +107,30 @@ export default function TestPage() {
       .then(data => setPrices(data.prices || {}))
       .catch(console.error);
 
-    const savedMappings = localStorage.getItem('tcgplayer-mappings');
-    if (savedMappings) {
-      setMappings(JSON.parse(savedMappings));
-    }
-
-    const savedArtStyles = localStorage.getItem('artstyle-changes');
-    if (savedArtStyles) {
-      setArtStyleChanges(JSON.parse(savedArtStyles));
+    // Load fixed cards from this session
+    const savedFixed = localStorage.getItem('fixed-cards');
+    if (savedFixed) {
+      setFixedCards(new Set(JSON.parse(savedFixed)));
     }
   }, []);
 
-  // Toggle manga status for a card
-  const toggleManga = (cardId: string, currentArtStyle: string) => {
-    const newArtStyle = currentArtStyle === 'manga' ? 'alternate' : 'manga';
+  // Toggle art style for a card
+  const setCardArtStyle = (cardId: string, newArtStyle: string) => {
     const newChanges = { ...artStyleChanges, [cardId]: newArtStyle };
     setArtStyleChanges(newChanges);
     localStorage.setItem('artstyle-changes', JSON.stringify(newChanges));
+  };
+
+  // Cycle through art styles: alternate -> manga -> wanted -> alternate
+  const cycleArtStyle = (cardId: string, currentArtStyle: string) => {
+    const cycle: Record<string, string> = {
+      'alternate': 'manga',
+      'manga': 'wanted',
+      'wanted': 'alternate',
+      'standard': 'manga'
+    };
+    const newArtStyle = cycle[currentArtStyle] || 'manga';
+    setCardArtStyle(cardId, newArtStyle);
   };
 
   // Get effective art style (considering pending changes)
@@ -111,8 +164,8 @@ export default function TestPage() {
     const unmapped: string[] = [];
 
     cards.forEach(card => {
-      // Check pending mappings first, then existing prices
-      const productId = mappings[card.id]?.tcgProductId || prices[card.id]?.tcgplayerProductId;
+      // Check prices for product ID
+      const productId = prices[card.id]?.tcgplayerProductId;
 
       if (productId) {
         if (!productIdUsage[productId]) {
@@ -158,7 +211,7 @@ export default function TestPage() {
       unmappedCardIds: new Set(unmapped),
       cardIssues: issues
     };
-  }, [cards, prices, mappings]);
+  }, [cards, prices]);
 
   // Filter groups - when a set is selected, only show cards from that set within each group
   const filteredGroups = useMemo(() => {
@@ -177,14 +230,14 @@ export default function TestPage() {
 
         const hasPrice = group.some(c => prices[c.id]?.tcgplayerUrl);
         const hasVariants = group.length > 1;
-        const hasMappings = group.some(c => mappings[c.id]);
-        const needsMapping = hasVariants && group.some(c => !mappings[c.id] && !prices[c.id]?.tcgplayerProductId);
+        const hasFixedCards = group.some(c => fixedCards.has(c.id));
+        const needsMapping = hasVariants && group.some(c => !fixedCards.has(c.id) && !prices[c.id]?.tcgplayerProductId);
         const hasIssues = group.some(c => cardIssues[c.id]);
 
         switch (filter) {
           case 'with-price': return hasPrice;
           case 'has-variants': return hasVariants && hasPrice;
-          case 'mapped': return hasMappings;
+          case 'mapped': return hasFixedCards;
           case 'unmapped': return needsMapping;
           case 'issues': return hasIssues;
           default: return true;
@@ -199,7 +252,7 @@ export default function TestPage() {
         if (!aHasDupe && bHasDupe) return 1;
         return 0;
       });
-  }, [cardGroups, prices, mappings, filter, selectedSet, cardIssues]);
+  }, [cardGroups, prices, fixedCards, filter, selectedSet, cardIssues]);
 
   // Navigation
   const currentIndex = modalBaseId ? filteredGroups.findIndex(([id]) => id === modalBaseId) : -1;
@@ -279,99 +332,90 @@ export default function TestPage() {
     return null;
   };
 
-  const assignProductToCard = (cardId: string, product: TCGProduct) => {
-    const newMappings = {
-      ...mappings,
-      [cardId]: {
-        cardId,
-        tcgProductId: product.productId,
-        tcgUrl: product.url,
-        tcgName: product.productName,
-        price: product.marketPrice,
-      }
-    };
-    setMappings(newMappings);
-    localStorage.setItem('tcgplayer-mappings', JSON.stringify(newMappings));
+  // Show a random encouragement message
+  const showEncouragement = (newTotal: number) => {
+    // Check for milestone
+    if (MILESTONE_MESSAGES[newTotal]) {
+      setEncouragement(MILESTONE_MESSAGES[newTotal]);
+    } else {
+      // Random encouragement
+      const msg = ENCOURAGEMENT_MESSAGES[Math.floor(Math.random() * ENCOURAGEMENT_MESSAGES.length)];
+      setEncouragement(msg);
+    }
+    // Clear after 4 seconds
+    setTimeout(() => setEncouragement(null), 4000);
+  };
+
+  const assignProductToCard = async (cardId: string, product: TCGProduct) => {
+    if (saving) return;
+    setSaving(true);
     setActiveCardId(null);
+
+    const name = contributorName || 'Melody';
+    const artStyle = artStyleChanges[cardId] || null;
+
+    try {
+      const res = await fetch('/api/mappings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminKey && { 'x-admin-key': adminKey }),
+        },
+        body: JSON.stringify([{
+          cardId,
+          tcgProductId: product.productId,
+          tcgUrl: product.url,
+          tcgName: product.productName,
+          price: product.marketPrice,
+          artStyle,
+          submittedBy: name,
+        }]),
+      });
+
+      if (res.ok) {
+        // Update fixed cards
+        const newFixed = new Set(fixedCards);
+        newFixed.add(cardId);
+        setFixedCards(newFixed);
+        localStorage.setItem('fixed-cards', JSON.stringify([...newFixed]));
+
+        // Update counts
+        const newSession = sessionFixes + 1;
+        const newTotal = totalFixes + 1;
+        setSessionFixes(newSession);
+        setTotalFixes(newTotal);
+        localStorage.setItem('total-fixes', String(newTotal));
+
+        // Show encouragement
+        showEncouragement(newTotal);
+
+        // Clear art style change if applied
+        if (artStyle) {
+          const newChanges = { ...artStyleChanges };
+          delete newChanges[cardId];
+          setArtStyleChanges(newChanges);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save:', error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const removeMapping = (cardId: string) => {
-    const newMappings = { ...mappings };
-    delete newMappings[cardId];
-    setMappings(newMappings);
-    localStorage.setItem('tcgplayer-mappings', JSON.stringify(newMappings));
+    // Remove from fixed cards (local only - doesn't affect database)
+    const newFixed = new Set(fixedCards);
+    newFixed.delete(cardId);
+    setFixedCards(newFixed);
+    localStorage.setItem('fixed-cards', JSON.stringify([...newFixed]));
   };
 
-  const clearAllMappings = () => {
-    if (confirm('Clear all mappings? This cannot be undone.')) {
-      setMappings({});
-      localStorage.removeItem('tcgplayer-mappings');
-    }
-  };
-
-  const exportMappings = () => {
-    const dataStr = JSON.stringify(mappings, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tcgplayer-mappings.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const applyMappingsToData = async () => {
-    const hasMappings = Object.keys(mappings).length > 0;
-    const hasArtStyleChanges = Object.keys(artStyleChanges).length > 0;
-
-    if (!hasMappings && !hasArtStyleChanges) {
-      alert('No changes to apply.');
-      return;
-    }
-
-    const confirmMsg = [
-      hasMappings ? `${Object.keys(mappings).length} price mappings` : null,
-      hasArtStyleChanges ? `${Object.keys(artStyleChanges).length} artStyle changes` : null,
-    ].filter(Boolean).join(' and ');
-
-    if (!confirm(`Apply ${confirmMsg}?`)) {
-      return;
-    }
-
-    setSaving(true);
-    setSaveStatus(null);
-
-    try {
-      const res = await fetch('/api/apply-mappings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mappings, artStyleChanges }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setSaveStatus(`Success! Applied ${data.updated} mappings, ${data.artStyleUpdated} artStyle changes.`);
-        // Refresh prices
-        const pricesRes = await fetch('/api/prices');
-        const pricesData = await pricesRes.json();
-        setPrices(pricesData.prices || {});
-        // Refresh cards to get updated artStyles
-        const cardsRes = await fetch('/api/cards');
-        const cardsData = await cardsRes.json();
-        setCards(cardsData.cards || []);
-        // Clear local state
-        setMappings({});
-        setArtStyleChanges({});
-        localStorage.removeItem('tcgplayer-mappings');
-        localStorage.removeItem('artstyle-changes');
-      } else {
-        setSaveStatus(`Error: ${data.error}`);
-      }
-    } catch (error) {
-      setSaveStatus(`Failed: ${error}`);
-    } finally {
-      setSaving(false);
+  const clearSessionFixes = () => {
+    if (confirm('Clear your session fix history? (Database entries remain)')) {
+      setFixedCards(new Set());
+      setSessionFixes(0);
+      localStorage.removeItem('fixed-cards');
     }
   };
 
@@ -380,10 +424,11 @@ export default function TestPage() {
   };
 
   const getEffectiveProductId = (cardId: string): number | null => {
-    if (mappings[cardId]) {
-      return mappings[cardId].tcgProductId;
-    }
     return prices[cardId]?.tcgplayerProductId || null;
+  };
+
+  const isCardFixed = (cardId: string): boolean => {
+    return fixedCards.has(cardId);
   };
 
   // Filter modal group by selected set
@@ -409,37 +454,57 @@ export default function TestPage() {
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-3 mb-6">
-          <button
-            onClick={applyMappingsToData}
-            disabled={saving || (Object.keys(mappings).length === 0 && Object.keys(artStyleChanges).length === 0)}
-            className="px-6 py-3 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-lg text-lg font-medium"
-          >
-            {saving ? 'Saving...' : `Save ${Object.keys(mappings).length + Object.keys(artStyleChanges).length} Changes`}
-          </button>
-          <button
-            onClick={exportMappings}
-            className="px-4 py-3 bg-zinc-700 hover:bg-zinc-600 rounded-lg disabled:opacity-50"
-            disabled={Object.keys(mappings).length === 0}
-          >
-            Export JSON
-          </button>
-          {Object.keys(mappings).length > 0 && (
-            <button
-              onClick={clearAllMappings}
-              className="px-4 py-3 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg"
-            >
-              Clear All
-            </button>
-          )}
-        </div>
-
-        {saveStatus && (
-          <div className={`mb-6 p-4 rounded-lg text-lg ${saveStatus.startsWith('Error') || saveStatus.startsWith('Failed') ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'}`}>
-            {saveStatus}
+        {/* Encouragement Message */}
+        {encouragement && (
+          <div className="mb-6 p-6 bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-blue-500/20 border-2 border-pink-400/50 rounded-xl animate-pulse">
+            <p className="text-2xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400">
+              {encouragement}
+            </p>
           </div>
         )}
+
+        {/* Fix Counter */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-xl border border-green-500/30">
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Your name"
+                value={contributorName}
+                onChange={(e) => {
+                  setContributorName(e.target.value);
+                  localStorage.setItem('contributor-name', e.target.value);
+                }}
+                className="px-3 py-2 bg-zinc-900 border border-zinc-600 rounded-lg w-40"
+              />
+              <input
+                type="password"
+                placeholder="Admin key"
+                value={adminKey}
+                onChange={(e) => {
+                  setAdminKey(e.target.value);
+                  localStorage.setItem('admin-key', e.target.value);
+                }}
+                className="px-3 py-2 bg-zinc-900 border border-zinc-600 rounded-lg w-32"
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-green-400">{sessionFixes}</div>
+                <div className="text-xs text-zinc-400">This Session</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-blue-400">{totalFixes}</div>
+                <div className="text-xs text-zinc-400">All Time</div>
+              </div>
+            </div>
+            {saving && (
+              <div className="px-4 py-2 bg-yellow-500/20 text-yellow-300 rounded-lg animate-pulse">
+                Saving...
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Issue Summary */}
         {Object.keys(cardIssues).length > 0 && (
@@ -476,7 +541,7 @@ export default function TestPage() {
                 >
                   {f === 'issues' ? `⚠️ Issues (${Object.keys(cardIssues).length})` :
                    f === 'has-variants' ? 'Cards with Variants' :
-                   f === 'mapped' ? `Fixed (${Object.keys(mappings).length})` :
+                   f === 'mapped' ? `My Fixes (${fixedCards.size})` :
                    'All Cards'}
                 </button>
               ))}
@@ -505,7 +570,7 @@ export default function TestPage() {
         {/* Card Groups - Main List */}
         <div className="space-y-4">
           {filteredGroups.map(([baseId, group]) => {
-            const hasAnyMapping = group.some(c => mappings[c.id]);
+            const hasAnyFixed = group.some(c => fixedCards.has(c.id));
             const groupHasDuplicate = group.some(c => cardIssues[c.id]?.isDuplicate);
             const groupHasUnmapped = group.some(c => cardIssues[c.id]?.isUnmapped);
 
@@ -513,7 +578,7 @@ export default function TestPage() {
               <div
                 key={baseId}
                 className={`p-6 rounded-xl border-2 ${
-                  hasAnyMapping ? 'border-green-500 bg-green-500/5' :
+                  hasAnyFixed ? 'border-green-500 bg-green-500/5' :
                   groupHasDuplicate ? 'border-red-500 bg-red-500/5' :
                   groupHasUnmapped ? 'border-orange-500 bg-orange-500/5' :
                   'border-zinc-700 bg-zinc-900'
@@ -526,7 +591,7 @@ export default function TestPage() {
                     <span className="px-3 py-1 bg-zinc-700 rounded-full text-sm">
                       {group.length} version{group.length > 1 ? 's' : ''}
                     </span>
-                    {hasAnyMapping && (
+                    {hasAnyFixed && (
                       <span className="px-3 py-1 bg-green-600 rounded-full text-sm font-medium">
                         FIXED
                       </span>
@@ -554,7 +619,7 @@ export default function TestPage() {
                 <div className="flex gap-6 overflow-x-auto pb-2">
                   {group.map(card => {
                     const productId = getEffectiveProductId(card.id);
-                    const mapping = mappings[card.id];
+                    const isFixed = fixedCards.has(card.id);
                     const price = prices[card.id];
                     const issue = cardIssues[card.id];
 
@@ -572,7 +637,7 @@ export default function TestPage() {
                                card.artStyle === 'wanted' ? 'WANTED' : 'ALT ART'}
                             </span>
                           )}
-                          {mapping && <span className="px-2 py-0.5 bg-green-600 rounded text-xs font-bold">FIXED</span>}
+                          {isFixed && <span className="px-2 py-0.5 bg-green-600 rounded text-xs font-bold">FIXED</span>}
                           {issue?.isDuplicate && (
                             <span className="px-2 py-0.5 bg-red-600 rounded text-xs font-bold" title={`Same TCG link as: ${issue.duplicateWith?.join(', ')}`}>
                               DUPLICATE
@@ -604,7 +669,7 @@ export default function TestPage() {
                           <div>
                             <div className="text-xs font-bold text-yellow-400 mb-1 text-center">TCGPLAYER</div>
                             {productId ? (
-                              <div className={`w-32 aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-800 ring-2 ${mapping ? 'ring-green-500' : 'ring-yellow-500'}`}>
+                              <div className={`w-32 aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-800 ring-2 ${isFixed ? 'ring-green-500' : 'ring-yellow-500'}`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={getTcgplayerImageUrl(productId)}
@@ -620,9 +685,9 @@ export default function TestPage() {
                           </div>
                         </div>
 
-                        {(mapping?.price || price?.marketPrice) && (
+                        {price?.marketPrice && (
                           <div className="text-center mt-2 text-lg font-bold text-green-400">
-                            ${(mapping?.price || price?.marketPrice)?.toFixed(2)}
+                            ${price.marketPrice.toFixed(2)}
                           </div>
                         )}
                       </div>
@@ -696,7 +761,7 @@ export default function TestPage() {
               </h3>
               <div className="flex gap-6 overflow-x-auto pb-2">
                 {modalGroup.map(card => {
-                  const mapping = mappings[card.id];
+                  const isFixed = fixedCards.has(card.id);
                   const currentProductId = getEffectiveProductId(card.id);
                   const isActive = activeCardId === card.id;
 
@@ -706,7 +771,7 @@ export default function TestPage() {
                       className={`shrink-0 p-4 rounded-xl border-3 transition-all ${
                         isActive
                           ? 'border-blue-500 bg-blue-500/20 ring-4 ring-blue-500/50'
-                          : mapping
+                          : isFixed
                           ? 'border-green-500 bg-green-500/10'
                           : 'border-zinc-600 bg-zinc-800 hover:border-zinc-400'
                       }`}
@@ -757,10 +822,10 @@ export default function TestPage() {
                         {/* Current TCGPlayer */}
                         <div>
                           <div className="text-xs font-bold text-yellow-400 mb-1 text-center">
-                            {mapping ? 'FIXED TO' : 'CURRENT TCG'}
+                            {isFixed ? 'FIXED!' : 'CURRENT TCG'}
                           </div>
                           {currentProductId ? (
-                            <div className={`w-40 aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-700 ring-2 ${mapping ? 'ring-green-500' : 'ring-yellow-500'}`}>
+                            <div className={`w-40 aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-700 ring-2 ${isFixed ? 'ring-green-500' : 'ring-yellow-500'}`}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={getTcgplayerImageUrl(currentProductId)}
@@ -778,43 +843,48 @@ export default function TestPage() {
 
                       {/* Action buttons */}
                       <div className="mt-4 space-y-2">
-                        {mapping ? (
-                          <>
-                            <div className="text-sm text-green-400 text-center font-medium">
-                              ✓ Fixed to: {mapping.tcgName}
-                            </div>
-                            <button
-                              onClick={() => removeMapping(card.id)}
-                              className="w-full py-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg"
-                            >
-                              Undo Fix
-                            </button>
-                          </>
+                        {isFixed ? (
+                          <div className="text-sm text-green-400 text-center font-medium py-3">
+                            ✓ Fixed this session!
+                          </div>
                         ) : (
                           <button
                             onClick={() => setActiveCardId(isActive ? null : card.id)}
+                            disabled={saving}
                             className={`w-full py-3 rounded-lg font-bold text-lg ${
                               isActive
                                 ? 'bg-blue-600 text-white'
-                                : 'bg-yellow-600 hover:bg-yellow-500 text-black'
+                                : 'bg-yellow-600 hover:bg-yellow-500 text-black disabled:opacity-50'
                             }`}
                           >
-                            {isActive ? 'Now click a product below ↓' : 'Select to Fix This'}
+                            {saving ? 'Saving...' : isActive ? 'Now click a product below ↓' : 'Select to Fix This'}
                           </button>
                         )}
 
-                        {/* Manga toggle - only for parallel cards */}
+                        {/* Art style toggles - only for parallel cards */}
                         {card.isParallel && (
-                          <button
-                            onClick={() => toggleManga(card.id, getEffectiveArtStyle(card))}
-                            className={`w-full py-2 rounded-lg font-medium ${
-                              getEffectiveArtStyle(card) === 'manga'
-                                ? 'bg-pink-600 hover:bg-pink-500 text-white'
-                                : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'
-                            }`}
-                          >
-                            {getEffectiveArtStyle(card) === 'manga' ? '✓ Marked as Manga' : 'Mark as Manga'}
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setCardArtStyle(card.id, getEffectiveArtStyle(card) === 'manga' ? 'alternate' : 'manga')}
+                              className={`flex-1 py-2 rounded-lg font-medium text-sm ${
+                                getEffectiveArtStyle(card) === 'manga'
+                                  ? 'bg-pink-600 hover:bg-pink-500 text-white'
+                                  : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'
+                              }`}
+                            >
+                              {getEffectiveArtStyle(card) === 'manga' ? '✓ Manga' : 'Manga'}
+                            </button>
+                            <button
+                              onClick={() => setCardArtStyle(card.id, getEffectiveArtStyle(card) === 'wanted' ? 'alternate' : 'wanted')}
+                              className={`flex-1 py-2 rounded-lg font-medium text-sm ${
+                                getEffectiveArtStyle(card) === 'wanted'
+                                  ? 'bg-orange-600 hover:bg-orange-500 text-white'
+                                  : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'
+                              }`}
+                            >
+                              {getEffectiveArtStyle(card) === 'wanted' ? '✓ Wanted' : 'Wanted'}
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -872,25 +942,19 @@ export default function TestPage() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                   {searchResults.map((product) => {
-                    const isAssigned = Object.values(mappings).some(m => m.tcgProductId === product.productId);
-
                     return (
                       <div
                         key={product.productId}
                         onClick={() => {
-                          if (activeCardId) {
+                          if (activeCardId && !saving) {
                             assignProductToCard(activeCardId, product);
                           }
                         }}
                         className={`p-3 rounded-xl border-2 transition-all ${
-                          activeCardId
+                          activeCardId && !saving
                             ? 'cursor-pointer hover:border-blue-500 hover:bg-blue-500/10'
                             : 'cursor-default'
-                        } ${
-                          isAssigned
-                            ? 'border-green-500 bg-green-500/10'
-                            : 'border-zinc-700 bg-zinc-800'
-                        }`}
+                        } border-zinc-700 bg-zinc-800`}
                       >
                         <div className="aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-700 mb-3">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -905,11 +969,6 @@ export default function TestPage() {
                         {product.marketPrice && (
                           <div className="text-lg font-bold text-green-400 mt-1">
                             ${product.marketPrice.toFixed(2)}
-                          </div>
-                        )}
-                        {isAssigned && (
-                          <div className="mt-2 px-2 py-1 bg-green-600 rounded text-xs font-bold text-center">
-                            ASSIGNED
                           </div>
                         )}
                       </div>
