@@ -861,276 +861,236 @@ export default function TestPage() {
             </div>
           )}
 
-          {/* Main content - side by side */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Left side - Our card */}
-            <div className="w-80 shrink-0 p-6 border-r border-zinc-800 flex flex-col items-center overflow-y-auto">
-              <h3 className="text-green-400 font-bold mb-2">Our Image (Correct)</h3>
-              <div className="w-48 aspect-[2.5/3.5] relative rounded-lg overflow-hidden ring-4 ring-green-500 bg-zinc-800">
-                <Image
-                  src={selectedCard.imageUrl}
-                  alt={selectedCard.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-              <div className="mt-2 text-center">
-                <div className="font-mono text-lg">{selectedCard.id}</div>
-                {selectedCard.isParallel && (
-                  <span className={`inline-block mt-1 px-3 py-1 rounded text-sm font-bold ${
-                    selectedCard.artStyle === 'manga' ? 'bg-pink-500 text-black' :
-                    selectedCard.artStyle === 'wanted' ? 'bg-orange-500 text-black' :
-                    'bg-amber-500 text-black'
-                  }`}>
-                    {selectedCard.artStyle === 'manga' ? 'MANGA' :
-                     selectedCard.artStyle === 'wanted' ? 'WANTED' : 'ALT ART'}
-                  </span>
-                )}
-              </div>
-
-              {/* Current TCG Mapping */}
-              <div className="mt-4 pt-4 border-t border-zinc-700 w-full flex flex-col items-center">
-                <h3 className="text-yellow-400 font-bold mb-2">Current TCG Mapping</h3>
-                {(() => {
-                  // Prefer dbMappings (source of truth) over prices
-                  const currentProductId = dbMappings[selectedCard.id]?.tcgProductId ?? prices[selectedCard.id]?.tcgplayerProductId;
-                  return currentProductId ? (
-                    <>
-                      <div className="w-48 aspect-[2.5/3.5] relative rounded-lg overflow-hidden ring-4 ring-yellow-500 bg-zinc-800">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={getTcgplayerImageUrl(currentProductId)}
-                          alt="Current TCG"
-                          className="absolute inset-0 w-full h-full object-contain"
-                        />
-                      </div>
-                      <div className="mt-2 text-xs text-zinc-400">
-                        Product ID: {currentProductId}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="w-48 aspect-[2.5/3.5] rounded-lg bg-zinc-800 ring-4 ring-red-500 flex items-center justify-center">
-                      <span className="text-red-400 text-sm font-bold">NOT MAPPED</span>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Looks Right button - show if has TCG mapping and not yet fixed */}
-              {prices[selectedCard.id]?.tcgplayerProductId && !fixedCards.has(selectedCard.id) && (
-                <button
-                  onClick={() => confirmLooksRight(selectedCard)}
-                  disabled={saving}
-                  className="mt-4 w-full px-4 py-3 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 rounded-lg font-bold text-lg transition-colors"
-                >
-                  ✓ Looks Right - Confirm Match
-                </button>
-              )}
-
-              {saving && (
-                <div className="mt-4 text-yellow-400 animate-pulse">Saving...</div>
-              )}
-
-              {assignError && (
-                <div className="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-sm">
-                  {assignError}
-                </div>
-              )}
-
-              {/* Skip button for missing images */}
+          {/* Action bar */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+            {/* Looks Right button */}
+            {prices[selectedCard.id]?.tcgplayerProductId && !fixedCards.has(selectedCard.id) && (
               <button
-                onClick={() => {
-                  // Just skip to next card
-                  if (currentIndex < filteredCards.length - 1) {
-                    openCard(filteredCards[currentIndex + 1]);
-                  } else {
-                    setSelectedCard(null);
-                  }
-                }}
-                className="mt-4 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm text-zinc-300"
+                onClick={() => confirmLooksRight(selectedCard)}
+                disabled={saving}
+                className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 rounded-lg font-bold transition-colors"
               >
-                Skip → Our image is missing
+                ✓ Looks Right
               </button>
+            )}
 
-              {/* Report Problem */}
-              <div className="mt-4 pt-4 border-t border-zinc-700 w-full">
-                {!showProblemInput ? (
-                  <button
-                    onClick={() => setShowProblemInput(true)}
-                    className="w-full px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500 rounded-lg text-sm text-orange-300"
-                  >
-                    ⚠️ Report Problem with this Card
-                  </button>
-                ) : (
-                  <div className="space-y-3">
-                    <label className="text-sm text-orange-400 font-bold">What&apos;s wrong with this card?</label>
+            {/* Skip button */}
+            <button
+              onClick={() => {
+                if (currentIndex < filteredCards.length - 1) {
+                  openCard(filteredCards[currentIndex + 1]);
+                } else {
+                  setSelectedCard(null);
+                }
+              }}
+              className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm text-zinc-300"
+            >
+              Skip
+            </button>
 
-                    {/* Quick select reasons */}
-                    <div className="flex flex-wrap gap-2">
-                      {[...PRESET_REASONS, ...customProblemReasons].map((reason) => (
-                        <button
-                          key={reason}
-                          onClick={() => {
-                            setProblemReason(reason);
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            problemReason === reason
-                              ? 'bg-orange-600 text-white'
-                              : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
-                          }`}
-                        >
-                          {reason}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Custom reason input */}
-                    <input
-                      type="text"
-                      value={problemReason}
-                      onChange={(e) => setProblemReason(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && problemReason.trim()) {
-                          reportProblem();
-                        }
+            {/* Report Problem */}
+            {!showProblemInput ? (
+              <button
+                onClick={() => setShowProblemInput(true)}
+                className="px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500 rounded-lg text-sm text-orange-300"
+              >
+                ⚠️ Report Problem
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 flex-1">
+                <div className="flex flex-wrap gap-1">
+                  {[...PRESET_REASONS, ...customProblemReasons].slice(0, 4).map((reason) => (
+                    <button
+                      key={reason}
+                      onClick={() => {
+                        setProblemReason(reason);
+                        reportProblem();
                       }}
-                      placeholder="Or type a custom reason..."
-                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-sm"
-                    />
+                      className="px-2 py-1 rounded text-xs font-medium bg-zinc-800 hover:bg-orange-600 text-zinc-300 hover:text-white transition-colors"
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={problemReason}
+                  onChange={(e) => setProblemReason(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && problemReason.trim()) {
+                      reportProblem();
+                    }
+                  }}
+                  placeholder="Custom reason..."
+                  className="w-40 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-sm"
+                />
+                <button
+                  onClick={() => {
+                    setShowProblemInput(false);
+                    setProblemReason('');
+                  }}
+                  className="px-2 py-1 text-zinc-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
-                    <div className="flex gap-2">
-                      <button
-                        onClick={reportProblem}
-                        disabled={saving || !problemReason.trim()}
-                        className="flex-1 px-3 py-2 bg-orange-600 hover:bg-orange-500 disabled:bg-zinc-700 rounded-lg text-sm font-bold"
-                      >
-                        Submit Report
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowProblemInput(false);
-                          setProblemReason('');
-                        }}
-                        className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+            {saving && (
+              <span className="text-yellow-400 animate-pulse ml-auto">Saving...</span>
+            )}
+
+            {/* Paste URL input */}
+            <div className="flex items-center gap-2 ml-auto">
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(selectedCard.baseId.replace(/_p\d+$/, ''))} tcgplayer one piece`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setTimeout(() => urlInputRef.current?.focus(), 100)}
+                className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm transition-colors"
+              >
+                🔍 Google
+              </a>
+              <input
+                ref={urlInputRef}
+                type="text"
+                placeholder="Paste TCGPlayer URL..."
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                onPaste={handleUrlPaste}
+                className="w-64 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+          </div>
+
+          {/* Main content - unified grid */}
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {/* Our Image - first item */}
+              <div className="p-3 rounded-lg border-4 border-green-500 bg-green-500/10">
+                <div className="text-xs font-bold text-green-400 mb-2 text-center">OUR IMAGE</div>
+                <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-800">
+                  <Image
+                    src={selectedCard.imageUrl}
+                    alt={selectedCard.name}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <div className="text-sm font-mono text-center mt-2">{selectedCard.id}</div>
+                {selectedCard.isParallel && (
+                  <div className="text-center mt-1">
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
+                      selectedCard.artStyle === 'manga' ? 'bg-pink-500 text-black' :
+                      selectedCard.artStyle === 'wanted' ? 'bg-orange-500 text-black' :
+                      'bg-amber-500 text-black'
+                    }`}>
+                      {selectedCard.artStyle === 'manga' ? 'MANGA' :
+                       selectedCard.artStyle === 'wanted' ? 'WANTED' : 'ALT ART'}
+                    </span>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Right side - TCGPlayer products */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Products grid */}
-              <div className="flex-1 overflow-y-auto p-4">
-                <h3 className="text-yellow-400 font-bold mb-4">
-                  Click to assign TCGPlayer product:
-                </h3>
-
-                {searching ? (
-                  <div className="text-center py-12 text-zinc-400">Searching...</div>
-                ) : searchResults.length === 0 ? (
-                  <div className="text-center py-12 text-zinc-400">
-                    No products found
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                    {searchResults.map((product) => (
-                      <div
-                        key={product.productId}
-                        onClick={() => assignProduct(product)}
-                        className="cursor-pointer p-3 rounded-lg border-2 border-zinc-700 bg-zinc-800 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
-                      >
-                        <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
+              {/* Current TCG Mapping - second item */}
+              {(() => {
+                const currentProductId = dbMappings[selectedCard.id]?.tcgProductId ?? prices[selectedCard.id]?.tcgplayerProductId;
+                return (
+                  <div className={`p-3 rounded-lg border-4 ${currentProductId ? 'border-yellow-500 bg-yellow-500/10' : 'border-red-500 bg-red-500/10'}`}>
+                    <div className={`text-xs font-bold mb-2 text-center ${currentProductId ? 'text-yellow-400' : 'text-red-400'}`}>
+                      CURRENT TCG
+                    </div>
+                    {currentProductId ? (
+                      <>
+                        <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-800">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={product.imageUrl}
-                            alt={product.productName}
+                            src={getTcgplayerImageUrl(currentProductId)}
+                            alt="Current TCG"
                             className="absolute inset-0 w-full h-full object-contain"
                           />
                         </div>
-                        <div className="text-xs text-zinc-400 truncate">{product.number}</div>
-                        <div className="text-sm truncate">{product.productName}</div>
-                        {product.marketPrice && (
-                          <div className="text-green-400 font-bold mt-1">
-                            ${product.marketPrice.toFixed(2)}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Google Search Results */}
-                {(searchingGoogle || googleResults.length > 0) && (
-                  <div className="mt-6 pt-6 border-t border-zinc-800">
-                    <h3 className="text-blue-400 font-bold mb-4 flex items-center gap-2">
-                      🔍 Google Search Results
-                      {searchingGoogle && <span className="text-zinc-500 text-sm font-normal">(searching...)</span>}
-                    </h3>
-
-                    {searchingGoogle ? (
-                      <div className="text-center py-8 text-zinc-400">Searching Google...</div>
-                    ) : googleResults.length === 0 ? (
-                      <div className="text-center py-4 text-zinc-500 text-sm">No Google results found</div>
+                        <div className="text-xs text-zinc-400 text-center mt-2">ID: {currentProductId}</div>
+                      </>
                     ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                        {googleResults.map((product) => (
-                          <div
-                            key={`google-${product.productId}`}
-                            onClick={() => assignProduct(product)}
-                            className="cursor-pointer p-3 rounded-lg border-2 border-blue-700 bg-blue-900/20 hover:border-blue-500 hover:bg-blue-500/20 transition-all"
-                          >
-                            <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={product.imageUrl}
-                                alt={product.productName}
-                                className="absolute inset-0 w-full h-full object-contain"
-                              />
-                            </div>
-                            <div className="text-sm truncate text-blue-200">{product.productName}</div>
-                            <div className="text-xs text-zinc-500 mt-1">via Google</div>
-                          </div>
-                        ))}
+                      <div className="aspect-[2.5/3.5] rounded bg-zinc-800 flex items-center justify-center">
+                        <span className="text-red-400 text-sm font-bold">NOT MAPPED</span>
                       </div>
                     )}
                   </div>
-                )}
+                );
+              })()}
 
-                {/* Not in this list help */}
-                <div className="mt-6 pt-6 border-t border-zinc-800">
-                  <div className="bg-zinc-800/50 rounded-xl p-4">
-                    <h4 className="text-orange-400 font-bold mb-3">Still not found?</h4>
-                    <div className="flex gap-3 items-center">
-                      <a
-                        href={`https://www.google.com/search?q=${encodeURIComponent(selectedCard.baseId.replace(/_p\d+$/, ''))} tcgplayer one piece`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => {
-                          // Focus the input after a brief delay (after tab opens)
-                          setTimeout(() => urlInputRef.current?.focus(), 100);
-                        }}
-                        className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg font-medium transition-colors"
-                      >
-                        🔍 Open Google
-                      </a>
-                      <input
-                        ref={urlInputRef}
-                        type="text"
-                        placeholder="Paste TCGPlayer URL here (auto-saves)..."
-                        value={manualUrl}
-                        onChange={(e) => setManualUrl(e.target.value)}
-                        onPaste={handleUrlPaste}
-                        className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                      />
-                    </div>
-                  </div>
-                </div>
+              {/* Divider text */}
+              <div className="col-span-full text-center py-2">
+                <span className="text-zinc-500 text-sm">
+                  {searching ? 'Searching TCGPlayer...' : `Click a product below to assign it →`}
+                </span>
               </div>
+
+              {/* TCGPlayer Search Results */}
+              {searchResults.map((product) => (
+                <div
+                  key={product.productId}
+                  onClick={() => assignProduct(product)}
+                  className="cursor-pointer p-3 rounded-lg border-2 border-zinc-700 bg-zinc-800 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                >
+                  <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={product.imageUrl}
+                      alt={product.productName}
+                      className="absolute inset-0 w-full h-full object-contain"
+                    />
+                  </div>
+                  <div className="text-xs text-zinc-400 truncate">{product.number}</div>
+                  <div className="text-sm truncate">{product.productName}</div>
+                  {product.marketPrice && (
+                    <div className="text-green-400 font-bold mt-1 text-sm">
+                      ${product.marketPrice.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Google Results */}
+              {googleResults.length > 0 && (
+                <>
+                  <div className="col-span-full text-center py-2 border-t border-zinc-800 mt-2">
+                    <span className="text-blue-400 text-sm font-bold">🔍 From Google Search</span>
+                  </div>
+                  {googleResults.map((product) => (
+                    <div
+                      key={`google-${product.productId}`}
+                      onClick={() => assignProduct(product)}
+                      className="cursor-pointer p-3 rounded-lg border-2 border-blue-700 bg-blue-900/20 hover:border-blue-500 hover:bg-blue-500/20 transition-all"
+                    >
+                      <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={product.imageUrl}
+                          alt={product.productName}
+                          className="absolute inset-0 w-full h-full object-contain"
+                        />
+                      </div>
+                      <div className="text-sm truncate text-blue-200">{product.productName}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Loading states */}
+              {searching && (
+                <div className="col-span-full text-center py-8 text-zinc-400">
+                  Searching TCGPlayer...
+                </div>
+              )}
+              {searchingGoogle && !searching && (
+                <div className="col-span-full text-center py-4 text-blue-400 text-sm">
+                  Searching Google...
+                </div>
+              )}
             </div>
           </div>
         </div>
