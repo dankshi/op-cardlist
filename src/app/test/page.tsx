@@ -976,6 +976,25 @@ export default function TestPage() {
                   })}
                 </div>
               )}
+
+              {/* Not in this list? Search Google */}
+              {modalBaseId && (
+                <div className="mt-6 pt-6 border-t border-zinc-700 text-center">
+                  <p className="text-zinc-400 mb-3">Can&apos;t find the right card?</p>
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(modalBaseId.replace(/_p\d+$/, ''))} tcgplayer one piece`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium text-lg transition-colors"
+                  >
+                    <span>🔍</span>
+                    Search Google for {modalBaseId.replace(/_p\d+$/, '')}
+                  </a>
+                  <p className="text-zinc-500 text-sm mt-2">
+                    Find it on TCGPlayer, copy the URL, and paste it above
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
