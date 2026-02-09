@@ -1022,13 +1022,6 @@ export default function TestPage() {
                 );
               })()}
 
-              {/* Divider text */}
-              <div className="col-span-full text-center py-2">
-                <span className="text-zinc-500 text-sm">
-                  {searching ? 'Searching TCGPlayer...' : `Click a product below to assign it →`}
-                </span>
-              </div>
-
               {/* TCGPlayer Search Results */}
               {searchResults.map((product) => (
                 <div
@@ -1054,41 +1047,30 @@ export default function TestPage() {
                 </div>
               ))}
 
-              {/* Google Results */}
-              {googleResults.length > 0 && (
-                <>
-                  <div className="col-span-full text-center py-2 border-t border-zinc-800 mt-2">
-                    <span className="text-blue-400 text-sm font-bold">🔍 From Google Search</span>
+              {/* Google Results - inline with TCG results */}
+              {googleResults.map((product) => (
+                <div
+                  key={`google-${product.productId}`}
+                  onClick={() => assignProduct(product)}
+                  className="cursor-pointer p-3 rounded-lg border-2 border-blue-600 bg-zinc-800 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
+                >
+                  <div className="text-[10px] font-bold text-blue-400 mb-1">GOOGLE</div>
+                  <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={product.imageUrl}
+                      alt={product.productName}
+                      className="absolute inset-0 w-full h-full object-contain"
+                    />
                   </div>
-                  {googleResults.map((product) => (
-                    <div
-                      key={`google-${product.productId}`}
-                      onClick={() => assignProduct(product)}
-                      className="cursor-pointer p-3 rounded-lg border-2 border-blue-700 bg-blue-900/20 hover:border-blue-500 hover:bg-blue-500/20 transition-all"
-                    >
-                      <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={product.imageUrl}
-                          alt={product.productName}
-                          className="absolute inset-0 w-full h-full object-contain"
-                        />
-                      </div>
-                      <div className="text-sm truncate text-blue-200">{product.productName}</div>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {/* Loading states */}
-              {searching && (
-                <div className="col-span-full text-center py-8 text-zinc-400">
-                  Searching TCGPlayer...
+                  <div className="text-sm truncate">{product.productName}</div>
                 </div>
-              )}
-              {searchingGoogle && !searching && (
-                <div className="col-span-full text-center py-4 text-blue-400 text-sm">
-                  Searching Google...
+              ))}
+
+              {/* Loading state */}
+              {searching && searchResults.length === 0 && (
+                <div className="col-span-full text-center py-8 text-zinc-400">
+                  Searching...
                 </div>
               )}
             </div>
