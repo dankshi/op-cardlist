@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Image from "next/image";
 import type { Card, CardPrice } from "@/types/card";
 
@@ -64,7 +64,9 @@ export default function TestPage() {
   // Modal state - now just a single card
   const [selectedCard, setSelectedCard] = useState<CardWithPrice | null>(null);
   const [searchResults, setSearchResults] = useState<TCGProduct[]>([]);
+  const [googleResults, setGoogleResults] = useState<TCGProduct[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchingGoogle, setSearchingGoogle] = useState(false);
   const [manualUrl, setManualUrl] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -76,6 +78,18 @@ export default function TestPage() {
   const [assignError, setAssignError] = useState<string | null>(null);
   const [hideJollyRogerWarning, setHideJollyRogerWarning] = useState(false);
   const [showJollyRogerExpanded, setShowJollyRogerExpanded] = useState(false);
+  const [showProblemInput, setShowProblemInput] = useState(false);
+  const [problemReason, setProblemReason] = useState('');
+  const [customProblemReasons, setCustomProblemReasons] = useState<string[]>([]);
+  const urlInputRef = useRef<HTMLInputElement>(null);
+
+  // Preset problem reasons
+  const PRESET_REASONS = [
+    'Product is already mapped',
+    'Card not found on TCGPlayer',
+    'Our image is wrong/missing',
+    'Multiple variants exist',
+  ];
 
   useEffect(() => {
     const savedAdminKey = localStorage.getItem('admin-key');
@@ -104,6 +118,12 @@ export default function TestPage() {
       .then(res => res.json())
       .then(data => setDbMappings(data.mappings || {}))
       .catch(console.error);
+
+    // Fetch custom problem reasons
+    fetch('/api/problems/reasons')
+      .then(res => res.json())
+      .then(data => setCustomProblemReasons(data.reasons || []))
+      .catch(console.error);
   }, []);
 
   // Cards are "fixed" if they have a row in the database
@@ -125,10 +145,9 @@ export default function TestPage() {
     return prbCards;
   }, [cards]);
 
-  // Detect issues and build reverse lookup
-  const { cardIssues, issueCards, productToCard } = useMemo(() => {
+  // Detect issues (duplicates and unmapped cards)
+  const { cardIssues, issueCards } = useMemo(() => {
     const productIdUsage: Record<number, string[]> = {};
-    const prodToCard: Record<number, string> = {}; // productId -> first cardId that uses it
     const issues: Record<string, { isDuplicate: boolean; isUnmapped: boolean }> = {};
 
     cards.forEach(card => {
@@ -136,7 +155,6 @@ export default function TestPage() {
       if (productId) {
         if (!productIdUsage[productId]) {
           productIdUsage[productId] = [];
-          prodToCard[productId] = card.id; // Store first card using this productId
         }
         productIdUsage[productId].push(card.id);
       } else {
@@ -154,7 +172,7 @@ export default function TestPage() {
     });
 
     const cardsWithIssues = cards.filter(c => issues[c.id]);
-    return { cardIssues: issues, issueCards: cardsWithIssues, productToCard: prodToCard };
+    return { cardIssues: issues, issueCards: cardsWithIssues };
   }, [cards, prices]);
 
   // Filter cards
@@ -214,24 +232,46 @@ export default function TestPage() {
   const openCard = async (card: CardWithPrice) => {
     setSelectedCard(card);
     setSearchResults([]);
+    setGoogleResults([]);
     setSearching(true);
+    setSearchingGoogle(true);
     setManualUrl('');
     setAssignError(null);
+    setShowProblemInput(false);
+    setProblemReason('');
     // Don't reset hideJollyRogerWarning - keep user preference across cards
 
     const cardNum = card.baseId.match(/-(\d+)$/)?.[1] || '';
 
-    try {
-      const res = await fetch(
-        `/api/tcgplayer-search?name=${encodeURIComponent(card.name)}&number=${cardNum}&baseId=${encodeURIComponent(card.baseId)}`
-      );
-      const data = await res.json();
+    // Fetch both TCGPlayer API and Google search in parallel
+    const tcgSearch = fetch(
+      `/api/tcgplayer-search?name=${encodeURIComponent(card.name)}&number=${cardNum}&baseId=${encodeURIComponent(card.baseId)}`
+    ).then(res => res.json()).catch(() => ({ products: [] }));
+
+    const googleSearch = fetch(
+      `/api/google-tcg-search?q=${encodeURIComponent(`${card.baseId.replace(/_p\d+$/, '')} ${card.name} one piece tcg`)}`
+    ).then(res => res.json()).catch(() => ({ results: [] }));
+
+    // Handle TCGPlayer results
+    tcgSearch.then(data => {
       setSearchResults(data.products || []);
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
       setSearching(false);
-    }
+    });
+
+    // Handle Google results
+    googleSearch.then(data => {
+      const results = (data.results || []).map((r: { productId: number; title: string; url: string; imageUrl: string }) => ({
+        productId: r.productId,
+        productName: r.title,
+        marketPrice: null,
+        lowPrice: null,
+        number: '',
+        url: r.url,
+        imageUrl: r.imageUrl,
+      }));
+      setGoogleResults(results);
+      setSearchingGoogle(false);
+    });
   };
 
   const parseManualUrl = (url: string): TCGProduct | null => {
@@ -261,16 +301,6 @@ export default function TestPage() {
   const assignProduct = async (product: TCGProduct) => {
     if (!selectedCard || saving) return;
     setAssignError(null);
-
-    // Check if this product is already mapped to another card
-    const existingCardId = productToCard[product.productId];
-    if (existingCardId && existingCardId !== selectedCard.id) {
-      setAssignError(
-        `This TCGPlayer product is already mapped to ${existingCardId}. ` +
-        `You need to fix that card first! Check the borders - is one a Full Art or Alternate Art version?`
-      );
-      return;
-    }
 
     setSaving(true);
     const name = contributorName || 'Melody';
@@ -402,6 +432,83 @@ export default function TestPage() {
       console.error('Failed to confirm:', error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Report a problem with a card
+  const reportProblem = async () => {
+    if (!selectedCard || saving || !problemReason.trim()) return;
+
+    setSaving(true);
+    const name = contributorName || 'Melody';
+
+    try {
+      const res = await fetch('/api/problems', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cardId: selectedCard.id,
+          reason: problemReason.trim(),
+          reportedBy: name,
+        }),
+      });
+
+      if (res.ok) {
+        setShowProblemInput(false);
+        setProblemReason('');
+
+        // Advance to next card
+        if (currentIndex < filteredCards.length - 1) {
+          setTimeout(() => openCard(filteredCards[currentIndex + 1]), 500);
+        } else {
+          setSelectedCard(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to report problem:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Revert a fixed card mapping (delete from database)
+  const revertMapping = async (card: CardWithPrice, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (saving) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/mappings/${encodeURIComponent(card.id)}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        // Remove from dbMappings
+        setDbMappings(prev => {
+          const updated = { ...prev };
+          delete updated[card.id];
+          return updated;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to revert:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle paste in URL input - auto-save
+  const handleUrlPaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (pastedText.includes('tcgplayer.com/product/')) {
+      e.preventDefault();
+      const product = parseManualUrl(pastedText);
+      if (product && selectedCard) {
+        // Auto-save immediately
+        assignProduct(product);
+      }
     }
   };
 
@@ -593,6 +700,19 @@ export default function TestPage() {
                       className="w-full px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 rounded text-xs font-bold transition-colors"
                     >
                       ✓ Looks Right
+                    </button>
+                  </div>
+                )}
+
+                {/* Revert button - only show for fixed cards */}
+                {isFixed && (
+                  <div className="px-3 pb-3">
+                    <button
+                      onClick={(e) => revertMapping(card, e)}
+                      disabled={saving}
+                      className="w-full px-3 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500 disabled:bg-zinc-700 rounded text-xs font-bold transition-colors text-red-300 hover:text-white"
+                    >
+                      ↩ Revert
                     </button>
                   </div>
                 )}
@@ -832,34 +952,78 @@ export default function TestPage() {
               >
                 Skip → Our image is missing
               </button>
+
+              {/* Report Problem */}
+              <div className="mt-4 pt-4 border-t border-zinc-700 w-full">
+                {!showProblemInput ? (
+                  <button
+                    onClick={() => setShowProblemInput(true)}
+                    className="w-full px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500 rounded-lg text-sm text-orange-300"
+                  >
+                    ⚠️ Report Problem with this Card
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="text-sm text-orange-400 font-bold">What&apos;s wrong with this card?</label>
+
+                    {/* Quick select reasons */}
+                    <div className="flex flex-wrap gap-2">
+                      {[...PRESET_REASONS, ...customProblemReasons].map((reason) => (
+                        <button
+                          key={reason}
+                          onClick={() => {
+                            setProblemReason(reason);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            problemReason === reason
+                              ? 'bg-orange-600 text-white'
+                              : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                          }`}
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Custom reason input */}
+                    <input
+                      type="text"
+                      value={problemReason}
+                      onChange={(e) => setProblemReason(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && problemReason.trim()) {
+                          reportProblem();
+                        }
+                      }}
+                      placeholder="Or type a custom reason..."
+                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-sm"
+                    />
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={reportProblem}
+                        disabled={saving || !problemReason.trim()}
+                        className="flex-1 px-3 py-2 bg-orange-600 hover:bg-orange-500 disabled:bg-zinc-700 rounded-lg text-sm font-bold"
+                      >
+                        Submit Report
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowProblemInput(false);
+                          setProblemReason('');
+                        }}
+                        className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Right side - TCGPlayer products */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* URL input */}
-              <div className="p-4 border-b border-zinc-800 flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Paste TCGPlayer URL..."
-                  value={manualUrl}
-                  onChange={(e) => setManualUrl(e.target.value)}
-                  className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg"
-                />
-                <button
-                  onClick={() => {
-                    const product = parseManualUrl(manualUrl);
-                    if (product) {
-                      setSearchResults(prev => [product, ...prev]);
-                      setManualUrl('');
-                    }
-                  }}
-                  disabled={!manualUrl.includes('tcgplayer.com/product/')}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-lg"
-                >
-                  Add
-                </button>
-              </div>
-
               {/* Products grid */}
               <div className="flex-1 overflow-y-auto p-4">
                 <h3 className="text-yellow-400 font-bold mb-4">
@@ -900,32 +1064,70 @@ export default function TestPage() {
                   </div>
                 )}
 
+                {/* Google Search Results */}
+                {(searchingGoogle || googleResults.length > 0) && (
+                  <div className="mt-6 pt-6 border-t border-zinc-800">
+                    <h3 className="text-blue-400 font-bold mb-4 flex items-center gap-2">
+                      🔍 Google Search Results
+                      {searchingGoogle && <span className="text-zinc-500 text-sm font-normal">(searching...)</span>}
+                    </h3>
+
+                    {searchingGoogle ? (
+                      <div className="text-center py-8 text-zinc-400">Searching Google...</div>
+                    ) : googleResults.length === 0 ? (
+                      <div className="text-center py-4 text-zinc-500 text-sm">No Google results found</div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {googleResults.map((product) => (
+                          <div
+                            key={`google-${product.productId}`}
+                            onClick={() => assignProduct(product)}
+                            className="cursor-pointer p-3 rounded-lg border-2 border-blue-700 bg-blue-900/20 hover:border-blue-500 hover:bg-blue-500/20 transition-all"
+                          >
+                            <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={product.imageUrl}
+                                alt={product.productName}
+                                className="absolute inset-0 w-full h-full object-contain"
+                              />
+                            </div>
+                            <div className="text-sm truncate text-blue-200">{product.productName}</div>
+                            <div className="text-xs text-zinc-500 mt-1">via Google</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Not in this list help */}
                 <div className="mt-6 pt-6 border-t border-zinc-800">
                   <div className="bg-zinc-800/50 rounded-xl p-4">
-                    <h4 className="text-orange-400 font-bold mb-3">Not in this list?</h4>
-                    <ol className="text-sm text-zinc-300 space-y-2 mb-4">
-                      <li className="flex gap-2">
-                        <span className="text-orange-400 font-bold">1.</span>
-                        <span>Click the button below to search Google</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-orange-400 font-bold">2.</span>
-                        <span>Find the card on TCGPlayer and copy the URL</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-orange-400 font-bold">3.</span>
-                        <span>Paste the URL in the box above and click Add</span>
-                      </li>
-                    </ol>
-                    <a
-                      href={`https://www.google.com/search?q=${encodeURIComponent(selectedCard.baseId.replace(/_p\d+$/, ''))} tcgplayer one piece`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500 rounded-lg font-medium transition-colors"
-                    >
-                      🔍 Search Google for {selectedCard.baseId.replace(/_p\d+$/, '')}
-                    </a>
+                    <h4 className="text-orange-400 font-bold mb-3">Still not found?</h4>
+                    <div className="flex gap-3 items-center">
+                      <a
+                        href={`https://www.google.com/search?q=${encodeURIComponent(selectedCard.baseId.replace(/_p\d+$/, ''))} tcgplayer one piece`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => {
+                          // Focus the input after a brief delay (after tab opens)
+                          setTimeout(() => urlInputRef.current?.focus(), 100);
+                        }}
+                        className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg font-medium transition-colors"
+                      >
+                        🔍 Open Google
+                      </a>
+                      <input
+                        ref={urlInputRef}
+                        type="text"
+                        placeholder="Paste TCGPlayer URL here (auto-saves)..."
+                        value={manualUrl}
+                        onChange={(e) => setManualUrl(e.target.value)}
+                        onPaste={handleUrlPaste}
+                        className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
