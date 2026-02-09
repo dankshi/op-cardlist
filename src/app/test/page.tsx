@@ -89,6 +89,7 @@ export default function TestPage() {
     'Card not found on TCGPlayer',
     'Our image is wrong/missing',
     'Multiple variants exist',
+    'Duplicate',
   ];
 
   useEffect(() => {
@@ -258,14 +259,14 @@ export default function TestPage() {
       setSearching(false);
     });
 
-    // Handle Google results
+    // Handle TCGPlayer direct search results
     googleSearch.then(data => {
-      const results = (data.results || []).map((r: { productId: number; title: string; url: string; imageUrl: string }) => ({
+      const results = (data.results || []).map((r: { productId: number; title: string; url: string; imageUrl: string; number?: string; setName?: string }) => ({
         productId: r.productId,
         productName: r.title,
         marketPrice: null,
         lowPrice: null,
-        number: '',
+        number: r.number || '',
         url: r.url,
         imageUrl: r.imageUrl,
       }));
@@ -763,58 +764,70 @@ export default function TestPage() {
           </div>
 
           {/* Jolly Roger Warning */}
-          {!hideJollyRogerWarning && (selectedCard.setId === 'prb-01' || jollyRogerCards.has(selectedCard.baseId)) && (
-            <div className="mx-4 mt-2 p-4 bg-purple-500/20 border border-purple-500 rounded-lg relative">
-              <div className="absolute top-2 right-2 flex gap-2">
-                <button
-                  onClick={() => setShowJollyRogerExpanded(true)}
-                  className="text-purple-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-purple-500/30"
-                >
-                  🔍 Expand
-                </button>
-                <button
-                  onClick={() => setHideJollyRogerWarning(true)}
-                  className="text-purple-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-purple-500/30"
-                >
-                  ✕ Hide
-                </button>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">☠️</span>
-                <div className="text-purple-200 text-sm flex-1">
-                  {selectedCard.setId === 'prb-01' ? (
-                    <strong className="text-purple-100">This COULD be a Jolly Roger Foil! Look for &quot;Jolly Roger Foil&quot; in the TCGPlayer product name.</strong>
-                  ) : (
-                    <strong className="text-purple-100">This card has a Jolly Roger Foil version! Check the borders carefully.</strong>
-                  )}
-                  <div className="mt-3 p-3 bg-zinc-900 rounded-lg cursor-pointer hover:bg-zinc-800" onClick={() => setShowJollyRogerExpanded(true)}>
-                    <p className="text-xs text-zinc-400 mb-3">How to tell the difference - look at the WHITE BORDER on Jolly Roger: <span className="text-purple-400">(click to expand)</span></p>
-                    <div className="flex justify-center gap-6">
-                      <div className="text-center">
-                        <p className="text-xs text-green-400 font-bold mb-2">✓ Regular Card</p>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="https://product-images.tcgplayer.com/fit-in/200x279/454565.jpg"
-                          alt="Regular card example"
-                          className="w-24 h-auto rounded border-2 border-green-500"
-                        />
-                        <p className="text-[10px] text-zinc-500 mt-1">Colored border</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-purple-400 font-bold mb-2">☠️ Jolly Roger Foil</p>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="https://product-images.tcgplayer.com/fit-in/200x279/586590.jpg"
-                          alt="Jolly Roger Foil example"
-                          className="w-24 h-auto rounded border-2 border-purple-500"
-                        />
-                        <p className="text-[10px] text-purple-300 mt-1">WHITE border</p>
+          {(selectedCard.setId === 'prb-01' || jollyRogerCards.has(selectedCard.baseId)) && (
+            hideJollyRogerWarning ? (
+              // Minimized hint bar
+              <button
+                onClick={() => setShowJollyRogerExpanded(true)}
+                className="mx-4 mt-2 px-4 py-2 bg-purple-500/10 border border-purple-500/50 rounded-lg text-purple-300 text-sm hover:bg-purple-500/20 transition-colors flex items-center gap-2"
+              >
+                <span>☠️</span>
+                <span>Jolly Roger hint</span>
+              </button>
+            ) : (
+              // Full warning panel
+              <div className="mx-4 mt-2 p-4 bg-purple-500/20 border border-purple-500 rounded-lg relative">
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button
+                    onClick={() => setShowJollyRogerExpanded(true)}
+                    className="text-purple-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-purple-500/30"
+                  >
+                    🔍 Expand
+                  </button>
+                  <button
+                    onClick={() => setHideJollyRogerWarning(true)}
+                    className="text-purple-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-purple-500/30"
+                  >
+                    ✕ Hide
+                  </button>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">☠️</span>
+                  <div className="text-purple-200 text-sm flex-1">
+                    {selectedCard.setId === 'prb-01' ? (
+                      <strong className="text-purple-100">This COULD be a Jolly Roger Foil! Look for &quot;Jolly Roger Foil&quot; in the TCGPlayer product name.</strong>
+                    ) : (
+                      <strong className="text-purple-100">This card has a Jolly Roger Foil version! Check the borders carefully.</strong>
+                    )}
+                    <div className="mt-3 p-3 bg-zinc-900 rounded-lg cursor-pointer hover:bg-zinc-800" onClick={() => setShowJollyRogerExpanded(true)}>
+                      <p className="text-xs text-zinc-400 mb-3">How to tell the difference - look at the WHITE BORDER on Jolly Roger: <span className="text-purple-400">(click to expand)</span></p>
+                      <div className="flex justify-center gap-6">
+                        <div className="text-center">
+                          <p className="text-xs text-green-400 font-bold mb-2">✓ Regular Card</p>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src="https://product-images.tcgplayer.com/fit-in/200x279/454565.jpg"
+                            alt="Regular card example"
+                            className="w-24 h-auto rounded border-2 border-green-500"
+                          />
+                          <p className="text-[10px] text-zinc-500 mt-1">Colored border</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-purple-400 font-bold mb-2">☠️ Jolly Roger Foil</p>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src="https://product-images.tcgplayer.com/fit-in/200x279/586590.jpg"
+                            alt="Jolly Roger Foil example"
+                            className="w-24 h-auto rounded border-2 border-purple-500"
+                          />
+                          <p className="text-[10px] text-purple-300 mt-1">WHITE border</p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )
           )}
 
           {/* Expanded Jolly Roger Comparison Modal */}
@@ -1047,14 +1060,14 @@ export default function TestPage() {
                 </div>
               ))}
 
-              {/* Google Results - inline with TCG results */}
+              {/* TCGPlayer Direct Search Results */}
               {googleResults.map((product) => (
                 <div
-                  key={`google-${product.productId}`}
+                  key={`search-${product.productId}`}
                   onClick={() => assignProduct(product)}
                   className="cursor-pointer p-3 rounded-lg border-2 border-blue-600 bg-zinc-800 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
                 >
-                  <div className="text-[10px] font-bold text-blue-400 mb-1">GOOGLE</div>
+                  <div className="text-[10px] font-bold text-blue-400 mb-1">SEARCH</div>
                   <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -1063,6 +1076,9 @@ export default function TestPage() {
                       className="absolute inset-0 w-full h-full object-contain"
                     />
                   </div>
+                  {product.number && (
+                    <div className="text-xs text-yellow-400 font-mono">{product.number}</div>
+                  )}
                   <div className="text-sm truncate">{product.productName}</div>
                 </div>
               ))}
