@@ -363,8 +363,8 @@ export default function TestPage() {
           </span>
         </div>
 
-        {/* Cards Grid */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+        {/* Cards Grid - showing both our image and TCGPlayer side by side */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredCards.map(card => {
             const isFixed = fixedCards.has(card.id);
             const issue = cardIssues[card.id];
@@ -374,36 +374,68 @@ export default function TestPage() {
               <div
                 key={card.id}
                 onClick={() => openCard(card)}
-                className={`cursor-pointer rounded-lg overflow-hidden border-2 transition-all hover:scale-105 ${
-                  isFixed ? 'border-green-500' :
-                  issue?.isDuplicate ? 'border-red-500' :
-                  issue?.isUnmapped ? 'border-orange-500' :
-                  'border-zinc-700'
+                className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.02] hover:shadow-xl ${
+                  isFixed ? 'border-green-500 bg-green-500/5' :
+                  issue?.isDuplicate ? 'border-red-500 bg-red-500/5' :
+                  issue?.isUnmapped ? 'border-orange-500 bg-orange-500/5' :
+                  'border-zinc-700 bg-zinc-900'
                 }`}
               >
-                <div className="aspect-[2.5/3.5] relative bg-zinc-800">
-                  <Image
-                    src={card.imageUrl}
-                    alt={card.name}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                  {/* Status badge */}
-                  <div className="absolute top-1 right-1">
+                {/* Card ID and status */}
+                <div className="px-3 py-2 bg-zinc-800 flex items-center justify-between">
+                  <span className="font-mono text-sm font-bold">{card.id}</span>
+                  <div className="flex gap-1">
                     {isFixed && (
-                      <span className="px-1.5 py-0.5 bg-green-600 rounded text-[10px] font-bold">✓</span>
+                      <span className="px-2 py-0.5 bg-green-600 rounded text-xs font-bold">FIXED</span>
                     )}
                     {issue?.isDuplicate && !isFixed && (
-                      <span className="px-1.5 py-0.5 bg-red-600 rounded text-[10px] font-bold">DUP</span>
+                      <span className="px-2 py-0.5 bg-red-600 rounded text-xs font-bold">DUP</span>
                     )}
                     {issue?.isUnmapped && !isFixed && (
-                      <span className="px-1.5 py-0.5 bg-orange-600 rounded text-[10px] font-bold">?</span>
+                      <span className="px-2 py-0.5 bg-orange-600 rounded text-xs font-bold">NO LINK</span>
                     )}
                   </div>
                 </div>
-                <div className="p-1.5 bg-zinc-900">
-                  <div className="text-[10px] font-mono text-zinc-400 truncate">{card.id}</div>
+
+                {/* Two images side by side */}
+                <div className="p-3 flex gap-3">
+                  {/* Our image */}
+                  <div className="flex-1">
+                    <div className="text-[10px] font-bold text-green-400 mb-1 text-center">OURS</div>
+                    <div className="aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-800 ring-2 ring-green-500">
+                      <Image
+                        src={card.imageUrl}
+                        alt={card.name}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  </div>
+
+                  {/* TCGPlayer image */}
+                  <div className="flex-1">
+                    <div className="text-[10px] font-bold text-yellow-400 mb-1 text-center">TCG</div>
+                    {productId ? (
+                      <div className={`aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-800 ring-2 ${isFixed ? 'ring-green-500' : 'ring-yellow-500'}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={getTcgplayerImageUrl(productId)}
+                          alt="TCGPlayer"
+                          className="absolute inset-0 w-full h-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-[2.5/3.5] rounded-lg bg-zinc-800 ring-2 ring-red-500 flex items-center justify-center">
+                        <span className="text-zinc-500 text-xs">None</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card name */}
+                <div className="px-3 pb-2">
+                  <div className="text-xs text-zinc-400 truncate">{card.name}</div>
                 </div>
               </div>
             );
