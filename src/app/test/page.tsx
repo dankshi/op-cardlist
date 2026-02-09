@@ -582,16 +582,33 @@ export default function TestPage() {
                   </div>
                 )}
 
-                {/* Google search link */}
-                <div className="mt-6 pt-6 border-t border-zinc-800 text-center">
-                  <a
-                    href={`https://www.google.com/search?q=${encodeURIComponent(selectedCard.baseId.replace(/_p\d+$/, ''))} tcgplayer one piece`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300"
-                  >
-                    🔍 Search Google for {selectedCard.baseId.replace(/_p\d+$/, '')}
-                  </a>
+                {/* Not in this list help */}
+                <div className="mt-6 pt-6 border-t border-zinc-800">
+                  <div className="bg-zinc-800/50 rounded-xl p-4">
+                    <h4 className="text-orange-400 font-bold mb-3">Not in this list?</h4>
+                    <ol className="text-sm text-zinc-300 space-y-2 mb-4">
+                      <li className="flex gap-2">
+                        <span className="text-orange-400 font-bold">1.</span>
+                        <span>Click the button below to search Google</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-orange-400 font-bold">2.</span>
+                        <span>Find the card on TCGPlayer and copy the URL</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-orange-400 font-bold">3.</span>
+                        <span>Paste the URL in the box above and click Add</span>
+                      </li>
+                    </ol>
+                    <a
+                      href={`https://www.google.com/search?q=${encodeURIComponent(selectedCard.baseId.replace(/_p\d+$/, ''))} tcgplayer one piece`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500 rounded-lg font-medium transition-colors"
+                    >
+                      🔍 Search Google for {selectedCard.baseId.replace(/_p\d+$/, '')}
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
