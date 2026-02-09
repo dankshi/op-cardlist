@@ -318,6 +318,49 @@ Prices are displayed in:
 
 ---
 
+## Competitive Analysis: PriceCharting
+
+**Goal:** Take market share from PriceCharting by building a significantly better pricing UI for One Piece TCG.
+
+### PriceCharting Current Features
+
+Reference: https://www.pricecharting.com/game/one-piece-wings-of-the-captain/vinsmoke-reiju-treasure-cup-top-8-op06-069
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-tier pricing** | Shows ungraded ($1,399) and graded prices (PSA 10, BGS 10, CGC 10) ranging $2,157 - $10,999 |
+| **Price comparison** | Links to TCGPlayer, eBay, and their own marketplace |
+| **Historic sales data** | Completed sales with buyer/seller agreement, showing date, price, and source platform |
+| **Price history chart** | Graph showing market value trends over months for ungraded and graded variants |
+| **Collection management** | Users can add items to collections/wishlists and track value changes |
+| **Compare vs Other Items** | Tool to evaluate card against others |
+| **Grading service links** | Affiliate links to PSA, CGC with discount codes |
+
+### How We'll Beat Them
+
+1. **Better card data** - We have all variants mapped correctly (p1-p4 → art styles), PriceCharting often mislabels
+2. **Faster, cleaner UI** - Modern React/Next.js stack vs their dated PHP interface
+3. **One Piece focused** - They're generic (video games, cards, etc.) - we specialize
+4. **Better images** - Direct from Bandai official sources
+5. **Mobile-first design** - Their mobile experience is poor
+
+### Pricing Features Roadmap
+
+| Priority | Feature | Status |
+|----------|---------|--------|
+| P0 | Basic market prices from TCGPlayer | ✅ Done |
+| P0 | Price history tracking (store daily/weekly snapshots) | 🔜 Next |
+| P1 | Price history charts (interactive, per-variant) | Planned |
+| P1 | Graded card pricing (PSA 10, BGS 10, CGC 10) | Planned |
+| P1 | eBay sold listings integration | Planned |
+| P2 | Collection tracking with portfolio value | Planned |
+| P2 | Price alerts (notify when card drops below threshold) | Planned |
+| P2 | Compare cards feature | Planned |
+| P3 | Historic sales feed (recent transactions) | Planned |
+| P3 | Market analytics (trending cards, biggest movers) | Planned |
+
+---
+
 ## Future Improvements
 
 1. **Set-specific variant mappings** - Different sets may have different p1-p4 patterns

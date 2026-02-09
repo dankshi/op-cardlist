@@ -117,8 +117,19 @@ export default function RootLayout({
           </main>
           {modal}
           <footer className="border-t border-zinc-800 dark:border-zinc-800 light:border-zinc-200 mt-16">
-            <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm">
-              <p>One Piece TCG Card List is a fan-made database. One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
+            <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-2">
+              <p>
+                Built by{" "}
+                <a
+                  href="https://openseatcg.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-zinc-300 hover:text-white transition-colors"
+                >
+                  OPEN SEA TCG
+                </a>
+              </p>
+              <p>One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
             </div>
           </footer>
         </ThemeProvider>
