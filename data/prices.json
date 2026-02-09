@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-02-08T09:23:18.884Z",
+  "lastUpdated": "2026-02-09T00:36:25.537Z",
   "prices": {
     "EB01-003": {
       "marketPrice": 3.4592,
@@ -4633,9 +4633,9 @@
       "tcgplayerProductId": 545840
     },
     "OP07-051_p2": {
-      "marketPrice": 1825.00,
+      "marketPrice": 1825,
       "lowPrice": 51.99,
-      "highPrice": 3500.00,
+      "highPrice": 3500,
       "lastUpdated": "2026-02-08T12:00:00.000Z",
       "tcgplayerUrl": "https://www.tcgplayer.com/product/545841/one-piece-card-game-500-years-in-the-future-boa-hancock-051-parallel-manga",
       "tcgplayerProductId": 545841
@@ -5097,10 +5097,10 @@
       "tcgplayerProductId": 558161
     },
     "OP08-118_p2": {
-      "marketPrice": 25.68,
-      "lastUpdated": "2026-02-08T08:18:41.772Z",
-      "tcgplayerUrl": "https://www.tcgplayer.com/product/558161/Silvers Rayleigh Parallel",
-      "tcgplayerProductId": 558161
+      "marketPrice": 650.16,
+      "lastUpdated": "2026-02-09T00:36:25.537Z",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/558162/Silvers Rayleigh Parallel Manga",
+      "tcgplayerProductId": 558162
     },
     "OP08-119": {
       "marketPrice": 3.3,

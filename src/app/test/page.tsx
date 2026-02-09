@@ -31,7 +31,7 @@ export default function TestPage() {
   const [prices, setPrices] = useState<Record<string, CardPrice>>({});
   const [mappings, setMappings] = useState<Record<string, CardMapping>>({});
   const [artStyleChanges, setArtStyleChanges] = useState<Record<string, string>>({});
-  const [filter, setFilter] = useState<'all' | 'with-price' | 'has-variants' | 'mapped' | 'unmapped'>('has-variants');
+  const [filter, setFilter] = useState<'all' | 'with-price' | 'has-variants' | 'mapped' | 'unmapped' | 'issues'>('issues');
   const [selectedSet, setSelectedSet] = useState<string>('all');
   const [sets, setSets] = useState<string[]>([]);
 
@@ -104,6 +104,62 @@ export default function TestPage() {
     return groups;
   }, [cards]);
 
+  // Detect duplicate TCGPlayer product IDs and unmapped cards
+  const { duplicateProductIds, unmappedCardIds, cardIssues } = useMemo(() => {
+    // Count how many cards use each product ID
+    const productIdUsage: Record<number, string[]> = {};
+    const unmapped: string[] = [];
+
+    cards.forEach(card => {
+      // Check pending mappings first, then existing prices
+      const productId = mappings[card.id]?.tcgProductId || prices[card.id]?.tcgplayerProductId;
+
+      if (productId) {
+        if (!productIdUsage[productId]) {
+          productIdUsage[productId] = [];
+        }
+        productIdUsage[productId].push(card.id);
+      } else {
+        unmapped.push(card.id);
+      }
+    });
+
+    // Find duplicates (product IDs used by more than one card)
+    const duplicates: Record<number, string[]> = {};
+    Object.entries(productIdUsage).forEach(([productId, cardIds]) => {
+      if (cardIds.length > 1) {
+        duplicates[parseInt(productId)] = cardIds;
+      }
+    });
+
+    // Build a map of cardId -> issues
+    const issues: Record<string, { isDuplicate: boolean; duplicateWith?: string[]; isUnmapped: boolean }> = {};
+
+    Object.entries(duplicates).forEach(([productId, cardIds]) => {
+      cardIds.forEach(cardId => {
+        issues[cardId] = {
+          isDuplicate: true,
+          duplicateWith: cardIds.filter(id => id !== cardId),
+          isUnmapped: false
+        };
+      });
+    });
+
+    unmapped.forEach(cardId => {
+      if (!issues[cardId]) {
+        issues[cardId] = { isDuplicate: false, isUnmapped: true };
+      } else {
+        issues[cardId].isUnmapped = true;
+      }
+    });
+
+    return {
+      duplicateProductIds: duplicates,
+      unmappedCardIds: new Set(unmapped),
+      cardIssues: issues
+    };
+  }, [cards, prices, mappings]);
+
   // Filter groups - when a set is selected, only show cards from that set within each group
   const filteredGroups = useMemo(() => {
     return Object.entries(cardGroups)
@@ -123,16 +179,27 @@ export default function TestPage() {
         const hasVariants = group.length > 1;
         const hasMappings = group.some(c => mappings[c.id]);
         const needsMapping = hasVariants && group.some(c => !mappings[c.id] && !prices[c.id]?.tcgplayerProductId);
+        const hasIssues = group.some(c => cardIssues[c.id]);
 
         switch (filter) {
           case 'with-price': return hasPrice;
           case 'has-variants': return hasVariants && hasPrice;
           case 'mapped': return hasMappings;
           case 'unmapped': return needsMapping;
+          case 'issues': return hasIssues;
           default: return true;
         }
+      })
+      // Sort issues filter to show duplicates first, then unmapped
+      .sort((a, b) => {
+        if (filter !== 'issues') return 0;
+        const aHasDupe = a[1].some(c => cardIssues[c.id]?.isDuplicate);
+        const bHasDupe = b[1].some(c => cardIssues[c.id]?.isDuplicate);
+        if (aHasDupe && !bHasDupe) return -1;
+        if (!aHasDupe && bHasDupe) return 1;
+        return 0;
       });
-  }, [cardGroups, prices, mappings, filter, selectedSet]);
+  }, [cardGroups, prices, mappings, filter, selectedSet, cardIssues]);
 
   // Navigation
   const currentIndex = modalBaseId ? filteredGroups.findIndex(([id]) => id === modalBaseId) : -1;
@@ -374,22 +441,41 @@ export default function TestPage() {
           </div>
         )}
 
+        {/* Issue Summary */}
+        {Object.keys(cardIssues).length > 0 && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <h3 className="text-lg font-bold text-red-400 mb-2">⚠️ Issues Found</h3>
+            <div className="flex gap-6 text-sm">
+              <div>
+                <span className="text-red-300 font-bold">{Object.keys(duplicateProductIds).length}</span>
+                <span className="text-zinc-400 ml-1">duplicate TCG links</span>
+                <span className="text-zinc-500 ml-1">({Object.values(duplicateProductIds).flat().length} cards affected)</span>
+              </div>
+              <div>
+                <span className="text-orange-300 font-bold">{unmappedCardIds.size}</span>
+                <span className="text-zinc-400 ml-1">unmapped cards</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="flex flex-wrap gap-4 mb-8 items-end">
           <div>
             <label className="text-sm text-zinc-400 block mb-2">Show</label>
             <div className="flex gap-2">
-              {(['has-variants', 'mapped', 'all'] as const).map(f => (
+              {(['issues', 'has-variants', 'mapped', 'all'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-4 py-2 rounded-lg font-medium ${
                     filter === f
-                      ? 'bg-blue-600 text-white'
+                      ? f === 'issues' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
                       : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                   }`}
                 >
-                  {f === 'has-variants' ? 'Cards with Variants' :
+                  {f === 'issues' ? `⚠️ Issues (${Object.keys(cardIssues).length})` :
+                   f === 'has-variants' ? 'Cards with Variants' :
                    f === 'mapped' ? `Fixed (${Object.keys(mappings).length})` :
                    'All Cards'}
                 </button>
@@ -420,16 +506,21 @@ export default function TestPage() {
         <div className="space-y-4">
           {filteredGroups.map(([baseId, group]) => {
             const hasAnyMapping = group.some(c => mappings[c.id]);
+            const groupHasDuplicate = group.some(c => cardIssues[c.id]?.isDuplicate);
+            const groupHasUnmapped = group.some(c => cardIssues[c.id]?.isUnmapped);
 
             return (
               <div
                 key={baseId}
                 className={`p-6 rounded-xl border-2 ${
-                  hasAnyMapping ? 'border-green-500 bg-green-500/5' : 'border-zinc-700 bg-zinc-900'
+                  hasAnyMapping ? 'border-green-500 bg-green-500/5' :
+                  groupHasDuplicate ? 'border-red-500 bg-red-500/5' :
+                  groupHasUnmapped ? 'border-orange-500 bg-orange-500/5' :
+                  'border-zinc-700 bg-zinc-900'
                 }`}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <span className="text-2xl font-mono font-bold text-blue-400">{baseId}</span>
                     <span className="text-xl text-zinc-300">{group[0].name}</span>
                     <span className="px-3 py-1 bg-zinc-700 rounded-full text-sm">
@@ -438,6 +529,16 @@ export default function TestPage() {
                     {hasAnyMapping && (
                       <span className="px-3 py-1 bg-green-600 rounded-full text-sm font-medium">
                         FIXED
+                      </span>
+                    )}
+                    {groupHasDuplicate && (
+                      <span className="px-3 py-1 bg-red-600 rounded-full text-sm font-medium">
+                        ⚠️ DUPLICATE TCG LINK
+                      </span>
+                    )}
+                    {groupHasUnmapped && !groupHasDuplicate && (
+                      <span className="px-3 py-1 bg-orange-600 rounded-full text-sm font-medium">
+                        NEEDS MAPPING
                       </span>
                     )}
                   </div>
@@ -455,10 +556,11 @@ export default function TestPage() {
                     const productId = getEffectiveProductId(card.id);
                     const mapping = mappings[card.id];
                     const price = prices[card.id];
+                    const issue = cardIssues[card.id];
 
                     return (
                       <div key={card.id} className="shrink-0">
-                        <div className="text-sm font-mono text-zinc-400 mb-2 flex items-center gap-2">
+                        <div className="text-sm font-mono text-zinc-400 mb-2 flex items-center gap-2 flex-wrap">
                           <span className="font-bold">{card.id}</span>
                           {card.isParallel && (
                             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
@@ -471,6 +573,16 @@ export default function TestPage() {
                             </span>
                           )}
                           {mapping && <span className="px-2 py-0.5 bg-green-600 rounded text-xs font-bold">FIXED</span>}
+                          {issue?.isDuplicate && (
+                            <span className="px-2 py-0.5 bg-red-600 rounded text-xs font-bold" title={`Same TCG link as: ${issue.duplicateWith?.join(', ')}`}>
+                              DUPLICATE
+                            </span>
+                          )}
+                          {issue?.isUnmapped && (
+                            <span className="px-2 py-0.5 bg-orange-600 rounded text-xs font-bold">
+                              UNMAPPED
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex gap-3">

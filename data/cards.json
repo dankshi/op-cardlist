@@ -42508,7 +42508,7 @@
           "setId": "op-08",
           "variant": "p2",
           "isParallel": true,
-          "artStyle": "alternate",
+          "artStyle": "manga",
           "price": {
             "marketPrice": 2.68,
             "lastUpdated": "2026-02-08T07:36:38.846Z",
@@ -73670,5 +73670,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-02-08T07:43:57.262Z"
+  "lastUpdated": "2026-02-09T00:36:25.558Z"
 }
