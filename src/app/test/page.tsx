@@ -318,15 +318,28 @@ export default function TestPage() {
     }
   };
 
+  // Helper to find the next card to navigate to
+  // Calculates index at call time (not render time) for accuracy
+  const getNextCard = (currentCardId: string): CardWithPrice | null => {
+    const idx = filteredCards.findIndex(c => c.id === currentCardId);
+
+    if (idx >= 0 && idx < filteredCards.length - 1) {
+      // Normal case: found in list with a next card available
+      return filteredCards[idx + 1];
+    } else if (idx === -1 && filteredCards.length > 0) {
+      // Edge case: current card not in list anymore, continue with first available
+      return filteredCards[0];
+    }
+    // At end of list or empty list
+    return null;
+  };
+
   const assignProduct = async (product: TCGProduct) => {
     if (!selectedCard || saving) return;
     setAssignError(null);
 
     // Capture next card BEFORE updating state (since card will be removed from filtered list)
-    // Important: check currentIndex >= 0 to avoid going back to first card when index is -1
-    const nextCard = currentIndex >= 0 && currentIndex < filteredCards.length - 1
-      ? filteredCards[currentIndex + 1]
-      : null;
+    const nextCard = getNextCard(selectedCard.id);
 
     setSaving(true);
     const name = contributorName || 'Melody';
@@ -410,10 +423,7 @@ export default function TestPage() {
     }
 
     // Capture next card BEFORE updating state (since card will be removed from filtered list)
-    // Important: check currentIndex >= 0 to avoid going back to first card when index is -1
-    const nextCard = currentIndex >= 0 && currentIndex < filteredCards.length - 1
-      ? filteredCards[currentIndex + 1]
-      : null;
+    const nextCard = getNextCard(card.id);
 
     setSaving(true);
     const name = contributorName || 'Melody';
@@ -477,10 +487,7 @@ export default function TestPage() {
     if (!selectedCard || saving) return;
 
     // Capture next card BEFORE updating state (since card will be removed from list)
-    // Important: check currentIndex >= 0 to avoid going back to first card when index is -1
-    const nextCard = currentIndex >= 0 && currentIndex < filteredCards.length - 1
-      ? filteredCards[currentIndex + 1]
-      : null;
+    const nextCard = getNextCard(selectedCard.id);
 
     setSaving(true);
     const name = contributorName || 'Melody';
@@ -527,10 +534,7 @@ export default function TestPage() {
     if (!selectedCard || saving || !problemReason.trim()) return;
 
     // Capture next card BEFORE updating state (since card will be removed from list)
-    // Important: check currentIndex >= 0 to avoid going back to first card when index is -1
-    const nextCard = currentIndex >= 0 && currentIndex < filteredCards.length - 1
-      ? filteredCards[currentIndex + 1]
-      : null;
+    const nextCard = getNextCard(selectedCard.id);
 
     setSaving(true);
     const name = contributorName || 'Melody';
