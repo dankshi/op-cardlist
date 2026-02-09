@@ -210,13 +210,41 @@ export default function TestPage() {
         break;
     }
 
-    // Sort: duplicates first, then unmapped
+    // Rarity priority: higher number = more rare = should appear first
+    const rarityPriority: Record<string, number> = {
+      'SEC': 9,  // Secret Rare
+      'SP': 8,   // Special
+      'SR': 7,   // Super Rare
+      'L': 6,    // Leader
+      'TR': 5,   // Treasure Rare
+      'R': 4,    // Rare
+      'P': 3,    // Promo
+      'UC': 2,   // Uncommon
+      'C': 1,    // Common
+    };
+
+    // Sort: rare cards first, then by price (highest first), then duplicates
     return result.sort((a, b) => {
+      // 1. Rarity (higher rarity first)
+      const aRarity = rarityPriority[a.rarity] || 0;
+      const bRarity = rarityPriority[b.rarity] || 0;
+      if (aRarity !== bRarity) {
+        return bRarity - aRarity;
+      }
+
+      // 2. Price (higher price first) - use db mapping price or prices data
+      const aPrice = dbMappings[a.id]?.price ?? prices[a.id]?.marketPrice ?? 0;
+      const bPrice = dbMappings[b.id]?.price ?? prices[b.id]?.marketPrice ?? 0;
+      if (aPrice !== bPrice) {
+        return bPrice - aPrice;
+      }
+
+      // 3. Duplicates first (within same rarity/price)
       const aIsDupe = cardIssues[a.id]?.isDuplicate ? 1 : 0;
       const bIsDupe = cardIssues[b.id]?.isDuplicate ? 1 : 0;
       return bIsDupe - aIsDupe;
     });
-  }, [cards, selectedSet, filter, cardIssues, fixedCards, problemCardIds]);
+  }, [cards, selectedSet, filter, cardIssues, fixedCards, problemCardIds, prices, dbMappings]);
 
   // Navigation
   const currentIndex = selectedCard ? filteredCards.findIndex(c => c.id === selectedCard.id) : -1;
