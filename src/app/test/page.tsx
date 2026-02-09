@@ -221,8 +221,8 @@ export default function TestPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!selectedCard) return;
-      if (e.key === 'ArrowRight' || e.key === 'n') goToNext();
-      if (e.key === 'ArrowLeft' || e.key === 'p') goToPrev();
+      if (e.key === 'ArrowRight') goToNext();
+      if (e.key === 'ArrowLeft') goToPrev();
       if (e.key === 'Escape') setSelectedCard(null);
     };
     window.addEventListener('keydown', handleKeyDown);
