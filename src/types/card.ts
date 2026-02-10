@@ -14,6 +14,7 @@ export interface CardPrice {
   lastUpdated: string | null;
   tcgplayerUrl: string | null;
   tcgplayerProductId: number | null;
+  tcgplayerProductName: string | null;
 }
 
 export interface Card {

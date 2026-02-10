@@ -11,11 +11,12 @@
     "scrape:op13": "tsx scripts/scrape.ts 569113",
     "scrape:prices": "tsx scripts/scrape-prices.ts",
     "scrape:prices:test": "tsx scripts/scrape-prices.ts --limit=5",
-    "archive:prices": "tsx scripts/archive-prices.ts",
-    "extract:prices": "tsx scripts/extract-prices.ts",
     "backup:images": "tsx scripts/backup-images.ts",
     "backup:download": "tsx scripts/backup-images.ts --download-only",
-    "backup:upload": "tsx scripts/backup-images.ts --upload-only"
+    "backup:upload": "tsx scripts/backup-images.ts --upload-only",
+    "scrape:products": "tsx scripts/scrape-products.ts",
+    "backup:product-images": "tsx scripts/backup-product-images.ts",
+    "backup:product-thumbnails": "tsx scripts/backup-product-images.ts --thumbnails-only"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",

@@ -11,7 +11,7 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  const cards = getAllCards();
+  const cards = await getAllCards();
   return cards.map((card) => ({
     cardId: card.id.toLowerCase(),
   }));
@@ -19,7 +19,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { cardId } = await params;
-  const card = getCardById(cardId.toUpperCase());
+  const card = await getCardById(cardId.toUpperCase());
 
   if (!card) {
     return {
@@ -93,7 +93,7 @@ const colorClasses: Record<string, string> = {
 
 export default async function CardPage({ params }: PageProps) {
   const { cardId } = await params;
-  const card = getCardById(cardId.toUpperCase());
+  const card = await getCardById(cardId.toUpperCase());
 
   if (!card) {
     notFound();
@@ -204,11 +204,17 @@ export default async function CardPage({ params }: PageProps) {
                       </a>
                     )}
                   </div>
-                  {(card.price.lowPrice != null || card.price.highPrice != null) && (
+                  {(card.price.lowestPrice != null || card.price.medianPrice != null) && (
                     <p className="text-xs text-zinc-500 mt-1">
-                      {card.price.lowPrice != null && `Low: $${card.price.lowPrice.toFixed(2)}`}
-                      {card.price.lowPrice != null && card.price.highPrice != null && ' • '}
-                      {card.price.highPrice != null && `High: $${card.price.highPrice.toFixed(2)}`}
+                      {card.price.lowestPrice != null && `Low: $${card.price.lowestPrice.toFixed(2)}`}
+                      {card.price.lowestPrice != null && card.price.medianPrice != null && ' • '}
+                      {card.price.medianPrice != null && `Median: $${card.price.medianPrice.toFixed(2)}`}
+                    </p>
+                  )}
+                  {card.price.lastSoldPrice != null && (
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Last sold: ${card.price.lastSoldPrice.toFixed(2)}
+                      {card.price.lastSoldDate && ` (${new Date(card.price.lastSoldDate).toLocaleDateString()})`}
                     </p>
                   )}
                 </div>
@@ -224,6 +230,11 @@ export default async function CardPage({ params }: PageProps) {
                 <p className="text-xs text-zinc-500">
                   Set: <span className="text-zinc-300 light:text-zinc-700 font-medium">{card.setId.toUpperCase()}</span>
                 </p>
+                {card.price?.tcgplayerProductId != null && (
+                  <p className="text-xs text-zinc-500 mt-1">
+                    TCGPlayer ID: <span className="text-zinc-300 light:text-zinc-700 font-mono">{card.price.tcgplayerProductId}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>

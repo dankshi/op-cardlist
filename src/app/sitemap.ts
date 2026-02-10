@@ -2,9 +2,9 @@ import { MetadataRoute } from 'next';
 import { getAllSets, getAllCards } from '@/lib/cards';
 import { SITE_URL } from '@/lib/seo';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const sets = getAllSets();
-  const cards = getAllCards();
+  const cards = await getAllCards();
 
   // Homepage
   const staticPages: MetadataRoute.Sitemap = [

@@ -103,6 +103,75 @@ img[data-loaded="false"] {
   animation: card-entrance 0.4s ease-out forwards;
 }
 
+/* Hero section gradient */
+@keyframes hero-gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.hero-gradient {
+  background: linear-gradient(
+    135deg,
+    rgba(7, 89, 133, 0.12) 0%,
+    rgba(0, 0, 0, 0) 30%,
+    rgba(0, 0, 0, 0) 70%,
+    rgba(7, 89, 133, 0.08) 100%
+  );
+  background-size: 200% 200%;
+  animation: hero-gradient-shift 15s ease-in-out infinite;
+}
+
+.light .hero-gradient {
+  background: linear-gradient(
+    135deg,
+    rgba(14, 165, 233, 0.06) 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0) 70%,
+    rgba(14, 165, 233, 0.04) 100%
+  );
+  background-size: 200% 200%;
+  animation: hero-gradient-shift 15s ease-in-out infinite;
+}
+
+/* Section divider gradient line */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(14, 165, 233, 0.3) 50%,
+    transparent 100%
+  );
+}
+
+.light .section-divider {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(14, 165, 233, 0.15) 50%,
+    transparent 100%
+  );
+}
+
+/* Hide scrollbar for carousels */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Floating animation for spotlight elements */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
 /* Disable all 3D effects for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .holo-animated {
@@ -110,6 +179,14 @@ img[data-loaded="false"] {
   }
 
   .card-3d-enter {
+    animation: none !important;
+  }
+
+  .hero-gradient {
+    animation: none !important;
+  }
+
+  .animate-float {
     animation: none !important;
   }
 }

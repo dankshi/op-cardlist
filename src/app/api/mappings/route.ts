@@ -58,6 +58,7 @@ export async function GET(request: Request) {
 }
 
 // POST /api/mappings - Submit new mapping(s)
+// Writes to both card_mappings (audit trail) and card_prices (source of truth)
 export async function POST(request: Request) {
   try {
     if (!supabase) {
@@ -67,14 +68,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const submissions: MappingSubmission[] = Array.isArray(body) ? body : [body];
     const submittedBy = body.submittedBy || 'anonymous';
-    const adminKey = request.headers.get('x-admin-key');
-    const isAdmin = adminKey === process.env.ADMIN_KEY;
 
     if (submissions.length === 0) {
       return NextResponse.json({ error: 'No mappings provided' }, { status: 400 });
     }
 
-    const rows = submissions.map(sub => ({
+    // 1. Save to card_mappings (audit trail)
+    const mappingRows = submissions.map(sub => ({
       card_id: sub.cardId,
       tcgplayer_product_id: sub.tcgProductId,
       tcgplayer_url: sub.tcgUrl,
@@ -82,18 +82,36 @@ export async function POST(request: Request) {
       market_price: sub.price ?? null,
       art_style: sub.artStyle ?? null,
       submitted_by: submittedBy,
-      approved: true, // Always auto-approve
+      approved: true,
     }));
 
-    // Upsert to handle updates to existing mappings
     const { data, error } = await supabase
       .from('card_mappings')
-      .upsert(rows, { onConflict: 'card_id' })
+      .upsert(mappingRows, { onConflict: 'card_id' })
       .select();
 
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('Supabase error (card_mappings):', error);
       return NextResponse.json({ error: 'Failed to save mappings', details: error.message }, { status: 500 });
+    }
+
+    // 2. Save to card_prices (source of truth for the app)
+    const priceRows = submissions.map(sub => ({
+      card_id: sub.cardId,
+      tcgplayer_product_id: sub.tcgProductId,
+      tcgplayer_url: sub.tcgUrl,
+      market_price: sub.price ?? null,
+      manually_mapped: true,
+      mapped_by: submittedBy,
+    }));
+
+    const { error: priceError } = await supabase
+      .from('card_prices')
+      .upsert(priceRows, { onConflict: 'card_id' });
+
+    if (priceError) {
+      console.error('Supabase error (card_prices):', priceError);
+      // Don't fail — card_mappings already saved
     }
 
     return NextResponse.json({

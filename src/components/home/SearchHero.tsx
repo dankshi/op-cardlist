@@ -43,7 +43,8 @@ export function SearchHero() {
       .filter(
         (card) =>
           regex.test(card.name) ||
-          regex.test(card.id)
+          regex.test(card.id) ||
+          (card.tcgName && regex.test(card.tcgName))
       )
       .slice(0, 8);
     setResults(filtered);

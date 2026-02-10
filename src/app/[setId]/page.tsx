@@ -19,7 +19,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { setId } = await params;
-  const set = getSetBySlug(setId);
+  const set = await getSetBySlug(setId);
 
   if (!set) {
     return {
@@ -70,7 +70,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function SetPage({ params }: PageProps) {
   const { setId } = await params;
-  const set = getSetBySlug(setId);
+  const set = await getSetBySlug(setId);
 
   if (!set) {
     notFound();

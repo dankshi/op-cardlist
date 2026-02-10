@@ -1,6 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { Card, CardDatabase, CardPrice } from '../src/types/card';
+import * as dotenv from 'dotenv';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Card, CardDatabase } from '../src/types/card';
+import { SET_NAME_MAP } from '../src/lib/set-names';
+
+dotenv.config({ path: '.env.local' });
 
 const TCGPLAYER_SEARCH_URL = 'https://mp-search-api.tcgplayer.com/v1/search/request';
 
@@ -8,9 +13,9 @@ interface TCGPlayerProduct {
   productId: number;
   productName: string;
   marketPrice: number | null;
-  lowPrice: number | null;
-  midPrice: number | null;
-  highPrice: number | null;
+  lowestPrice: number | null;
+  medianPrice: number | null;
+  totalListings: number | null;
   productUrlName: string;
   setName: string;
   customAttributes: {
@@ -18,31 +23,11 @@ interface TCGPlayerProduct {
   };
 }
 
-// Mapping of our set IDs to TCGPlayer set URL names
-// TCGPlayer uses URL-friendly names like "a-fist-of-divine-speed" for OP11
-const SET_NAME_MAP: Record<string, string[]> = {
-  'op-01': ['romance-dawn', 'romance-dawn-pre-release-cards'],
-  'op-02': ['paramount-war', 'paramount-war-pre-release-cards'],
-  'op-03': ['pillars-of-strength', 'pillars-of-strength-pre-release-cards'],
-  'op-04': ['kingdoms-of-intrigue', 'kingdoms-of-intrigue-pre-release-cards'],
-  'op-05': ['awakening-of-the-new-era', 'awakening-of-the-new-era-pre-release-cards', 'awakening-of-the-new-era-1st-anniversary-tournament-cards'],
-  'op-06': ['wings-of-the-captain', 'wings-of-the-captain-pre-release-cards'],
-  'op-07': ['500-years-in-the-future', '500-years-in-the-future-pre-release-cards'],
-  'op-08': ['two-legends', 'two-legends-pre-release-cards'],
-  'op-09': ['emperors-in-the-new-world', 'emperors-in-the-new-world-pre-release-cards', 'emperors-in-the-new-world-2nd-anniversary-tournament-cards'],
-  'op-10': ['royal-blood', 'royal-blood-pre-release-cards'],
-  'op-11': ['a-fist-of-divine-speed', 'a-fist-of-divine-speed-release-event-cards'],
-  'op-12': ['legacy-of-the-master', 'legacy-of-the-master-release-event-cards'],
-  'op-13': ['carrying-on-his-will', 'carrying-on-his-will-3rd-anniversary-tournament-cards'],
-  'eb-01': ['extra-booster-memorial-collection'],
-  'eb-02': ['extra-booster-anime-25th-collection'],
-  'eb-03': ['extra-booster-one-piece-heroines-edition'],
-  'op14-eb04': ['extra-booster-the-azure-seas-seven', 'the-azure-seas-seven', 'the-azure-seas-seven-release-event-cards'],
-  'prb-01': ['premium-booster-the-best'],
-};
-
 // Internal art style type for more precise matching
-type InternalArtStyle = 'standard' | 'alternate' | 'manga' | 'super' | 'red-super' | 'wanted' | 'treasure';
+type InternalArtStyle = 'standard' | 'alternate' | 'manga' | 'super' | 'red-super' | 'wanted' | 'treasure' | 'reprint' | 'jolly-roger' | 'full-art';
+
+// Sets where cards are reprints (variant naming doesn't follow standard booster conventions)
+const REPRINT_SETS = new Set(['prb-01']);
 
 // Categorize TCGPlayer product names into art styles
 function getArtStyleFromName(productName: string): InternalArtStyle {
@@ -53,7 +38,10 @@ function getArtStyleFromName(productName: string): InternalArtStyle {
   if (lower.includes('wanted') || lower.includes('wanted poster')) return 'wanted';
   if (lower.includes('manga')) return 'manga';
   if (lower.includes('treasure') || lower.includes('treasure cup') || lower.includes('box topper')) return 'treasure';
+  if (lower.includes('full art')) return 'full-art';
+  if (lower.includes('jolly roger')) return 'jolly-roger';
   if (lower.includes('alternate art') || lower.includes('alt art') || lower.includes('parallel') || lower.includes('art variant')) return 'alternate';
+  if (lower.includes('reprint')) return 'reprint';
 
   return 'standard';
 }
@@ -185,45 +173,77 @@ function findMatchingProduct(card: Card, products: TCGPlayerProduct[], debug: bo
     });
   }
 
-  // Get expected art style for this card
-  const expectedStyle = getExpectedArtStyle(card);
-
   // Find best match by art style
   let result: TCGPlayerProduct | undefined;
 
-  if (!card.isParallel) {
-    // For base cards, prefer standard (non-alternate) versions
-    result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'standard');
-  } else {
-    // For parallel cards, try to match the specific art style
-    result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === expectedStyle);
-
-    // Fallbacks for specific styles
-    if (!result && expectedStyle === 'red-super') {
-      result = matchingProducts.find((p) => ['red-super', 'super', 'alternate'].includes(getArtStyleFromName(p.productName)));
+  // Reprint sets (PRB-01, etc.) use different variant naming than standard boosters
+  if (REPRINT_SETS.has(card.setId)) {
+    if (!card.isParallel) {
+      // Non-parallel: prefer standard or reprint
+      result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'standard');
+      if (!result) {
+        result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'reprint');
+      }
+    } else {
+      // Parallel cards: match by card's artStyle field
+      if (card.artStyle === 'manga') {
+        result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'manga');
+      }
+      if (!result) {
+        result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'alternate');
+      }
+      if (!result) {
+        result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'full-art');
+      }
+      if (!result) {
+        result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'jolly-roger');
+      }
+      if (!result) {
+        result = matchingProducts.find((p) => !['standard', 'reprint'].includes(getArtStyleFromName(p.productName)));
+      }
     }
-    if (!result && expectedStyle === 'super') {
-      result = matchingProducts.find((p) => ['super', 'red-super', 'alternate'].includes(getArtStyleFromName(p.productName)));
-    }
-    if (!result && expectedStyle === 'wanted') {
-      result = matchingProducts.find((p) => ['wanted', 'super', 'alternate'].includes(getArtStyleFromName(p.productName)));
-    }
-    if (!result && expectedStyle === 'manga') {
-      result = matchingProducts.find((p) => ['manga', 'alternate'].includes(getArtStyleFromName(p.productName)));
-    }
-    if (!result && expectedStyle === 'alternate') {
-      result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'alternate');
-    }
-
-    // Fall back to any non-standard version
+    // Final fallback for reprint sets
     if (!result) {
-      result = matchingProducts.find((p) => getArtStyleFromName(p.productName) !== 'standard');
+      result = matchingProducts[0];
     }
-  }
+  } else {
+    // Standard booster set matching
+    const expectedStyle = getExpectedArtStyle(card);
 
-  // Final fallback
-  if (!result) {
-    result = matchingProducts[0];
+    if (!card.isParallel) {
+      // For base cards, prefer standard (non-alternate) versions
+      result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'standard');
+    } else {
+      // For parallel cards, try to match the specific art style
+      result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === expectedStyle);
+
+      // Fallbacks for specific styles
+      if (!result && expectedStyle === 'red-super') {
+        result = matchingProducts.find((p) => ['red-super', 'super', 'alternate'].includes(getArtStyleFromName(p.productName)));
+      }
+      if (!result && expectedStyle === 'super') {
+        result = matchingProducts.find((p) => ['super', 'red-super', 'alternate'].includes(getArtStyleFromName(p.productName)));
+      }
+      if (!result && expectedStyle === 'wanted') {
+        result = matchingProducts.find((p) => ['wanted', 'super', 'alternate'].includes(getArtStyleFromName(p.productName)));
+      }
+      if (!result && expectedStyle === 'manga') {
+        result = matchingProducts.find((p) => ['manga', 'alternate'].includes(getArtStyleFromName(p.productName)));
+      }
+      if (!result && expectedStyle === 'alternate') {
+        result = matchingProducts.find((p) => getArtStyleFromName(p.productName) === 'alternate');
+      }
+
+      // Fall back to any non-standard version
+      if (!result) {
+        result = matchingProducts.find((p) => getArtStyleFromName(p.productName) !== 'standard');
+      }
+    }
+
+    // Final fallback
+    if (!result) {
+      result = matchingProducts[0];
+    }
   }
 
   if (debug && result) {
@@ -233,19 +253,41 @@ function findMatchingProduct(card: Card, products: TCGPlayerProduct[], debug: bo
   return result || null;
 }
 
+// Fetch the most recent sale for a product from TCGPlayer
+async function fetchLastSoldPrice(productId: number): Promise<{ price: number; date: string } | null> {
+  try {
+    const res = await fetch(`https://mpapi.tcgplayer.com/v2/product/${productId}/latestsales`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) return null;
+
+    const text = await res.text();
+    if (text.startsWith('<')) return null; // HTML = rate limited
+
+    const data = JSON.parse(text);
+    const sales = data.data || data;
+    if (Array.isArray(sales) && sales.length > 0) {
+      return { price: sales[0].purchasePrice, date: sales[0].orderDate };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-interface PriceData {
-  lastUpdated: string;
-  prices: Record<string, CardPrice>;
-}
-
 async function main() {
-  const dataDir = path.join(process.cwd(), 'data');
-  const cardsPath = path.join(dataDir, 'cards.json');
-  const pricesPath = path.join(dataDir, 'prices.json');
+  const cardsPath = path.join(process.cwd(), 'data', 'cards.json');
 
   if (!fs.existsSync(cardsPath)) {
     console.error('cards.json not found. Run the card scraper first.');
@@ -254,13 +296,34 @@ async function main() {
 
   const database: CardDatabase = JSON.parse(fs.readFileSync(cardsPath, 'utf-8'));
 
-  // Load existing prices
-  let priceData: PriceData = {
-    lastUpdated: new Date().toISOString(),
-    prices: {},
-  };
-  if (fs.existsSync(pricesPath)) {
-    priceData = JSON.parse(fs.readFileSync(pricesPath, 'utf-8'));
+  // Connect to Supabase (required)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local');
+    process.exit(1);
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  console.log('Connected to Supabase');
+
+  // Fetch manually-mapped cards from Supabase (their product IDs are protected)
+  const manualMappings = new Map<string, number>(); // card_id → tcgplayer_product_id
+  const { data: manualData, error: manualError } = await supabase
+    .from('card_prices')
+    .select('card_id, tcgplayer_product_id')
+    .eq('manually_mapped', true);
+
+  if (manualError) {
+    console.error('Error fetching manual mappings:', manualError);
+  } else if (manualData) {
+    for (const row of manualData) {
+      if (row.tcgplayer_product_id) {
+        manualMappings.set(row.card_id, row.tcgplayer_product_id);
+      }
+    }
+    console.log(`Loaded ${manualMappings.size} manually-mapped cards (product IDs protected)`);
   }
 
   const args = process.argv.slice(2);
@@ -290,7 +353,7 @@ async function main() {
   }
 
   console.log('Starting TCGPlayer price scrape (set-based)...');
-  console.log(`Writing to: ${pricesPath}`);
+  console.log('Writing to: Supabase card_prices');
   console.log(`Total cards to process: ${totalCards}`);
   if (setFilter) console.log(`Filtering to set: ${setFilter}`);
   if (cardFilter) console.log(`Filtering to card: ${cardFilter}`);
@@ -299,6 +362,8 @@ async function main() {
   let totalProcessed = 0;
   let totalFound = 0;
   let totalNotFound = 0;
+  let totalManualPreserved = 0;
+  const matchedProductIds: { cardId: string; productId: number }[] = [];
   const startTime = Date.now();
 
   function formatTime(ms: number): string {
@@ -321,6 +386,19 @@ async function main() {
     return `[${totalProcessed}/${totalCards}] ${percent}% | ETA: ${eta}`;
   }
 
+  // Collect rows per set for batch upsert to Supabase
+  interface CardPriceRow {
+    card_id: string;
+    tcgplayer_product_id: number;
+    tcgplayer_product_name: string | null;
+    tcgplayer_url: string;
+    market_price: number | null;
+    lowest_price: number | null;
+    median_price: number | null;
+    total_listings: number | null;
+    manually_mapped: boolean;
+  }
+
   for (const set of database.sets) {
     if (setFilter && set.id !== setFilter) continue;
 
@@ -341,6 +419,8 @@ async function main() {
       continue;
     }
 
+    const setRows: CardPriceRow[] = [];
+
     // Match each of our cards to TCGPlayer products
     for (const card of set.cards) {
       if (cardFilter && !card.id.toLowerCase().includes(cardFilter.toLowerCase())) {
@@ -350,21 +430,62 @@ async function main() {
       const label = card.isParallel ? `${card.id} (${card.artStyle || card.variant || 'alt'})` : card.id;
       process.stdout.write(`  ${label.padEnd(25)} ${card.name.substring(0, 20).padEnd(20)} `);
 
-      const product = findMatchingProduct(card, products, debug);
+      let product: TCGPlayerProduct | null = null;
+      let isManual = false;
+
+      // Check if this card has a manually-mapped product ID
+      const manualProductId = manualMappings.get(card.id);
+      if (manualProductId) {
+        // Find the manual product in the set's products to get fresh prices
+        product = products.find(p => p.productId === manualProductId) || null;
+        isManual = true;
+
+        if (!product) {
+          // Manual product not in this set's products — likely a wrong-set mapping.
+          // Upsert with null prices so the missing price serves as a visible signal.
+          setRows.push({
+            card_id: card.id,
+            tcgplayer_product_id: manualProductId,
+            tcgplayer_product_name: null,
+            tcgplayer_url: `https://www.tcgplayer.com/product/${manualProductId}`,
+            market_price: null,
+            lowest_price: null,
+            median_price: null,
+            total_listings: null,
+            manually_mapped: true,
+          });
+          matchedProductIds.push({ cardId: card.id, productId: manualProductId });
+          console.log('[manual, not in set] (prices cleared — check mapping)');
+          totalManualPreserved++;
+          totalProcessed++;
+          continue;
+        }
+      }
+
+      if (!product) {
+        // Auto-match: find best matching product by card number + art style
+        product = findMatchingProduct(card, products, debug);
+      }
 
       if (product) {
-        priceData.prices[card.id] = {
-          marketPrice: product.marketPrice,
-          lowPrice: product.lowPrice,
-          midPrice: product.midPrice,
-          highPrice: product.highPrice,
-          lastUpdated: new Date().toISOString(),
-          tcgplayerUrl: `https://www.tcgplayer.com/product/${product.productId}/${product.productUrlName}`,
-          tcgplayerProductId: product.productId,
-        };
-        const displayPrice = product.marketPrice?.toFixed(2) || product.lowPrice?.toFixed(2) || 'N/A';
-        console.log(`$${displayPrice}`);
+        setRows.push({
+          card_id: card.id,
+          tcgplayer_product_id: product.productId,
+          tcgplayer_product_name: product.productName,
+          tcgplayer_url: `https://www.tcgplayer.com/product/${product.productId}/${product.productUrlName}`,
+          market_price: product.marketPrice,
+          lowest_price: product.lowestPrice,
+          median_price: product.medianPrice,
+          total_listings: product.totalListings,
+          manually_mapped: isManual,
+        });
+
+        matchedProductIds.push({ cardId: card.id, productId: product.productId });
+        const prefix = isManual ? '[manual] ' : '';
+        const displayPrice = product.marketPrice?.toFixed(2) || product.lowestPrice?.toFixed(2) || 'N/A';
+        console.log(`${prefix}$${displayPrice}`);
         totalFound++;
+        if (isManual) totalManualPreserved++;
       } else {
         console.log('--');
         totalNotFound++;
@@ -372,18 +493,83 @@ async function main() {
 
       totalProcessed++;
     }
+
+    // Batch upsert this set's rows to Supabase
+    if (setRows.length > 0) {
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < setRows.length; i += BATCH_SIZE) {
+        const batch = setRows.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from('card_prices')
+          .upsert(batch, {
+            onConflict: 'card_id',
+            // Don't overwrite manually_mapped=true with false
+            ignoreDuplicates: false,
+          });
+
+        if (error) {
+          console.error(`  Supabase upsert error for ${set.id}:`, error.message);
+        }
+      }
+      if (debug) console.log(`  Upserted ${setRows.length} rows to Supabase`);
+    }
+  }
+
+  // Fetch last sold prices for all matched products
+  if (matchedProductIds.length > 0) {
+    console.log(`\nFetching last sold prices for ${matchedProductIds.length} products...`);
+    let lastSoldFound = 0;
+    const lastSoldRows: { card_id: string; last_sold_price: number; last_sold_date: string }[] = [];
+    const batchSize = 5;
+    for (let i = 0; i < matchedProductIds.length; i += batchSize) {
+      const batch = matchedProductIds.slice(i, i + batchSize);
+      const results = await Promise.all(
+        batch.map(({ productId }) => fetchLastSoldPrice(productId))
+      );
+      for (let j = 0; j < batch.length; j++) {
+        const { cardId } = batch[j];
+        const sale = results[j];
+        if (sale) {
+          lastSoldRows.push({
+            card_id: cardId,
+            last_sold_price: sale.price,
+            last_sold_date: sale.date,
+          });
+          lastSoldFound++;
+        }
+      }
+      if (i % 50 === 0 && i > 0) {
+        process.stdout.write(`  ${i}/${matchedProductIds.length}\r`);
+      }
+      await sleep(100); // Rate limit between batches
+    }
+    console.log(`  Found last sold price for ${lastSoldFound}/${matchedProductIds.length} products`);
+
+    // Update last sold prices in Supabase
+    if (lastSoldRows.length > 0) {
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < lastSoldRows.length; i += BATCH_SIZE) {
+        const batch = lastSoldRows.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from('card_prices')
+          .upsert(batch, { onConflict: 'card_id' });
+
+        if (error) {
+          console.error(`  Supabase last sold upsert error:`, error.message);
+        }
+      }
+      console.log(`  Updated ${lastSoldRows.length} last sold prices in Supabase`);
+    }
   }
 
   const totalTime = formatTime(Date.now() - startTime);
 
-  priceData.lastUpdated = new Date().toISOString();
-  fs.writeFileSync(pricesPath, JSON.stringify(priceData, null, 2));
-
   console.log(`\n✓ Done in ${totalTime}!`);
   console.log(`  Processed: ${totalProcessed}/${totalCards}`);
   console.log(`  Found: ${totalFound} (${((totalFound / totalProcessed) * 100).toFixed(1)}%)`);
+  console.log(`  Manual preserved: ${totalManualPreserved}`);
   console.log(`  Not found: ${totalNotFound}`);
-  console.log(`  Saved to: ${pricesPath}`);
+  console.log(`  Saved to: Supabase card_prices`);
 }
 
 main().catch(console.error);

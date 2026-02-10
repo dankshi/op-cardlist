@@ -32,8 +32,8 @@ function getTopValueCards(cards: Card[], limit: number = 20): Card[] {
     .slice(0, limit);
 }
 
-export default function HotCardsPage() {
-  const allCards = getAllCards();
+export default async function HotCardsPage() {
+  const allCards = await getAllCards();
   const historyFiles = getPriceHistoryFiles();
   const hasHistory = historyFiles.length > 1;
 

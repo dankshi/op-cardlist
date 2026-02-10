@@ -10,8 +10,6 @@ on:
 jobs:
   update-prices:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout repository
@@ -30,14 +28,5 @@ jobs:
         run: npm run scrape:prices
         env:
           NODE_ENV: production
-
-      - name: Archive daily prices
-        run: npm run archive:prices
-
-      - name: Commit and push changes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: update prices [skip ci]"
-          file_pattern: "data/prices.json data/price-history/*.json"
-          commit_user_name: "github-actions[bot]"
-          commit_user_email: "github-actions[bot]@users.noreply.github.com"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

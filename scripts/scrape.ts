@@ -42,13 +42,25 @@ const SETS: Record<string, SetInfo> = {
   '569103': { id: 'op-03', name: 'OP-03 - Pillars of Strength', releaseDate: '2023-06-30' },
   '569102': { id: 'op-02', name: 'OP-02 - Paramount War', releaseDate: '2023-03-10' },
   '569101': { id: 'op-01', name: 'OP-01 - Romance Dawn', releaseDate: '2022-12-02' },
-  // Extra Booster Packs (Asia site - released earlier)
-  '556201': { id: 'eb-01', name: 'EB-01 - Memorial Collection', releaseDate: '2024-01-27', site: 'asia', englishImages: true },
-  '556202': { id: 'eb-02', name: 'EB-02 - Anime 25th Collection', releaseDate: '2024-10-25', site: 'asia', englishImages: true },
-  '556203': { id: 'eb-03', name: 'EB-03 - One Piece Heroines Edition', releaseDate: '2026-02-02', site: 'asia', englishImages: true },
-  '556204': { id: 'op14-eb04', name: 'OP14-EB04 - The Azure Sea\'s Seven', releaseDate: '2026-01-16', site: 'asia', englishImages: false },
-  // Premium Booster Packs (Asia site)
-  '556301': { id: 'prb-01', name: 'PRB-01 - One Piece Card The Best', releaseDate: '2024-11-08', site: 'asia', englishImages: true },
+  // Extra Booster Packs (now available on English site)
+  // Previously used Asia site (556xxx) IDs - switched to English site (569xxx) for native English images.
+  '569201': { id: 'eb-01', name: 'EB-01 - Memorial Collection', releaseDate: '2024-01-27' },
+  '569202': { id: 'eb-02', name: 'EB-02 - Anime 25th Collection', releaseDate: '2024-10-25' },
+  '569203': { id: 'eb-03', name: 'EB-03 - One Piece Heroines Edition', releaseDate: '2026-02-02' },
+  // OP14-EB04: English combined OP14 + EB04 into one set with different card numbering.
+  // - Asia site (556204): Only EB04-xxx cards (EB04-001 to EB04-061). Japanese images.
+  // - English site (569114): OP14-001 to OP14-080 + EB04-011 to EB04-041 + OP12-108.
+  //   Asia EB04-001 through EB04-010 were renumbered into OP14-xxx for English.
+  //   English images available on en.onepiece-cardgame.com.
+  // Previously used '556204' with site:'asia', englishImages:false (Japanese images only).
+  '569114': { id: 'op14-eb04', name: 'OP14-EB04 - The Azure Sea\'s Seven', releaseDate: '2026-01-16' },
+  // Premium Booster Packs (now available on English site)
+  // Previously used Asia site (556301) - switched to English site (569301) for native English images.
+  '569301': { id: 'prb-01', name: 'PRB-01 - One Piece Card The Best', releaseDate: '2024-11-08' },
+  // Promotion Cards & Other Product Cards (English site)
+  // These are ongoing categories, not time-limited sets. Release date is approximate (first cards appeared).
+  '569901': { id: 'promo', name: 'Promotion Cards', releaseDate: '2022-12-02' },
+  '569801': { id: 'other-product', name: 'Other Product Cards', releaseDate: '2022-12-02' },
 };
 
 function parseRarity(text: string): Rarity {

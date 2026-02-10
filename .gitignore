@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# prices (source of truth is Supabase, not this file)
+data/prices.json
+data/price-history/
+
 # image backup cache
 /.images-cache
 

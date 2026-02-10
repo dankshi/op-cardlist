@@ -79,25 +79,6 @@ export function CardThumbnail({ card }: CardThumbnailProps) {
         )}
       </div>
 
-      {/* Badges (outside transform to stay fixed) */}
-      {card.isParallel && (
-        <span className={`absolute top-1 right-1 z-10 px-1.5 py-0.5 text-[10px] font-bold rounded ${
-          card.artStyle === 'wanted' ? 'bg-orange-500 text-black' :
-          card.artStyle === 'manga' ? 'bg-pink-500 text-black' :
-          'bg-amber-500 text-black'
-        }`}>
-          {card.artStyle === 'wanted' ? 'WANTED' :
-           card.artStyle === 'manga' ? 'MANGA' :
-           'ALT'}
-        </span>
-      )}
-
-      {/* Price badge */}
-      {card.price?.marketPrice != null && (
-        <span className="absolute bottom-1.5 left-1.5 z-10 px-2 py-1 text-sm font-bold rounded-md bg-green-600 text-white shadow-lg">
-          ${card.price.marketPrice.toFixed(2)}
-        </span>
-      )}
     </div>
   );
 }

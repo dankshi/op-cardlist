@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useCallback, useState } from "react";
-import { getCardById } from "@/lib/cards";
 import type { Card } from "@/types/card";
 import { use } from "react";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
@@ -27,8 +26,10 @@ export default function CardModal({ params }: PageProps) {
   const router = useRouter();
 
   useEffect(() => {
-    const foundCard = getCardById(cardId.toUpperCase());
-    setCard(foundCard ?? null);
+    fetch(`/api/cards?id=${encodeURIComponent(cardId.toUpperCase())}`)
+      .then(res => res.json())
+      .then(data => setCard(data.card ?? null))
+      .catch(() => setCard(null));
   }, [cardId]);
 
   const handleClose = useCallback(() => {
@@ -194,11 +195,17 @@ export default function CardModal({ params }: PageProps) {
                     </a>
                   )}
                 </div>
-                {(card.price.lowPrice != null || card.price.highPrice != null) && (
+                {(card.price.lowestPrice != null || card.price.medianPrice != null) && (
                   <p className="text-xs text-zinc-500 mt-1">
-                    {card.price.lowPrice != null && `Low: $${card.price.lowPrice.toFixed(2)}`}
-                    {card.price.lowPrice != null && card.price.highPrice != null && ' • '}
-                    {card.price.highPrice != null && `High: $${card.price.highPrice.toFixed(2)}`}
+                    {card.price.lowestPrice != null && `Low: $${card.price.lowestPrice.toFixed(2)}`}
+                    {card.price.lowestPrice != null && card.price.medianPrice != null && ' • '}
+                    {card.price.medianPrice != null && `Median: $${card.price.medianPrice.toFixed(2)}`}
+                  </p>
+                )}
+                {card.price.lastSoldPrice != null && (
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Last sold: ${card.price.lastSoldPrice.toFixed(2)}
+                    {card.price.lastSoldDate && ` (${new Date(card.price.lastSoldDate).toLocaleDateString()})`}
                   </p>
                 )}
               </div>
@@ -214,6 +221,11 @@ export default function CardModal({ params }: PageProps) {
               <p className="text-xs text-zinc-500">
                 Set: <span className="text-zinc-300 light:text-zinc-700 font-medium">{card.setId.toUpperCase()}</span>
               </p>
+              {card.price?.tcgplayerProductId != null && (
+                <p className="text-xs text-zinc-500 mt-1">
+                  TCGPlayer ID: <span className="text-zinc-300 light:text-zinc-700 font-mono">{card.price.tcgplayerProductId}</span>
+                </p>
+              )}
             </div>
           </div>
         </div>

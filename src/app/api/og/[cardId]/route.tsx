@@ -18,7 +18,7 @@ export async function GET(
   { params }: { params: Promise<{ cardId: string }> }
 ) {
   const { cardId } = await params;
-  const card = getCardById(cardId.toUpperCase());
+  const card = await getCardById(cardId.toUpperCase());
 
   if (!card) {
     return new Response('Card not found', { status: 404 });
