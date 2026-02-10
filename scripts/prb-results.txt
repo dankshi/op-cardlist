@@ -1,0 +1,888 @@
+Found 319 PRB-01 cards
+With tcgplayerProductId: 318
+Fetching TCGPlayer...
+  Fetched 50/325
+  Fetched 100/325
+  Fetched 150/325
+  Fetched 200/325
+  Fetched 250/325
+  Fetched 300/325
+  Fetched 325/325
+Total TCGPlayer prods: 325
+
+=== MISMATCH ANALYSIS ===
+Correct: 204
+MISMATCHES: 114
+No mapping: 1
+Unmapped cards: OP01-016_p7
+
+--- MISMATCHED CARDS ---
+Card ID             Base ID     Name                          Rarity  CurProdID     Suggested
+----------------------------------------------------------------------------------------------------------------------------------
+OP01-006_p1         OP01-006    Otama                         UC      536170        NO MATCH
+OP01-006_p2         OP01-006    Otama                         UC      499430        NO MATCH
+OP01-006_r1         OP01-006    Otama                         UC      454518        NO MATCH
+OP01-024_p2         OP01-024    Monkey.D.Luffy                SR      453508        586178 (Monkey.D.Luffy (OP01-024) (Alternate Art))
+OP01-024_r1         OP01-024    Monkey.D.Luffy                SR      453508        586178 (Monkey.D.Luffy (OP01-024) (Alternate Art))
+OP01-029_r1         OP01-029    Radical Beam!!                UC      454550        NO MATCH
+OP01-033_p2         OP01-033    Izo                           UC      454554        586589 (Izo (OP01-033) (Jolly Roger Foil)) | 593285 (Izo (OP01-033) (Alternate Art)) | 593284 (Izo (OP01-033) (Full Art))
+OP01-033_r1         OP01-033    Izo                           UC      454554        586589 (Izo (OP01-033) (Jolly Roger Foil)) | 593285 (Izo (OP01-033) (Alternate Art)) | 593284 (Izo (OP01-033) (Full Art))
+OP01-041_p2         OP01-041    Kouzuki Momonosuke            R       454565        NO MATCH
+OP01-041_r1         OP01-041    Kouzuki Momonosuke            R       454565        NO MATCH
+OP01-047_p3         OP01-047    Trafalgar Law                 SR      454571        586893 (Trafalgar Law (OP01-047) (Alternate Art))
+OP01-047_r1         OP01-047    Trafalgar Law                 SR      454571        586893 (Trafalgar Law (OP01-047) (Alternate Art))
+OP01-052_p1         OP01-052    Raizo                         UC      509459        NO MATCH
+OP01-070_p3         OP01-070    Dracule Mihawk                SR      454598        594314 (Dracule Mihawk (OP01-070) (Reprint)) | 586549 (Dracule Mihawk (OP01-070) (Alternate Art))
+OP01-120_r2         OP01-120    Shanks                        SEC     454666        594316 (Shanks (OP01-120) (Reprint)) | 586194 (Shanks (OP01-120) (Alternate Art))
+OP02-015_p1         OP02-015    Makino                        UC      536169        NO MATCH
+OP02-018_r2         OP02-018    Marco                         R       486338        NO MATCH
+OP02-089_p1         OP02-089    Judgment of Hell              R       486456        NO MATCH
+OP02-089_p2         OP02-089    Judgment of Hell              R       486456        NO MATCH
+OP02-089_p3         OP02-089    Judgment of Hell              R       486456        NO MATCH
+OP02-089_r1         OP02-089    Judgment of Hell              R       486456        NO MATCH
+OP02-106_r2         OP02-106    Tsuru                         UC      581038        NO MATCH
+OP02-117_p4         OP02-117    Ice Age                       UC      486494        NO MATCH
+OP02-117_r2         OP02-117    Ice Age                       UC      486731        NO MATCH
+OP03-055_r1         OP03-055    Gum-Gum Giant Gavel           C       499985        NO MATCH
+OP03-056_p1         OP03-056    Sanji's Pilaf                 UC      501711        NO MATCH
+OP03-056_r1         OP03-056    Sanji's Pilaf                 UC      501711        NO MATCH
+OP03-057_p2         OP03-057    Three Thousand Worlds         R       499988        NO MATCH
+OP03-057_r1         OP03-057    Three Thousand Worlds         R       514060        NO MATCH
+OP03-079_p2         OP03-079    Vergo                         UC      581044        NO MATCH
+OP03-089_r2         OP03-089    Brannew                       R       581045        NO MATCH
+OP03-094_p1         OP03-094    Air Door                      UC      500044        NO MATCH
+OP03-094_r1         OP03-094    Air Door                      UC      501720        NO MATCH
+OP03-110_r1         OP03-110    Charlotte Smoothie            R       581054        NO MATCH
+OP03-116_p2         OP03-116    Shirahoshi                    UC      584365        593473 (Shirahoshi (OP03-116) (Jolly Roger Foil)) | 593474 (Shirahoshi (OP03-116) (Full Art)) | 594339 (Shirahoshi (OP03-116) (Reprint))
+OP03-116_p3         OP03-116    Shirahoshi                    UC      588173        593473 (Shirahoshi (OP03-116) (Jolly Roger Foil)) | 593474 (Shirahoshi (OP03-116) (Full Art)) | 594339 (Shirahoshi (OP03-116) (Reprint))
+OP03-121_r1         OP03-121    Thunder Bolt                  C       500112        NO MATCH
+OP03-123_r1         OP03-123    Charlotte Katakuri            SEC     500120        NO MATCH
+OP04-036_p1         OP04-036    Donquixote Family             C       516756        NO MATCH
+OP04-036_r1         OP04-036    Donquixote Family             C       516855        NO MATCH
+OP04-056_p1         OP04-056    Gum-Gum Red Roc               R       516772        NO MATCH
+OP04-056_p2         OP04-056    Gum-Gum Red Roc               R       516772        NO MATCH
+OP04-056_r1         OP04-056    Gum-Gum Red Roc               R       516772        NO MATCH
+OP04-095_r1         OP04-095    Barrier!!                     C       516893        NO MATCH
+OP04-104_r1         OP04-104    Sanji                         SR      515282        586551 (Sanji (OP04-104) (Alternate Art))
+OP05-010_p1         OP05-010    Nico Robin                    UC      583747        NO MATCH
+OP05-010_r1         OP05-010    Nico Robin                    UC      583747        NO MATCH
+OP05-015_p2         OP05-015    Belo Betty                    R       544621        594346 (Belo Betty (OP05-015) (Reprint))
+OP05-015_r1         OP05-015    Belo Betty                    R       544621        594346 (Belo Betty (OP05-015) (Reprint))
+OP05-057_p1         OP05-057    Hound Blaze                   R       528613        NO MATCH
+OP05-057_r1         OP05-057    Hound Blaze                   R       528613        NO MATCH
+OP05-073_p1         OP05-073    Miss Doublefinger(Zala)       UC      544623        NO MATCH
+OP05-073_r1         OP05-073    Miss Doublefinger(Zala)       UC      544623        NO MATCH
+OP05-074_r2         OP05-074    Eustass"Captain"Kid           SR      527020        586959 (Eustass"Captain"Kid (OP05-074) (Alternate Art)) | 587960 (Eustass"Captain"Kid (OP05-074) (Manga))
+OP05-114_r1         OP05-114    El Thor                       UC      528676        NO MATCH
+OP05-115_p1         OP05-115    Two-Hundred Million Volts Am  R       528677        NO MATCH
+OP05-115_p2         OP05-115    Two-Hundred Million Volts Am  R       528677        NO MATCH
+OP05-115_r1         OP05-115    Two-Hundred Million Volts Am  R       528677        NO MATCH
+OP05-117_p1         OP05-117    Upper Yard                    UC      528679        NO MATCH
+OP05-117_p2         OP05-117    Upper Yard                    UC      528679        NO MATCH
+OP05-117_p3         OP05-117    Upper Yard                    UC      528679        NO MATCH
+OP05-117_r1         OP05-117    Upper Yard                    UC      528679        NO MATCH
+OP05-119_r2         OP05-119    Monkey.D.Luffy                SEC     527026        594325 (Monkey.D.Luffy (OP05-119) (Reprint)) | 586960 (Monkey.D.Luffy (OP05-119) (Alternate Art)) | 587963 (Monkey.D.Luffy (OP05-119) (Manga))
+OP06-023_p1         OP06-023    Arlong                        R       659234        NO MATCH
+OP06-023_r1         OP06-023    Arlong                        R       539775        NO MATCH
+OP06-035_p2         OP06-035    Hody Jones                    SR      539772        NO MATCH
+OP06-035_r1         OP06-035    Hody Jones                    SR      539772        NO MATCH
+OP06-036_p1         OP06-036    Ryuma                         R       583750        NO MATCH
+OP06-038_r1         OP06-038    The Billion-fold World Trich  UC      541606        NO MATCH
+OP06-056_p1         OP06-056    Ama no Murakumo Sword         UC      541736        NO MATCH
+OP06-056_r1         OP06-056    Ama no Murakumo Sword         UC      541736        NO MATCH
+OP06-060_p1         OP06-060    Vinsmoke Ichiji               C       541621        593500 (Vinsmoke Ichiji (OP06-060) (Jolly Roger Foil)) | 593501 (Vinsmoke Ichiji (OP06-060) (Full Art))
+OP06-060_r1         OP06-060    Vinsmoke Ichiji               C       541621        593500 (Vinsmoke Ichiji (OP06-060) (Jolly Roger Foil)) | 593501 (Vinsmoke Ichiji (OP06-060) (Full Art))
+OP06-064_p1         OP06-064    Vinsmoke Niji                 C       541623        593506 (Vinsmoke Niji (OP06-064) (Jolly Roger Foil)) | 593507 (Vinsmoke Niji (OP06-064) (Full Art))
+OP06-064_r1         OP06-064    Vinsmoke Niji                 C       541623        593506 (Vinsmoke Niji (OP06-064) (Jolly Roger Foil)) | 593507 (Vinsmoke Niji (OP06-064) (Full Art))
+OP06-065_p1         OP06-065    Vinsmoke Niji                 R       541070        587233 (Vinsmoke Niji (OP06-065) (Jolly Roger Foil)) | 593508 (Vinsmoke Niji (OP06-065) (Alternate Art)) | 587234 (Vinsmoke Niji (OP06-065) (Full Art))
+OP06-065_r1         OP06-065    Vinsmoke Niji                 R       541070        587233 (Vinsmoke Niji (OP06-065) (Jolly Roger Foil)) | 593508 (Vinsmoke Niji (OP06-065) (Alternate Art)) | 587234 (Vinsmoke Niji (OP06-065) (Full Art))
+OP06-066_p1         OP06-066    Vinsmoke Yonji                C       541699        593553 (Vinsmoke Yonji (OP06-066) (Jolly Roger Foil)) | 593554 (Vinsmoke Yonji (OP06-066) (Full Art))
+OP06-066_r1         OP06-066    Vinsmoke Yonji                C       541699        593553 (Vinsmoke Yonji (OP06-066) (Jolly Roger Foil)) | 593554 (Vinsmoke Yonji (OP06-066) (Full Art))
+OP06-067_p1         OP06-067    Vinsmoke Yonji                R       541071        587235 (Vinsmoke Yonji (OP06-067) (Jolly Roger Foil)) | 587236 (Vinsmoke Yonji (OP06-067) (Alternate Art)) | 593555 (Vinsmoke Yonji (OP06-067) (Full Art))
+OP06-067_r1         OP06-067    Vinsmoke Yonji                R       541071        587235 (Vinsmoke Yonji (OP06-067) (Jolly Roger Foil)) | 587236 (Vinsmoke Yonji (OP06-067) (Alternate Art)) | 593555 (Vinsmoke Yonji (OP06-067) (Full Art))
+OP06-068_p1         OP06-068    Vinsmoke Reiju                C       541625        593558 (Vinsmoke Reiju (OP06-068) (Jolly Roger Foil)) | 593559 (Vinsmoke Reiju (OP06-068) (Full Art))
+OP06-068_r1         OP06-068    Vinsmoke Reiju                C       541625        593558 (Vinsmoke Reiju (OP06-068) (Jolly Roger Foil)) | 593559 (Vinsmoke Reiju (OP06-068) (Full Art))
+OP06-069_p3         OP06-069    Vinsmoke Reiju                SR      541063        587574 (Vinsmoke Reiju (OP06-069) (Alternate Art))
+OP06-069_r1         OP06-069    Vinsmoke Reiju                SR      541063        587574 (Vinsmoke Reiju (OP06-069) (Alternate Art))
+OP06-079_p1         OP06-079    Kingdom of GERMA              C       541633        NO MATCH
+OP06-079_p2         OP06-079    Kingdom of GERMA              C       541704        NO MATCH
+OP06-079_p3         OP06-079    Kingdom of GERMA              C       541633        NO MATCH
+OP06-079_r1         OP06-079    Kingdom of GERMA              C       541633        NO MATCH
+OP06-086_p2         OP06-086    Gecko Moria                   SR      541055        NO MATCH
+OP06-086_r1         OP06-086    Gecko Moria                   SR      541055        NO MATCH
+OP06-091_p1         OP06-091    Victoria Cindry               UC      541641        NO MATCH
+OP06-091_r1         OP06-091    Victoria Cindry               UC      541641        NO MATCH
+OP06-100_p1         OP06-100    Inuarashi                     UC      635303        NO MATCH
+OP06-100_r1         OP06-100    Inuarashi                     UC      541647        NO MATCH
+OP06-110_p1         OP06-110    Nekomamushi                   UC      585983        NO MATCH
+OP06-110_p2         OP06-110    Nekomamushi                   UC      541750        NO MATCH
+OP06-110_r1         OP06-110    Nekomamushi                   UC      541750        NO MATCH
+OP06-114_p1         OP06-114    Wyper                         UC      541657        NO MATCH
+OP06-114_r1         OP06-114    Wyper                         UC      541657        NO MATCH
+P-014_p1            P-014       Koby                          P       457029        NO MATCH
+P-014_r1            P-014       Koby                          P       457029        NO MATCH
+ST03-013_r1         ST03-013    Boa Hancock                   C       288286        586896 (Boa Hancock (ST03-013) (Jolly Roger Foil)) | 593585 (Boa Hancock (ST03-013) (Full Art)) | 593586 (Boa Hancock (ST03-013) (Alternate Art))
+ST04-003_r1         ST04-003    Kaido                         SR      599813        586961 (Kaido (ST04-003) (Alternate Art))
+ST04-005_r1         ST04-005    Queen                         C       514066        NO MATCH
+ST04-016_r1         ST04-016    Blast Breath                  C       426897        NO MATCH
+ST06-010_p1         ST06-010    Helmeppo                      C       485251        NO MATCH
+ST06-014_p1         ST06-014    Shockwave                     C       486329        NO MATCH
+ST06-014_r1         ST06-014    Shockwave                     C       486329        NO MATCH
+ST07-007_r1         ST07-007    Charlotte Brulee              C       500139        NO MATCH
+ST09-014_p1         ST09-014    Narikabura Arrow              C       504463        NO MATCH
+ST09-014_r1         ST09-014    Narikabura Arrow              C       504463        NO MATCH
+ST12-014_p1         ST12-014    Duval                         C       542124        NO MATCH
+ST12-014_r1         ST12-014    Duval                         C       542124        NO MATCH
+
+--- DETAILS ---
+
+[OP01-006_p1] Otama
+  baseId: OP01-006, rarity: UC
+  current productId: 536170
+  current URL: https://www.tcgplayer.com/product/536170
+  NO suggestions found
+
+[OP01-006_p2] Otama
+  baseId: OP01-006, rarity: UC
+  current productId: 499430
+  current URL: https://www.tcgplayer.com/product/499430/one-piece-card-game-one-piece-promotion-cards-otama-judge
+  NO suggestions found
+
+[OP01-006_r1] Otama
+  baseId: OP01-006, rarity: UC
+  current productId: 454518
+  current URL: https://www.tcgplayer.com/product/454518/one-piece-card-game-romance-dawn-otama?Language=English
+  NO suggestions found
+
+[OP01-024_p2] Monkey.D.Luffy
+  baseId: OP01-024, rarity: SR
+  current productId: 453508
+  current URL: https://www.tcgplayer.com/product/453508/MonkeyDLuffy 024
+  suggested from PRB set:
+    pid:586178 name:Monkey.D.Luffy (OP01-024) (Alternate Art) market:$52.78 low:$20
+
+[OP01-024_r1] Monkey.D.Luffy
+  baseId: OP01-024, rarity: SR
+  current productId: 453508
+  current URL: https://www.tcgplayer.com/product/453508/MonkeyDLuffy 024
+  suggested from PRB set:
+    pid:586178 name:Monkey.D.Luffy (OP01-024) (Alternate Art) market:$52.78 low:$20
+
+[OP01-029_r1] Radical Beam!!
+  baseId: OP01-029, rarity: UC
+  current productId: 454550
+  current URL: https://www.tcgplayer.com/product/454550/one-piece-card-game-romance-dawn-radical-beam?Language=English
+  NO suggestions found
+
+[OP01-033_p2] Izo
+  baseId: OP01-033, rarity: UC
+  current productId: 454554
+  current URL: https://www.tcgplayer.com/product/454554/one-piece-card-game-romance-dawn-izo?Language=English
+  suggested from PRB set:
+    pid:586589 name:Izo (OP01-033) (Jolly Roger Foil) market:$0.69 low:$0.1
+    pid:593285 name:Izo (OP01-033) (Alternate Art) market:$7.78 low:$7.1
+    pid:593284 name:Izo (OP01-033) (Full Art) market:$2.16 low:$1.79
+
+[OP01-033_r1] Izo
+  baseId: OP01-033, rarity: UC
+  current productId: 454554
+  current URL: https://www.tcgplayer.com/product/454554
+  suggested from PRB set:
+    pid:586589 name:Izo (OP01-033) (Jolly Roger Foil) market:$0.69 low:$0.1
+    pid:593285 name:Izo (OP01-033) (Alternate Art) market:$7.78 low:$7.1
+    pid:593284 name:Izo (OP01-033) (Full Art) market:$2.16 low:$1.79
+
+[OP01-041_p2] Kouzuki Momonosuke
+  baseId: OP01-041, rarity: R
+  current productId: 454565
+  current URL: https://www.tcgplayer.com/product/454565/one-piece-card-game-romance-dawn-kouzuki-momonosuke
+  NO suggestions found
+
+[OP01-041_r1] Kouzuki Momonosuke
+  baseId: OP01-041, rarity: R
+  current productId: 454565
+  current URL: https://www.tcgplayer.com/product/454565
+  NO suggestions found
+
+[OP01-047_p3] Trafalgar Law
+  baseId: OP01-047, rarity: SR
+  current productId: 454571
+  current URL: https://www.tcgplayer.com/product/454571/Trafalgar Law 047
+  suggested from PRB set:
+    pid:586893 name:Trafalgar Law (OP01-047) (Alternate Art) market:$23.75 low:$16
+
+[OP01-047_r1] Trafalgar Law
+  baseId: OP01-047, rarity: SR
+  current productId: 454571
+  current URL: https://www.tcgplayer.com/product/454571/Trafalgar Law 047
+  suggested from PRB set:
+    pid:586893 name:Trafalgar Law (OP01-047) (Alternate Art) market:$23.75 low:$16
+
+[OP01-052_p1] Raizo
+  baseId: OP01-052, rarity: UC
+  current productId: 509459
+  current URL: https://www.tcgplayer.com/product/509459
+  NO suggestions found
+
+[OP01-070_p3] Dracule Mihawk
+  baseId: OP01-070, rarity: SR
+  current productId: 454598
+  current URL: https://www.tcgplayer.com/product/454598
+  suggested from PRB set:
+    pid:594314 name:Dracule Mihawk (OP01-070) (Reprint) market:$0.68 low:$0.04
+    pid:586549 name:Dracule Mihawk (OP01-070) (Alternate Art) market:$23.26 low:$21
+
+[OP01-120_r2] Shanks
+  baseId: OP01-120, rarity: SEC
+  current productId: 454666
+  current URL: https://www.tcgplayer.com/product/454666/Shanks Parallel Manga Alternate Art
+  suggested from PRB set:
+    pid:594316 name:Shanks (OP01-120) (Reprint) market:$2.32 low:$1.26
+    pid:586194 name:Shanks (OP01-120) (Alternate Art) market:$22.09 low:$11
+
+[OP02-015_p1] Makino
+  baseId: OP02-015, rarity: UC
+  current productId: 536169
+  current URL: https://www.tcgplayer.com/product/536169
+  NO suggestions found
+
+[OP02-018_r2] Marco
+  baseId: OP02-018, rarity: R
+  current productId: 486338
+  current URL: https://www.tcgplayer.com/product/486338/one-piece-card-game-paramount-war-marco
+  NO suggestions found
+
+[OP02-089_p1] Judgment of Hell
+  baseId: OP02-089, rarity: R
+  current productId: 486456
+  current URL: https://www.tcgplayer.com/product/486456/Judgment of Hell
+  NO suggestions found
+
+[OP02-089_p2] Judgment of Hell
+  baseId: OP02-089, rarity: R
+  current productId: 486456
+  current URL: https://www.tcgplayer.com/product/486456/Judgment of Hell
+  NO suggestions found
+
+[OP02-089_p3] Judgment of Hell
+  baseId: OP02-089, rarity: R
+  current productId: 486456
+  current URL: https://www.tcgplayer.com/product/486456/Judgment of Hell
+  NO suggestions found
+
+[OP02-089_r1] Judgment of Hell
+  baseId: OP02-089, rarity: R
+  current productId: 486456
+  current URL: https://www.tcgplayer.com/product/486456/Judgment of Hell
+  NO suggestions found
+
+[OP02-106_r2] Tsuru
+  baseId: OP02-106, rarity: UC
+  current productId: 581038
+  current URL: https://www.tcgplayer.com/product/581038
+  NO suggestions found
+
+[OP02-117_p4] Ice Age
+  baseId: OP02-117, rarity: UC
+  current productId: 486494
+  current URL: https://www.tcgplayer.com/product/486494
+  NO suggestions found
+
+[OP02-117_r2] Ice Age
+  baseId: OP02-117, rarity: UC
+  current productId: 486731
+  current URL: https://www.tcgplayer.com/product/486731
+  NO suggestions found
+
+[OP03-055_r1] Gum-Gum Giant Gavel
+  baseId: OP03-055, rarity: C
+  current productId: 499985
+  current URL: https://www.tcgplayer.com/product/499985/Gum Gum Giant Gavel
+  NO suggestions found
+
+[OP03-056_p1] Sanji's Pilaf
+  baseId: OP03-056, rarity: UC
+  current productId: 501711
+  current URL: https://www.tcgplayer.com/product/501711
+  NO suggestions found
+
+[OP03-056_r1] Sanji's Pilaf
+  baseId: OP03-056, rarity: UC
+  current productId: 501711
+  current URL: https://www.tcgplayer.com/product/501711
+  NO suggestions found
+
+[OP03-057_p2] Three Thousand Worlds
+  baseId: OP03-057, rarity: R
+  current productId: 499988
+  current URL: https://www.tcgplayer.com/product/499988/Three Thousand Worlds
+  NO suggestions found
+
+[OP03-057_r1] Three Thousand Worlds
+  baseId: OP03-057, rarity: R
+  current productId: 514060
+  current URL: https://www.tcgplayer.com/product/514060/Three Thousand Worlds Judge Pack Vol 2
+  NO suggestions found
+
+[OP03-079_p2] Vergo
+  baseId: OP03-079, rarity: UC
+  current productId: 581044
+  current URL: https://www.tcgplayer.com/product/581044
+  NO suggestions found
+
+[OP03-089_r2] Brannew
+  baseId: OP03-089, rarity: R
+  current productId: 581045
+  current URL: https://www.tcgplayer.com/product/581045
+  NO suggestions found
+
+[OP03-094_p1] Air Door
+  baseId: OP03-094, rarity: UC
+  current productId: 500044
+  current URL: https://www.tcgplayer.com/product/500044
+  NO suggestions found
+
+[OP03-094_r1] Air Door
+  baseId: OP03-094, rarity: UC
+  current productId: 501720
+  current URL: https://www.tcgplayer.com/product/501720
+  NO suggestions found
+
+[OP03-110_r1] Charlotte Smoothie
+  baseId: OP03-110, rarity: R
+  current productId: 581054
+  current URL: https://www.tcgplayer.com/product/581054
+  NO suggestions found
+
+[OP03-116_p2] Shirahoshi
+  baseId: OP03-116, rarity: UC
+  current productId: 584365
+  current URL: https://www.tcgplayer.com/product/584365
+  suggested from PRB set:
+    pid:593473 name:Shirahoshi (OP03-116) (Jolly Roger Foil) market:$0.32 low:$0.08
+    pid:593474 name:Shirahoshi (OP03-116) (Full Art) market:$17.07 low:$13
+    pid:594339 name:Shirahoshi (OP03-116) (Reprint) market:$0.12 low:$0.01
+
+[OP03-116_p3] Shirahoshi
+  baseId: OP03-116, rarity: UC
+  current productId: 588173
+  current URL: https://www.tcgplayer.com/product/588173
+  suggested from PRB set:
+    pid:593473 name:Shirahoshi (OP03-116) (Jolly Roger Foil) market:$0.32 low:$0.08
+    pid:593474 name:Shirahoshi (OP03-116) (Full Art) market:$17.07 low:$13
+    pid:594339 name:Shirahoshi (OP03-116) (Reprint) market:$0.12 low:$0.01
+
+[OP03-121_r1] Thunder Bolt
+  baseId: OP03-121, rarity: C
+  current productId: 500112
+  current URL: https://www.tcgplayer.com/product/500112
+  NO suggestions found
+
+[OP03-123_r1] Charlotte Katakuri
+  baseId: OP03-123, rarity: SEC
+  current productId: 500120
+  current URL: https://www.tcgplayer.com/product/500120
+  NO suggestions found
+
+[OP04-036_p1] Donquixote Family
+  baseId: OP04-036, rarity: C
+  current productId: 516756
+  current URL: https://www.tcgplayer.com/product/516756
+  NO suggestions found
+
+[OP04-036_r1] Donquixote Family
+  baseId: OP04-036, rarity: C
+  current productId: 516855
+  current URL: https://www.tcgplayer.com/product/516855
+  NO suggestions found
+
+[OP04-056_p1] Gum-Gum Red Roc
+  baseId: OP04-056, rarity: R
+  current productId: 516772
+  current URL: https://www.tcgplayer.com/product/516772/Gum Gum Red Roc
+  NO suggestions found
+
+[OP04-056_p2] Gum-Gum Red Roc
+  baseId: OP04-056, rarity: R
+  current productId: 516772
+  current URL: https://www.tcgplayer.com/product/516772/Gum Gum Red Roc
+  NO suggestions found
+
+[OP04-056_r1] Gum-Gum Red Roc
+  baseId: OP04-056, rarity: R
+  current productId: 516772
+  current URL: https://www.tcgplayer.com/product/516772/Gum Gum Red Roc
+  NO suggestions found
+
+[OP04-095_r1] Barrier!!
+  baseId: OP04-095, rarity: C
+  current productId: 516893
+  current URL: https://www.tcgplayer.com/product/516893
+  NO suggestions found
+
+[OP04-104_r1] Sanji
+  baseId: OP04-104, rarity: SR
+  current productId: 515282
+  current URL: https://www.tcgplayer.com/product/515282/Sanji 104
+  suggested from PRB set:
+    pid:586551 name:Sanji (OP04-104) (Alternate Art) market:$18.1 low:$9.99
+
+[OP05-010_p1] Nico Robin
+  baseId: OP05-010, rarity: UC
+  current productId: 583747
+  current URL: https://www.tcgplayer.com/product/583747
+  NO suggestions found
+
+[OP05-010_r1] Nico Robin
+  baseId: OP05-010, rarity: UC
+  current productId: 583747
+  current URL: https://www.tcgplayer.com/product/583747
+  NO suggestions found
+
+[OP05-015_p2] Belo Betty
+  baseId: OP05-015, rarity: R
+  current productId: 544621
+  current URL: https://www.tcgplayer.com/product/544621
+  suggested from PRB set:
+    pid:594346 name:Belo Betty (OP05-015) (Reprint) market:$0.33 low:$0.09
+
+[OP05-015_r1] Belo Betty
+  baseId: OP05-015, rarity: R
+  current productId: 544621
+  current URL: https://www.tcgplayer.com/product/544621
+  suggested from PRB set:
+    pid:594346 name:Belo Betty (OP05-015) (Reprint) market:$0.33 low:$0.09
+
+[OP05-057_p1] Hound Blaze
+  baseId: OP05-057, rarity: R
+  current productId: 528613
+  current URL: https://www.tcgplayer.com/product/528613
+  NO suggestions found
+
+[OP05-057_r1] Hound Blaze
+  baseId: OP05-057, rarity: R
+  current productId: 528613
+  current URL: https://www.tcgplayer.com/product/528613
+  NO suggestions found
+
+[OP05-073_p1] Miss Doublefinger(Zala)
+  baseId: OP05-073, rarity: UC
+  current productId: 544623
+  current URL: https://www.tcgplayer.com/product/544623
+  NO suggestions found
+
+[OP05-073_r1] Miss Doublefinger(Zala)
+  baseId: OP05-073, rarity: UC
+  current productId: 544623
+  current URL: https://www.tcgplayer.com/product/544623
+  NO suggestions found
+
+[OP05-074_r2] Eustass"Captain"Kid
+  baseId: OP05-074, rarity: SR
+  current productId: 527020
+  current URL: https://www.tcgplayer.com/product/527020/EustassCaptainKid Alternate Art Manga
+  suggested from PRB set:
+    pid:586959 name:Eustass"Captain"Kid (OP05-074) (Alternate Art) market:$20.81 low:$20.81
+    pid:587960 name:Eustass"Captain"Kid (OP05-074) (Manga) market:$481.99 low:$850
+
+[OP05-114_r1] El Thor
+  baseId: OP05-114, rarity: UC
+  current productId: 528676
+  current URL: https://www.tcgplayer.com/product/528676
+  NO suggestions found
+
+[OP05-115_p1] Two-Hundred Million Volts Amaru
+  baseId: OP05-115, rarity: R
+  current productId: 528677
+  current URL: https://www.tcgplayer.com/product/528677/Two Hundred Million Volts Amaru
+  NO suggestions found
+
+[OP05-115_p2] Two-Hundred Million Volts Amaru
+  baseId: OP05-115, rarity: R
+  current productId: 528677
+  current URL: https://www.tcgplayer.com/product/528677/Two Hundred Million Volts Amaru
+  NO suggestions found
+
+[OP05-115_r1] Two-Hundred Million Volts Amaru
+  baseId: OP05-115, rarity: R
+  current productId: 528677
+  current URL: https://www.tcgplayer.com/product/528677/Two Hundred Million Volts Amaru
+  NO suggestions found
+
+[OP05-117_p1] Upper Yard
+  baseId: OP05-117, rarity: UC
+  current productId: 528679
+  current URL: https://www.tcgplayer.com/product/528679
+  NO suggestions found
+
+[OP05-117_p2] Upper Yard
+  baseId: OP05-117, rarity: UC
+  current productId: 528679
+  current URL: https://www.tcgplayer.com/product/528679
+  NO suggestions found
+
+[OP05-117_p3] Upper Yard
+  baseId: OP05-117, rarity: UC
+  current productId: 528679
+  current URL: https://www.tcgplayer.com/product/528679
+  NO suggestions found
+
+[OP05-117_r1] Upper Yard
+  baseId: OP05-117, rarity: UC
+  current productId: 528679
+  current URL: https://www.tcgplayer.com/product/528679
+  NO suggestions found
+
+[OP05-119_r2] Monkey.D.Luffy
+  baseId: OP05-119, rarity: SEC
+  current productId: 527026
+  current URL: https://www.tcgplayer.com/product/527026/MonkeyDLuffy 119 Alternate Art Manga
+  suggested from PRB set:
+    pid:594325 name:Monkey.D.Luffy (OP05-119) (Reprint) market:$11.24 low:$6.49
+    pid:586960 name:Monkey.D.Luffy (OP05-119) (Alternate Art) market:$255.91 low:$65
+    pid:587963 name:Monkey.D.Luffy (OP05-119) (Manga) market:$2494.46 low:$6500
+
+[OP06-023_p1] Arlong
+  baseId: OP06-023, rarity: R
+  current productId: 659234
+  current URL: https://www.tcgplayer.com/product/659234
+  NO suggestions found
+
+[OP06-023_r1] Arlong
+  baseId: OP06-023, rarity: R
+  current productId: 539775
+  current URL: https://www.tcgplayer.com/product/539775
+  NO suggestions found
+
+[OP06-035_p2] Hody Jones
+  baseId: OP06-035, rarity: SR
+  current productId: 539772
+  current URL: https://www.tcgplayer.com/product/539772/Hody Jones 035
+  NO suggestions found
+
+[OP06-035_r1] Hody Jones
+  baseId: OP06-035, rarity: SR
+  current productId: 539772
+  current URL: https://www.tcgplayer.com/product/539772/Hody Jones 035
+  NO suggestions found
+
+[OP06-036_p1] Ryuma
+  baseId: OP06-036, rarity: R
+  current productId: 583750
+  current URL: https://www.tcgplayer.com/product/583750
+  NO suggestions found
+
+[OP06-038_r1] The Billion-fold World Trichiliocosm
+  baseId: OP06-038, rarity: UC
+  current productId: 541606
+  current URL: https://www.tcgplayer.com/product/541606/The Billion fold World Trichiliocosm
+  NO suggestions found
+
+[OP06-056_p1] Ama no Murakumo Sword
+  baseId: OP06-056, rarity: UC
+  current productId: 541736
+  current URL: https://www.tcgplayer.com/product/541736/Ama no Murakumo Sword
+  NO suggestions found
+
+[OP06-056_r1] Ama no Murakumo Sword
+  baseId: OP06-056, rarity: UC
+  current productId: 541736
+  current URL: https://www.tcgplayer.com/product/541736/Ama no Murakumo Sword
+  NO suggestions found
+
+[OP06-060_p1] Vinsmoke Ichiji
+  baseId: OP06-060, rarity: C
+  current productId: 541621
+  current URL: https://www.tcgplayer.com/product/541621/Vinsmoke Ichiji 060
+  suggested from PRB set:
+    pid:593500 name:Vinsmoke Ichiji (OP06-060) (Jolly Roger Foil) market:$0.21 low:$0.01
+    pid:593501 name:Vinsmoke Ichiji (OP06-060) (Full Art) market:$17.26 low:$12.69
+
+[OP06-060_r1] Vinsmoke Ichiji
+  baseId: OP06-060, rarity: C
+  current productId: 541621
+  current URL: https://www.tcgplayer.com/product/541621/Vinsmoke Ichiji 060
+  suggested from PRB set:
+    pid:593500 name:Vinsmoke Ichiji (OP06-060) (Jolly Roger Foil) market:$0.21 low:$0.01
+    pid:593501 name:Vinsmoke Ichiji (OP06-060) (Full Art) market:$17.26 low:$12.69
+
+[OP06-064_p1] Vinsmoke Niji
+  baseId: OP06-064, rarity: C
+  current productId: 541623
+  current URL: https://www.tcgplayer.com/product/541623/Vinsmoke Niji 064
+  suggested from PRB set:
+    pid:593506 name:Vinsmoke Niji (OP06-064) (Jolly Roger Foil) market:$0.16 low:$0.03
+    pid:593507 name:Vinsmoke Niji (OP06-064) (Full Art) market:$4.73 low:$3
+
+[OP06-064_r1] Vinsmoke Niji
+  baseId: OP06-064, rarity: C
+  current productId: 541623
+  current URL: https://www.tcgplayer.com/product/541623/Vinsmoke Niji 064
+  suggested from PRB set:
+    pid:593506 name:Vinsmoke Niji (OP06-064) (Jolly Roger Foil) market:$0.16 low:$0.03
+    pid:593507 name:Vinsmoke Niji (OP06-064) (Full Art) market:$4.73 low:$3
+
+[OP06-065_p1] Vinsmoke Niji
+  baseId: OP06-065, rarity: R
+  current productId: 541070
+  current URL: https://www.tcgplayer.com/product/541070/Vinsmoke Niji 065
+  suggested from PRB set:
+    pid:587233 name:Vinsmoke Niji (OP06-065) (Jolly Roger Foil) market:$0.19 low:$0.08
+    pid:593508 name:Vinsmoke Niji (OP06-065) (Alternate Art) market:$7.88 low:$7.89
+    pid:587234 name:Vinsmoke Niji (OP06-065) (Full Art) market:$3.3 low:$2.19
+
+[OP06-065_r1] Vinsmoke Niji
+  baseId: OP06-065, rarity: R
+  current productId: 541070
+  current URL: https://www.tcgplayer.com/product/541070/Vinsmoke Niji 065
+  suggested from PRB set:
+    pid:587233 name:Vinsmoke Niji (OP06-065) (Jolly Roger Foil) market:$0.19 low:$0.08
+    pid:593508 name:Vinsmoke Niji (OP06-065) (Alternate Art) market:$7.88 low:$7.89
+    pid:587234 name:Vinsmoke Niji (OP06-065) (Full Art) market:$3.3 low:$2.19
+
+[OP06-066_p1] Vinsmoke Yonji
+  baseId: OP06-066, rarity: C
+  current productId: 541699
+  current URL: https://www.tcgplayer.com/product/541699/Vinsmoke Yonji 066
+  suggested from PRB set:
+    pid:593553 name:Vinsmoke Yonji (OP06-066) (Jolly Roger Foil) market:$0.17 low:$0.01
+    pid:593554 name:Vinsmoke Yonji (OP06-066) (Full Art) market:$4.69 low:$4.1
+
+[OP06-066_r1] Vinsmoke Yonji
+  baseId: OP06-066, rarity: C
+  current productId: 541699
+  current URL: https://www.tcgplayer.com/product/541699/Vinsmoke Yonji 066
+  suggested from PRB set:
+    pid:593553 name:Vinsmoke Yonji (OP06-066) (Jolly Roger Foil) market:$0.17 low:$0.01
+    pid:593554 name:Vinsmoke Yonji (OP06-066) (Full Art) market:$4.69 low:$4.1
+
+[OP06-067_p1] Vinsmoke Yonji
+  baseId: OP06-067, rarity: R
+  current productId: 541071
+  current URL: https://www.tcgplayer.com/product/541071/Vinsmoke Yonji 067
+  suggested from PRB set:
+    pid:587235 name:Vinsmoke Yonji (OP06-067) (Jolly Roger Foil) market:$0.26 low:$0.01
+    pid:587236 name:Vinsmoke Yonji (OP06-067) (Alternate Art) market:$5.23 low:$4
+    pid:593555 name:Vinsmoke Yonji (OP06-067) (Full Art) market:$2.61 low:$2
+
+[OP06-067_r1] Vinsmoke Yonji
+  baseId: OP06-067, rarity: R
+  current productId: 541071
+  current URL: https://www.tcgplayer.com/product/541071/Vinsmoke Yonji 067
+  suggested from PRB set:
+    pid:587235 name:Vinsmoke Yonji (OP06-067) (Jolly Roger Foil) market:$0.26 low:$0.01
+    pid:587236 name:Vinsmoke Yonji (OP06-067) (Alternate Art) market:$5.23 low:$4
+    pid:593555 name:Vinsmoke Yonji (OP06-067) (Full Art) market:$2.61 low:$2
+
+[OP06-068_p1] Vinsmoke Reiju
+  baseId: OP06-068, rarity: C
+  current productId: 541625
+  current URL: https://www.tcgplayer.com/product/541625/Vinsmoke Reiju 068
+  suggested from PRB set:
+    pid:593558 name:Vinsmoke Reiju (OP06-068) (Jolly Roger Foil) market:$0.38 low:$0.04
+    pid:593559 name:Vinsmoke Reiju (OP06-068) (Full Art) market:$43.67 low:$15
+
+[OP06-068_r1] Vinsmoke Reiju
+  baseId: OP06-068, rarity: C
+  current productId: 541625
+  current URL: https://www.tcgplayer.com/product/541625/Vinsmoke Reiju 068
+  suggested from PRB set:
+    pid:593558 name:Vinsmoke Reiju (OP06-068) (Jolly Roger Foil) market:$0.38 low:$0.04
+    pid:593559 name:Vinsmoke Reiju (OP06-068) (Full Art) market:$43.67 low:$15
+
+[OP06-069_p3] Vinsmoke Reiju
+  baseId: OP06-069, rarity: SR
+  current productId: 541063
+  current URL: https://www.tcgplayer.com/product/541063/Vinsmoke Reiju 069
+  suggested from PRB set:
+    pid:587574 name:Vinsmoke Reiju (OP06-069) (Alternate Art) market:$58.44 low:$105
+
+[OP06-069_r1] Vinsmoke Reiju
+  baseId: OP06-069, rarity: SR
+  current productId: 541063
+  current URL: https://www.tcgplayer.com/product/541063/Vinsmoke Reiju 069
+  suggested from PRB set:
+    pid:587574 name:Vinsmoke Reiju (OP06-069) (Alternate Art) market:$58.44 low:$105
+
+[OP06-079_p1] Kingdom of GERMA
+  baseId: OP06-079, rarity: C
+  current productId: 541633
+  current URL: https://www.tcgplayer.com/product/541633/Kingdom of GERMA
+  NO suggestions found
+
+[OP06-079_p2] Kingdom of GERMA
+  baseId: OP06-079, rarity: C
+  current productId: 541704
+  current URL: https://www.tcgplayer.com/product/541704/Kingdom of GERMA
+  NO suggestions found
+
+[OP06-079_p3] Kingdom of GERMA
+  baseId: OP06-079, rarity: C
+  current productId: 541633
+  current URL: https://www.tcgplayer.com/product/541633/Kingdom of GERMA
+  NO suggestions found
+
+[OP06-079_r1] Kingdom of GERMA
+  baseId: OP06-079, rarity: C
+  current productId: 541633
+  current URL: https://www.tcgplayer.com/product/541633/Kingdom of GERMA
+  NO suggestions found
+
+[OP06-086_p2] Gecko Moria
+  baseId: OP06-086, rarity: SR
+  current productId: 541055
+  current URL: https://www.tcgplayer.com/product/541055/Gecko Moria 086
+  NO suggestions found
+
+[OP06-086_r1] Gecko Moria
+  baseId: OP06-086, rarity: SR
+  current productId: 541055
+  current URL: https://www.tcgplayer.com/product/541055/Gecko Moria 086
+  NO suggestions found
+
+[OP06-091_p1] Victoria Cindry
+  baseId: OP06-091, rarity: UC
+  current productId: 541641
+  current URL: https://www.tcgplayer.com/product/541641
+  NO suggestions found
+
+[OP06-091_r1] Victoria Cindry
+  baseId: OP06-091, rarity: UC
+  current productId: 541641
+  current URL: https://www.tcgplayer.com/product/541641
+  NO suggestions found
+
+[OP06-100_p1] Inuarashi
+  baseId: OP06-100, rarity: UC
+  current productId: 635303
+  current URL: https://www.tcgplayer.com/product/635303
+  NO suggestions found
+
+[OP06-100_r1] Inuarashi
+  baseId: OP06-100, rarity: UC
+  current productId: 541647
+  current URL: https://www.tcgplayer.com/product/541647
+  NO suggestions found
+
+[OP06-110_p1] Nekomamushi
+  baseId: OP06-110, rarity: UC
+  current productId: 585983
+  current URL: https://www.tcgplayer.com/product/585983
+  NO suggestions found
+
+[OP06-110_p2] Nekomamushi
+  baseId: OP06-110, rarity: UC
+  current productId: 541750
+  current URL: https://www.tcgplayer.com/product/541750
+  NO suggestions found
+
+[OP06-110_r1] Nekomamushi
+  baseId: OP06-110, rarity: UC
+  current productId: 541750
+  current URL: https://www.tcgplayer.com/product/541750
+  NO suggestions found
+
+[OP06-114_p1] Wyper
+  baseId: OP06-114, rarity: UC
+  current productId: 541657
+  current URL: https://www.tcgplayer.com/product/541657
+  NO suggestions found
+
+[OP06-114_r1] Wyper
+  baseId: OP06-114, rarity: UC
+  current productId: 541657
+  current URL: https://www.tcgplayer.com/product/541657
+  NO suggestions found
+
+[P-014_p1] Koby
+  baseId: P-014, rarity: P
+  current productId: 457029
+  current URL: https://www.tcgplayer.com/product/457029
+  NO suggestions found
+
+[P-014_r1] Koby
+  baseId: P-014, rarity: P
+  current productId: 457029
+  current URL: https://www.tcgplayer.com/product/457029
+  NO suggestions found
+
+[ST03-013_r1] Boa Hancock
+  baseId: ST03-013, rarity: C
+  current productId: 288286
+  current URL: https://www.tcgplayer.com/product/288286
+  suggested from PRB set:
+    pid:586896 name:Boa Hancock (ST03-013) (Jolly Roger Foil) market:$2.89 low:$1.55
+    pid:593585 name:Boa Hancock (ST03-013) (Full Art) market:$41.55 low:$23
+    pid:593586 name:Boa Hancock (ST03-013) (Alternate Art) market:$174.09 low:$60
+
+[ST04-003_r1] Kaido
+  baseId: ST04-003, rarity: SR
+  current productId: 599813
+  current URL: https://www.tcgplayer.com/product/599813/Kaido 003
+  suggested from PRB set:
+    pid:586961 name:Kaido (ST04-003) (Alternate Art) market:$16.72 low:$9.99
+
+[ST04-005_r1] Queen
+  baseId: ST04-005, rarity: C
+  current productId: 514066
+  current URL: https://www.tcgplayer.com/product/514066
+  NO suggestions found
+
+[ST04-016_r1] Blast Breath
+  baseId: ST04-016, rarity: C
+  current productId: 426897
+  current URL: https://www.tcgplayer.com/product/426897
+  NO suggestions found
+
+[ST06-010_p1] Helmeppo
+  baseId: ST06-010, rarity: C
+  current productId: 485251
+  current URL: https://www.tcgplayer.com/product/485251
+  NO suggestions found
+
+[ST06-014_p1] Shockwave
+  baseId: ST06-014, rarity: C
+  current productId: 486329
+  current URL: https://www.tcgplayer.com/product/486329
+  NO suggestions found
+
+[ST06-014_r1] Shockwave
+  baseId: ST06-014, rarity: C
+  current productId: 486329
+  current URL: https://www.tcgplayer.com/product/486329
+  NO suggestions found
+
+[ST07-007_r1] Charlotte Brulee
+  baseId: ST07-007, rarity: C
+  current productId: 500139
+  current URL: https://www.tcgplayer.com/product/500139
+  NO suggestions found
+
+[ST09-014_p1] Narikabura Arrow
+  baseId: ST09-014, rarity: C
+  current productId: 504463
+  current URL: https://www.tcgplayer.com/product/504463/Narikabura Arrow
+  NO suggestions found
+
+[ST09-014_r1] Narikabura Arrow
+  baseId: ST09-014, rarity: C
+  current productId: 504463
+  current URL: https://www.tcgplayer.com/product/504463/Narikabura Arrow
+  NO suggestions found
+
+[ST12-014_p1] Duval
+  baseId: ST12-014, rarity: C
+  current productId: 542124
+  current URL: https://www.tcgplayer.com/product/542124
+  NO suggestions found
+
+[ST12-014_r1] Duval
+  baseId: ST12-014, rarity: C
+  current productId: 542124
+  current URL: https://www.tcgplayer.com/product/542124
+  NO suggestions found
+
+=== COVERAGE ===
+TCGPlayer prods in set: 325
+Our mapped cards: 318
+TCGPlayer prods not in our data: 161
