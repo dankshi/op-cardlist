@@ -6,9 +6,11 @@ export type ArtStyle = 'standard' | 'alternate' | 'wanted' | 'manga';
 
 export interface CardPrice {
   marketPrice: number | null;
-  lowPrice: number | null;
-  midPrice: number | null;
-  highPrice: number | null;
+  lowestPrice: number | null;
+  medianPrice: number | null;
+  totalListings: number | null;
+  lastSoldPrice: number | null;
+  lastSoldDate: string | null;
   lastUpdated: string | null;
   tcgplayerUrl: string | null;
   tcgplayerProductId: number | null;
@@ -66,11 +68,19 @@ export interface SetImagesDatabase {
 }
 
 export type ProductCategory = 'boosters' | 'decks' | 'other';
+export type ProductTag =
+  | 'booster-packs' | 'extra-boosters' | 'premium-boosters'            // boosters
+  | 'starter-decks' | 'ultra-decks'                                    // decks
+  | 'sleeves' | 'playmats' | 'storage' | 'card-cases' | 'binders'     // accessories
+  | 'collections' | 'anniversary-sets' | 'illustration-boxes'         // premium/special
+  | 'double-packs' | 'tin-packs' | 'don-sets' | 'devil-fruits'       // card packs
+  | 'bundles' | 'misc';                                               // other
 
 export interface Product {
   id: string;                   // e.g., "op13", "st29", "sleeve030"
   name: string;
   category: ProductCategory;
+  tag: ProductTag;              // Fine-grained subcategory derived from name
   releaseDate: string | null;   // Raw text, e.g., "November 7, 2025"
   msrp: string | null;         // Raw text, e.g., "USD $4.99 per pack"
   detailUrl: string;

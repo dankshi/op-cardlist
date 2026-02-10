@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getSetBySlug, getAllSets } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
+import SetStats from "@/components/SetStats";
 import { SITE_URL, SITE_NAME, getSetKeywords, getBreadcrumbSchema } from "@/lib/seo";
 
 interface PageProps {
@@ -124,6 +125,9 @@ export default async function SetPage({ params }: PageProps) {
           )}
         </div>
       </header>
+
+      {/* Set Value Metrics */}
+      <SetStats cards={set.cards} setId={set.id} />
 
       {/* Card Grid with Filters */}
       <CardGrid cards={set.cards} setId={set.id} />
