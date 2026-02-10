@@ -13,7 +13,7 @@ export default function TestLayout({
       <header className="sticky top-0 bg-zinc-900 border-b border-zinc-800 z-10">
         <nav className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="group flex items-baseline gap-0.5 hover:opacity-90 transition-opacity">
-            <span className="text-2xl font-black italic text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]">OP</span>
+            <span className="text-2xl font-black italic text-sky-500 drop-shadow-[0_0_10px_rgba(14,165,233,0.5)]">OP</span>
             <span className="text-xl font-bold text-white tracking-tight">Card</span>
             <span className="text-xl font-bold text-zinc-400 tracking-tight">list</span>
           </Link>

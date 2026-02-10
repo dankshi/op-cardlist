@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { SET_NAME_MAP } from '@/lib/set-names';
 
 interface TCGSearchResult {
   productId: number;
@@ -14,10 +15,14 @@ interface TCGSearchResult {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q');
+  const setId = searchParams.get('setId') || '';
 
   if (!query) {
     return NextResponse.json({ error: 'Query required' }, { status: 400 });
   }
+
+  // Look up TCGPlayer set names for filtering
+  const setNames = setId ? SET_NAME_MAP[setId] : undefined;
 
   try {
     // Use TCGPlayer's internal search API
@@ -38,6 +43,7 @@ export async function GET(request: Request) {
             term: {
               productLineName: ['one-piece-card-game'],
               productTypeName: ['Cards'],
+              ...(setNames && setNames.length > 0 ? { setName: setNames } : {}),
             },
             range: {},
             match: {},

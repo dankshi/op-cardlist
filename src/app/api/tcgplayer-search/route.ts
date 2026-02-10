@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { SET_NAME_MAP } from '@/lib/set-names';
 
 const TCGPLAYER_SEARCH_URL = 'https://mp-search-api.tcgplayer.com/v1/search/request';
 
@@ -6,23 +7,29 @@ interface TCGPlayerProduct {
   productId: number;
   productName: string;
   marketPrice: number | null;
-  lowPrice: number | null;
+  lowestPrice: number | null;
   productUrlName: string;
+  setName: string;
   customAttributes: {
     number?: string;
   };
 }
 
-async function searchTCGPlayer(query: string): Promise<TCGPlayerProduct[]> {
+async function searchTCGPlayer(query: string, setNames?: string[]): Promise<TCGPlayerProduct[]> {
+  const term: Record<string, string[]> = {
+    productLineName: ['one-piece-card-game'],
+    productTypeName: ['Cards'],
+  };
+  if (setNames && setNames.length > 0) {
+    term.setName = setNames;
+  }
+
   const searchPayload = {
     algorithm: 'sales_exp_fields_boosted',
     from: 0,
     size: 50,
     filters: {
-      term: {
-        productLineName: ['one-piece-card-game'],
-        productTypeName: ['Cards'],
-      },
+      term,
       range: {},
       match: {},
     },
@@ -63,6 +70,10 @@ export async function GET(request: Request) {
   const cardName = searchParams.get('name') || '';
   const cardNumber = searchParams.get('number') || '';
   const baseId = searchParams.get('baseId') || ''; // e.g., "EB01-006"
+  const setId = searchParams.get('setId') || '';
+
+  // Look up TCGPlayer set names for filtering
+  const setNames = setId ? SET_NAME_MAP[setId] : undefined;
 
   try {
     // Do multiple searches to find all variants
@@ -73,8 +84,8 @@ export async function GET(request: Request) {
       `${cardName} manga`,                    // Find manga versions
     ].filter(q => q.trim());
 
-    // Run searches in parallel
-    const searchPromises = searches.map(q => searchTCGPlayer(q));
+    // Run searches in parallel (filtered to set if provided)
+    const searchPromises = searches.map(q => searchTCGPlayer(q, setNames));
     const allResults = await Promise.all(searchPromises);
 
     // Combine and dedupe by productId
@@ -105,8 +116,9 @@ export async function GET(request: Request) {
       productId: r.productId,
       productName: r.productName,
       marketPrice: r.marketPrice,
-      lowPrice: r.lowPrice,
+      lowPrice: r.lowestPrice,
       number: r.customAttributes?.number || '',
+      setName: r.setName || '',
       url: `https://www.tcgplayer.com/product/${r.productId}/${r.productUrlName}`,
       imageUrl: `https://product-images.tcgplayer.com/fit-in/400x558/${r.productId}.jpg`,
     }));

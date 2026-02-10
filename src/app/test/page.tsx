@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Image from "next/image";
 import type { Card, CardPrice } from "@/types/card";
+import { SET_NAME_MAP } from "@/lib/set-names";
 
 interface CardWithPrice extends Card {
   price?: CardPrice;
@@ -14,6 +15,7 @@ interface TCGProduct {
   marketPrice: number | null;
   lowPrice: number | null;
   number: string;
+  setName?: string;
   url: string;
   imageUrl: string;
 }
@@ -149,7 +151,7 @@ export default function TestPage() {
     return map;
   }, [cards]);
 
-  const { cardIssues, issueCards, dupGroups, reprintCardIds, resolvedCardIds } = useMemo(() => {
+  const { cardIssues, issueCards, dupGroups, reprintCardIds, resolvedCardIds, productIdToCards } = useMemo(() => {
     const productIdUsage: Record<number, string[]> = {};
     const issues: Record<string, { isDuplicate: boolean; isUnmapped: boolean }> = {};
 
@@ -196,7 +198,7 @@ export default function TestPage() {
     }
 
     const cardsWithIssues = cards.filter(c => issues[c.id]);
-    return { cardIssues: issues, issueCards: cardsWithIssues, dupGroups: cardToProduct, reprintCardIds: reprints, resolvedCardIds: resolved };
+    return { cardIssues: issues, issueCards: cardsWithIssues, dupGroups: cardToProduct, reprintCardIds: reprints, resolvedCardIds: resolved, productIdToCards: productIdUsage };
   }, [cards, prices, dbMappings, cardById, fixedCards]);
 
   // Filter cards
@@ -315,11 +317,11 @@ export default function TestPage() {
 
     // Fetch both TCGPlayer API and Google search in parallel
     const tcgSearch = fetch(
-      `/api/tcgplayer-search?name=${encodeURIComponent(card.name)}&number=${cardNum}&baseId=${encodeURIComponent(card.baseId)}`
+      `/api/tcgplayer-search?name=${encodeURIComponent(card.name)}&number=${cardNum}&baseId=${encodeURIComponent(card.baseId)}&setId=${encodeURIComponent(card.setId)}`
     ).then(res => res.json()).catch(() => ({ products: [] }));
 
     const googleSearch = fetch(
-      `/api/google-tcg-search?q=${encodeURIComponent(`${card.baseId.replace(/_p\d+$/, '')} ${card.name} one piece tcg`)}`
+      `/api/google-tcg-search?q=${encodeURIComponent(`${card.baseId.replace(/_p\d+$/, '')} ${card.name} one piece tcg`)}&setId=${encodeURIComponent(card.setId)}`
     ).then(res => res.json()).catch(() => ({ results: [] }));
 
     // Handle TCGPlayer results
@@ -336,6 +338,7 @@ export default function TestPage() {
         marketPrice: null,
         lowPrice: null,
         number: r.number || '',
+        setName: r.setName || '',
         url: r.url,
         imageUrl: r.imageUrl,
       }));
@@ -380,6 +383,26 @@ export default function TestPage() {
   const assignProduct = async (product: TCGProduct) => {
     if (!selectedCard || saving) return;
     setAssignError(null);
+
+    // Check if this product is from a different set
+    if (isSetMismatch(product, selectedCard)) {
+      const confirmed = window.confirm(
+        `This product is from set "${product.setName}" which doesn't match ${selectedCard.setId}.\n\nAssign to ${selectedCard.id} anyway?`
+      );
+      if (!confirmed) return;
+    }
+
+    // Check if this product ID is already assigned to another card
+    const existingCards = productIdToCards[product.productId];
+    if (existingCards) {
+      const otherCards = existingCards.filter(id => id !== selectedCard.id);
+      if (otherCards.length > 0) {
+        const confirmed = window.confirm(
+          `Product #${product.productId} is already assigned to:\n${otherCards.join(', ')}\n\nAssign to ${selectedCard.id} anyway?`
+        );
+        if (!confirmed) return;
+      }
+    }
 
     // Capture next card BEFORE updating state (since card will be removed from filtered list)
     const nextCard = getNextCard(selectedCard.id);
@@ -447,6 +470,12 @@ export default function TestPage() {
     }
   };
 
+  const isSetMismatch = (product: TCGProduct, card: CardWithPrice): boolean => {
+    if (!product.setName) return false;
+    const expectedSets = SET_NAME_MAP[card.setId] || [];
+    return !expectedSets.includes(product.setName);
+  };
+
   const getTcgplayerImageUrl = (productId: number) => {
     return `https://product-images.tcgplayer.com/fit-in/400x558/${productId}.jpg`;
   };
@@ -460,6 +489,18 @@ export default function TestPage() {
     if (!cardPrice?.tcgplayerProductId || !cardPrice?.tcgplayerUrl) {
       console.error('No existing mapping to confirm');
       return;
+    }
+
+    // Warn if this product ID is already fixed for another card
+    const existingCards = productIdToCards[cardPrice.tcgplayerProductId];
+    if (existingCards) {
+      const otherFixedCards = existingCards.filter(id => id !== card.id && fixedCards.has(id));
+      if (otherFixedCards.length > 0) {
+        const confirmed = window.confirm(
+          `Product #${cardPrice.tcgplayerProductId} is already fixed for:\n${otherFixedCards.join(', ')}\n\nConfirm ${card.id} with the same product anyway?`
+        );
+        if (!confirmed) return;
+      }
     }
 
     // Capture next card BEFORE updating state (since card will be removed from filtered list)
@@ -705,6 +746,9 @@ export default function TestPage() {
           <div className="flex gap-1">
             {isFixed && (
               <span className="px-2 py-0.5 bg-green-600 rounded text-xs font-bold">FIXED</span>
+            )}
+            {isFixed && productId && (productIdToCards[productId] || []).some(id => id !== card.id && fixedCards.has(id)) && (
+              <span className="px-2 py-0.5 bg-red-600 rounded text-xs font-bold">CONFLICT</span>
             )}
             {!isFixed && resolvedCardIds.has(card.id) && (
               <span className="px-2 py-0.5 bg-green-600/50 rounded text-xs font-bold text-green-200">RESOLVED</span>
@@ -1269,52 +1313,75 @@ export default function TestPage() {
               })()}
 
               {/* TCGPlayer Search Results */}
-              {searchResults.map((product) => (
-                <div
-                  key={product.productId}
-                  onClick={() => assignProduct(product)}
-                  className="cursor-pointer p-3 rounded-lg border-2 border-zinc-700 bg-zinc-800 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
-                >
-                  <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={product.imageUrl}
-                      alt={product.productName}
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
-                  </div>
-                  <div className="text-xs text-zinc-400 truncate">{product.number}</div>
-                  <div className="text-sm truncate">{product.productName}</div>
-                  {product.marketPrice && (
-                    <div className="text-green-400 font-bold mt-1 text-sm">
-                      ${product.marketPrice.toFixed(2)}
+              {searchResults.map((product) => {
+                const mismatch = isSetMismatch(product, selectedCard);
+                return (
+                  <div
+                    key={product.productId}
+                    onClick={() => assignProduct(product)}
+                    className={`cursor-pointer p-3 rounded-lg border-2 bg-zinc-800 transition-all ${
+                      mismatch
+                        ? 'border-orange-500 hover:border-orange-400 hover:bg-orange-500/10'
+                        : 'border-zinc-700 hover:border-blue-500 hover:bg-blue-500/10'
+                    }`}
+                  >
+                    {mismatch && (
+                      <div className="text-[10px] font-bold text-orange-400 mb-1">WRONG SET: {product.setName}</div>
+                    )}
+                    <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={product.imageUrl}
+                        alt={product.productName}
+                        className="absolute inset-0 w-full h-full object-contain"
+                      />
                     </div>
-                  )}
-                </div>
-              ))}
+                    <div className="text-xs text-zinc-400 truncate">{product.number}</div>
+                    <div className="text-sm truncate">{product.productName}</div>
+                    {product.marketPrice && (
+                      <div className="text-green-400 font-bold mt-1 text-sm">
+                        ${product.marketPrice.toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
               {/* TCGPlayer Direct Search Results */}
-              {googleResults.map((product) => (
-                <div
-                  key={`search-${product.productId}`}
-                  onClick={() => assignProduct(product)}
-                  className="cursor-pointer p-3 rounded-lg border-2 border-blue-600 bg-zinc-800 hover:border-blue-500 hover:bg-blue-500/10 transition-all"
-                >
-                  <div className="text-[10px] font-bold text-blue-400 mb-1">SEARCH</div>
-                  <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={product.imageUrl}
-                      alt={product.productName}
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
+              {googleResults.map((product) => {
+                const mismatch = isSetMismatch(product, selectedCard);
+                return (
+                  <div
+                    key={`search-${product.productId}`}
+                    onClick={() => assignProduct(product)}
+                    className={`cursor-pointer p-3 rounded-lg border-2 bg-zinc-800 transition-all ${
+                      mismatch
+                        ? 'border-orange-500 hover:border-orange-400 hover:bg-orange-500/10'
+                        : 'border-blue-600 hover:border-blue-500 hover:bg-blue-500/10'
+                    }`}
+                  >
+                    <div className="text-[10px] font-bold mb-1">
+                      {mismatch ? (
+                        <span className="text-orange-400">WRONG SET: {product.setName}</span>
+                      ) : (
+                        <span className="text-blue-400">SEARCH</span>
+                      )}
+                    </div>
+                    <div className="aspect-[2.5/3.5] relative rounded overflow-hidden bg-zinc-700 mb-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={product.imageUrl}
+                        alt={product.productName}
+                        className="absolute inset-0 w-full h-full object-contain"
+                      />
+                    </div>
+                    {product.number && (
+                      <div className="text-xs text-yellow-400 font-mono">{product.number}</div>
+                    )}
+                    <div className="text-sm truncate">{product.productName}</div>
                   </div>
-                  {product.number && (
-                    <div className="text-xs text-yellow-400 font-mono">{product.number}</div>
-                  )}
-                  <div className="text-sm truncate">{product.productName}</div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Loading state */}
               {searching && searchResults.length === 0 && (
