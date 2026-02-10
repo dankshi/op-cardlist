@@ -970,6 +970,7 @@ export default function TestPage() {
             </button>
             <div className="text-center">
               <span className="font-mono text-blue-400 font-bold">{selectedCard.id}</span>
+              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${selectedCard.setId === 'prb-01' ? 'bg-purple-600/50 text-purple-200' : 'bg-zinc-700 text-zinc-400'}`}>{selectedCard.setId.toUpperCase()}</span>
               <span className="text-zinc-400 ml-2">{selectedCard.name}</span>
               <span className="text-zinc-600 ml-2">({currentIndex + 1}/{filteredCards.length})</span>
             </div>
