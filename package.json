@@ -16,7 +16,8 @@
     "backup:upload": "tsx scripts/backup-images.ts --upload-only",
     "scrape:products": "tsx scripts/scrape-products.ts",
     "backup:product-images": "tsx scripts/backup-product-images.ts",
-    "backup:product-thumbnails": "tsx scripts/backup-product-images.ts --thumbnails-only"
+    "backup:product-thumbnails": "tsx scripts/backup-product-images.ts --thumbnails-only",
+    "discover:sets": "tsx scripts/discover-tcg-sets.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
