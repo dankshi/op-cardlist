@@ -18,22 +18,6 @@ interface TCGProduct {
   imageUrl: string;
 }
 
-// Milestone messages based on total DB fixes
-const MILESTONE_MESSAGES: Record<number, { message: string; celebrate: boolean }> = {
-  50: { message: "50 cards fixed!", celebrate: false },
-  100: { message: "100 CARDS! Century club!", celebrate: true },
-  150: { message: "150 cards!", celebrate: false },
-  200: { message: "200 cards! Double century!", celebrate: true },
-  250: { message: "250 cards!", celebrate: false },
-  300: { message: "300 cards! Triple century!", celebrate: true },
-  400: { message: "400 cards!", celebrate: false },
-  500: { message: "500 CARDS! HALF A THOUSAND!", celebrate: true },
-  750: { message: "750 cards!", celebrate: false },
-  1000: { message: "1000 CARDS! LEGENDARY!", celebrate: true },
-  1500: { message: "1500 cards!", celebrate: true },
-  2000: { message: "2000 CARDS! UNSTOPPABLE!", celebrate: true },
-};
-
 // Type for database mappings
 interface DbMapping {
   tcgProductId: number;
@@ -75,8 +59,6 @@ export default function TestPage() {
   const [adminKey, setAdminKey] = useState<string>('');
   const [contributorName, setContributorName] = useState<string>('');
   const [sessionFixes, setSessionFixes] = useState(0);
-  const [encouragement, setEncouragement] = useState<string | null>(null);
-  const [showCelebration, setShowCelebration] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [hideJollyRogerWarning, setHideJollyRogerWarning] = useState(false);
   const [showJollyRogerExpanded, setShowJollyRogerExpanded] = useState(false);
@@ -105,8 +87,10 @@ export default function TestPage() {
     fetch('/api/cards')
       .then(res => res.json())
       .then(data => {
-        setCards(data.cards || []);
-        const uniqueSets = [...new Set(data.cards?.map((c: Card) => c.setId) || [])] as string[];
+        // Hide eb-04 (Japanese only — English split it into op14 + op15)
+        const allCards = (data.cards || []).filter((c: Card) => c.setId !== 'eb-04');
+        setCards(allCards);
+        const uniqueSets = [...new Set(allCards.map((c: Card) => c.setId))] as string[];
         setSets(uniqueSets.sort());
       })
       .catch(console.error);
@@ -158,12 +142,20 @@ export default function TestPage() {
   }, [cards]);
 
   // Detect issues (duplicates and unmapped cards)
-  const { cardIssues, issueCards } = useMemo(() => {
+  // Also identify reprint dups (dup groups involving PRB-01 cards)
+  const cardById = useMemo(() => {
+    const map: Record<string, CardWithPrice> = {};
+    cards.forEach(c => { map[c.id] = c; });
+    return map;
+  }, [cards]);
+
+  const { cardIssues, issueCards, dupGroups, reprintCardIds, resolvedCardIds } = useMemo(() => {
     const productIdUsage: Record<number, string[]> = {};
     const issues: Record<string, { isDuplicate: boolean; isUnmapped: boolean }> = {};
 
     cards.forEach(card => {
-      const productId = prices[card.id]?.tcgplayerProductId;
+      // Use manual mapping product ID if available (fixes resolved duplicates)
+      const productId = dbMappings[card.id]?.tcgProductId ?? prices[card.id]?.tcgplayerProductId;
       if (productId) {
         if (!productIdUsage[productId]) {
           productIdUsage[productId] = [];
@@ -174,18 +166,38 @@ export default function TestPage() {
       }
     });
 
-    // Mark duplicates
+    // Mark duplicates and detect reprint groups (contain an unfixed PRB-01 card)
+    const reprints = new Set<string>();
+    const resolved = new Set<string>(); // Unfixed cards whose dup partners are all fixed
     Object.values(productIdUsage).forEach(cardIds => {
       if (cardIds.length > 1) {
+        const unfixedIds = cardIds.filter(id => !fixedCards.has(id));
+        // If only one unfixed card left, the dup is resolved
+        if (unfixedIds.length <= 1) {
+          // Mark the remaining unfixed card as resolved (shows in fixed tab with its partners)
+          unfixedIds.forEach(id => resolved.add(id));
+          return;
+        }
+
+        const hasUnfixedPrb = cardIds.some(id => cardById[id]?.setId === 'prb-01' && !fixedCards.has(id));
         cardIds.forEach(id => {
           issues[id] = { ...issues[id], isDuplicate: true, isUnmapped: false };
+          if (hasUnfixedPrb) reprints.add(id);
         });
       }
     });
 
+    // Build reverse lookup: card ID -> product ID (for grouping duplicates)
+    const cardToProduct: Record<string, number> = {};
+    for (const [prodId, cardIds] of Object.entries(productIdUsage)) {
+      if (cardIds.length > 1) {
+        cardIds.forEach(id => { cardToProduct[id] = Number(prodId); });
+      }
+    }
+
     const cardsWithIssues = cards.filter(c => issues[c.id]);
-    return { cardIssues: issues, issueCards: cardsWithIssues };
-  }, [cards, prices]);
+    return { cardIssues: issues, issueCards: cardsWithIssues, dupGroups: cardToProduct, reprintCardIds: reprints, resolvedCardIds: resolved };
+  }, [cards, prices, dbMappings, cardById, fixedCards]);
 
   // Filter cards
   const filteredCards = useMemo(() => {
@@ -199,11 +211,11 @@ export default function TestPage() {
     // Filter by type
     switch (filter) {
       case 'issues':
-        // Exclude fixed cards and problem cards from issues view
+        // Exclude fixed and problem cards from issues view
         result = result.filter(c => cardIssues[c.id] && !fixedCards.has(c.id) && !problemCardIds.has(c.id));
         break;
       case 'fixed':
-        result = result.filter(c => fixedCards.has(c.id));
+        result = result.filter(c => fixedCards.has(c.id) || resolvedCardIds.has(c.id));
         break;
       case 'problems':
         result = result.filter(c => problemCardIds.has(c.id));
@@ -223,28 +235,43 @@ export default function TestPage() {
       'C': 1,    // Common
     };
 
-    // Sort: rare cards first, then by price (highest first), then duplicates
+    // Pre-compute the max price for each duplicate group
+    const getPrice = (id: string) => dbMappings[id]?.price ?? prices[id]?.marketPrice ?? 0;
+    const dupGroupMaxPrice: Record<number, number> = {};
+    for (const card of result) {
+      const prodId = dupGroups[card.id];
+      if (prodId !== undefined) {
+        const p = getPrice(card.id);
+        dupGroupMaxPrice[prodId] = Math.max(dupGroupMaxPrice[prodId] ?? 0, p);
+      }
+    }
+
+    // Sort: duplicates grouped together by product ID, ordered by group's highest value
     return result.sort((a, b) => {
-      // 1. Rarity (higher rarity first)
+      const aDup = dupGroups[a.id];
+      const bDup = dupGroups[b.id];
+      const aIsDup = aDup !== undefined;
+      const bIsDup = bDup !== undefined;
+
+      // Duplicates before unmapped
+      if (aIsDup !== bIsDup) return aIsDup ? -1 : 1;
+
+      // Both are duplicates: group by product ID, sort groups by max price
+      if (aIsDup && bIsDup) {
+        if (aDup !== bDup) {
+          return (dupGroupMaxPrice[bDup] ?? 0) - (dupGroupMaxPrice[aDup] ?? 0);
+        }
+        // Same group: highest price first
+        return getPrice(b.id) - getPrice(a.id);
+      }
+
+      // Both unmapped: sort by rarity then price
       const aRarity = rarityPriority[a.rarity] || 0;
       const bRarity = rarityPriority[b.rarity] || 0;
-      if (aRarity !== bRarity) {
-        return bRarity - aRarity;
-      }
-
-      // 2. Price (higher price first) - use db mapping price or prices data
-      const aPrice = dbMappings[a.id]?.price ?? prices[a.id]?.marketPrice ?? 0;
-      const bPrice = dbMappings[b.id]?.price ?? prices[b.id]?.marketPrice ?? 0;
-      if (aPrice !== bPrice) {
-        return bPrice - aPrice;
-      }
-
-      // 3. Duplicates first (within same rarity/price)
-      const aIsDupe = cardIssues[a.id]?.isDuplicate ? 1 : 0;
-      const bIsDupe = cardIssues[b.id]?.isDuplicate ? 1 : 0;
-      return bIsDupe - aIsDupe;
+      if (aRarity !== bRarity) return bRarity - aRarity;
+      return getPrice(b.id) - getPrice(a.id);
     });
-  }, [cards, selectedSet, filter, cardIssues, fixedCards, problemCardIds, prices, dbMappings]);
+  }, [cards, selectedSet, filter, cardIssues, fixedCards, problemCardIds, reprintCardIds, resolvedCardIds, prices, dbMappings, dupGroups]);
 
   // Navigation
   const currentIndex = selectedCard ? filteredCards.findIndex(c => c.id === selectedCard.id) : -1;
@@ -334,18 +361,6 @@ export default function TestPage() {
     return null;
   };
 
-  const checkMilestone = (newDbTotal: number) => {
-    const milestone = MILESTONE_MESSAGES[newDbTotal];
-    if (milestone) {
-      setEncouragement(milestone.message);
-      if (milestone.celebrate) {
-        setShowCelebration(true);
-        setTimeout(() => setShowCelebration(false), 4000);
-      }
-      setTimeout(() => setEncouragement(null), 4000);
-    }
-  };
-
   // Helper to find the next card to navigate to
   // Calculates index at call time (not render time) for accuracy
   const getNextCard = (currentCardId: string): CardWithPrice | null => {
@@ -417,9 +432,6 @@ export default function TestPage() {
         const newSession = sessionFixes + 1;
         setSessionFixes(newSession);
 
-        // Check for milestones based on total DB fixes
-        const newDbTotal = fixedCards.size + 1;
-        checkMilestone(newDbTotal);
 
         // Auto-advance to next card (using captured reference)
         if (nextCard) {
@@ -490,9 +502,6 @@ export default function TestPage() {
         const newSession = sessionFixes + 1;
         setSessionFixes(newSession);
 
-        // Check for milestones based on total DB fixes
-        const newDbTotal = fixedCards.size + 1;
-        checkMilestone(newDbTotal);
 
         // If modal is open, advance to next (using captured reference)
         if (selectedCard && selectedCard.id === card.id) {
@@ -666,6 +675,144 @@ export default function TestPage() {
     }
   };
 
+  const renderCard = (card: CardWithPrice) => {
+    const isFixed = fixedCards.has(card.id);
+    const issue = cardIssues[card.id];
+    const cardPrice = prices[card.id];
+    const dbMapping = dbMappings[card.id];
+    const cardProblem = problems.find(p => p.card_id === card.id);
+    const productId = dbMapping?.tcgProductId ?? cardPrice?.tcgplayerProductId;
+    const marketPrice = dbMapping?.price ?? cardPrice?.marketPrice;
+
+    return (
+      <div
+        key={card.id}
+        onClick={() => openCard(card)}
+        className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.02] hover:shadow-xl ${
+          isFixed ? 'border-green-500 bg-green-500/5' :
+          resolvedCardIds.has(card.id) ? 'border-green-500/50 bg-green-500/5' :
+          cardProblem ? 'border-orange-500 bg-orange-500/5' :
+          issue?.isDuplicate ? 'border-red-500 bg-red-500/5' :
+          issue?.isUnmapped ? 'border-orange-500 bg-orange-500/5' :
+          'border-zinc-700 bg-zinc-900'
+        }`}
+      >
+        <div className="px-3 py-2 bg-zinc-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-bold">{card.id}</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${card.setId === 'prb-01' ? 'bg-purple-600/50 text-purple-200' : 'bg-zinc-700 text-zinc-400'}`}>{card.setId.toUpperCase()}</span>
+          </div>
+          <div className="flex gap-1">
+            {isFixed && (
+              <span className="px-2 py-0.5 bg-green-600 rounded text-xs font-bold">FIXED</span>
+            )}
+            {!isFixed && resolvedCardIds.has(card.id) && (
+              <span className="px-2 py-0.5 bg-green-600/50 rounded text-xs font-bold text-green-200">RESOLVED</span>
+            )}
+            {cardProblem && (
+              <span className="px-2 py-0.5 bg-orange-600 rounded text-xs font-bold">PROBLEM</span>
+            )}
+            {issue?.isDuplicate && !isFixed && !cardProblem && (
+              <span className="px-2 py-0.5 bg-red-600 rounded text-xs font-bold">DUP</span>
+            )}
+            {issue?.isUnmapped && !isFixed && !cardProblem && (
+              <span className="px-2 py-0.5 bg-orange-600 rounded text-xs font-bold">NO LINK</span>
+            )}
+          </div>
+        </div>
+
+        <div className="p-3 flex gap-3">
+          <div className="flex-1">
+            <div className="text-[10px] font-bold text-green-400 mb-1 text-center">OURS</div>
+            <div className="aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-800 ring-2 ring-green-500">
+              <Image
+                src={card.imageUrl}
+                alt={card.name}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <div className="text-[10px] font-bold text-yellow-400 mb-1 text-center">TCG</div>
+            {productId ? (
+              <div className={`aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-800 ring-2 ${isFixed ? 'ring-green-500' : 'ring-yellow-500'}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getTcgplayerImageUrl(productId)}
+                  alt="TCGPlayer"
+                  className="absolute inset-0 w-full h-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="aspect-[2.5/3.5] rounded-lg bg-zinc-800 ring-2 ring-red-500 flex items-center justify-center">
+                <span className="text-zinc-500 text-xs">None</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="px-3 pb-2">
+          <div className="text-xs text-zinc-400 truncate">{card.name}</div>
+          <div className="text-sm font-bold mt-1">
+            {marketPrice != null && marketPrice !== undefined ? (
+              <span className="text-green-400">${Number(marketPrice).toFixed(2)}</span>
+            ) : (
+              <span className="text-zinc-600">No price</span>
+            )}
+          </div>
+        </div>
+
+        {!isFixed && productId && (
+          <div className="px-3 pb-3">
+            <button
+              onClick={(e) => confirmLooksRight(card, e)}
+              disabled={saving}
+              className="w-full px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 rounded text-xs font-bold transition-colors"
+            >
+              ✓ Looks Right
+            </button>
+          </div>
+        )}
+
+        {isFixed && (
+          <div className="px-3 pb-3">
+            <button
+              onClick={(e) => revertMapping(card, e)}
+              disabled={saving}
+              className="w-full px-3 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500 disabled:bg-zinc-700 rounded text-xs font-bold transition-colors text-red-300 hover:text-white"
+            >
+              ↩ Revert
+            </button>
+          </div>
+        )}
+
+        {cardProblem && (
+          <div className="px-3 pb-3">
+            <div className="text-xs text-orange-300 mb-2 truncate" title={cardProblem.reason}>
+              ⚠️ {cardProblem.reason}
+            </div>
+            <div className="text-[10px] text-zinc-500 mb-2">
+              by {cardProblem.reported_by}
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                dismissProblem(cardProblem.id, card.id);
+              }}
+              disabled={saving}
+              className="w-full px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 rounded text-xs font-bold transition-colors"
+            >
+              ✕ Dismiss
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
       <div className="max-w-7xl mx-auto">
@@ -715,40 +862,6 @@ export default function TestPage() {
           </div>
         </div>
 
-        {/* Milestone Toast */}
-        {encouragement && (
-          <div className="fixed bottom-4 right-4 z-[100] pointer-events-none">
-            <div className={`px-5 py-3 rounded-lg shadow-xl ${
-              showCelebration
-                ? 'bg-gradient-to-r from-yellow-500 via-pink-500 to-purple-500 animate-pulse'
-                : 'bg-gradient-to-r from-pink-600/90 to-purple-600/90'
-            }`}>
-              <span className={`font-bold text-white ${showCelebration ? 'text-lg' : 'text-sm'}`}>
-                {showCelebration && '🎉 '}{encouragement}{showCelebration && ' 🎉'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Celebration Fireworks Overlay */}
-        {showCelebration && (
-          <div className="fixed inset-0 z-[99] pointer-events-none overflow-hidden">
-            {[...Array(20)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute animate-ping"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                  animationDelay: `${Math.random() * 2}s`,
-                  animationDuration: `${1 + Math.random()}s`,
-                }}
-              >
-                <span className="text-2xl">{['🎆', '🎇', '✨', '🌟', '💫'][Math.floor(Math.random() * 5)]}</span>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Filters */}
         <div className="mb-6 flex flex-wrap gap-4 items-center">
@@ -787,147 +900,54 @@ export default function TestPage() {
         </div>
 
         {/* Cards Grid - showing both our image and TCGPlayer side by side */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filteredCards.map(card => {
-            const isFixed = fixedCards.has(card.id);
-            const issue = cardIssues[card.id];
-            const cardPrice = prices[card.id];
-            const dbMapping = dbMappings[card.id];
-            const cardProblem = problems.find(p => p.card_id === card.id);
-            // Prefer db mapping (source of truth after fixing) over initial prices data
-            const productId = dbMapping?.tcgProductId ?? cardPrice?.tcgplayerProductId;
-            const marketPrice = dbMapping?.price ?? cardPrice?.marketPrice;
-
+        {(filter === 'issues' || filter === 'fixed') ? (
+          // Group by shared product ID, each group on its own row
+          (() => {
+            const groups: Record<string, CardWithPrice[]> = {};
+            const ungrouped: CardWithPrice[] = [];
+            filteredCards.forEach(card => {
+              const prodId = dupGroups[card.id];
+              if (prodId !== undefined) {
+                const key = String(prodId);
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(card);
+              } else {
+                ungrouped.push(card);
+              }
+            });
+            // Sort groups by highest price in group
+            const getPrice = (id: string) => dbMappings[id]?.price ?? prices[id]?.marketPrice ?? 0;
+            const sortedGroups = Object.entries(groups).sort(([, a], [, b]) => {
+              const aMax = Math.max(...a.map(c => getPrice(c.id)));
+              const bMax = Math.max(...b.map(c => getPrice(c.id)));
+              return bMax - aMax;
+            });
             return (
-              <div
-                key={card.id}
-                onClick={() => openCard(card)}
-                className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.02] hover:shadow-xl ${
-                  isFixed ? 'border-green-500 bg-green-500/5' :
-                  cardProblem ? 'border-orange-500 bg-orange-500/5' :
-                  issue?.isDuplicate ? 'border-red-500 bg-red-500/5' :
-                  issue?.isUnmapped ? 'border-orange-500 bg-orange-500/5' :
-                  'border-zinc-700 bg-zinc-900'
-                }`}
-              >
-                {/* Card ID and status */}
-                <div className="px-3 py-2 bg-zinc-800 flex items-center justify-between">
-                  <span className="font-mono text-sm font-bold">{card.id}</span>
-                  <div className="flex gap-1">
-                    {isFixed && (
-                      <span className="px-2 py-0.5 bg-green-600 rounded text-xs font-bold">FIXED</span>
-                    )}
-                    {cardProblem && (
-                      <span className="px-2 py-0.5 bg-orange-600 rounded text-xs font-bold">PROBLEM</span>
-                    )}
-                    {issue?.isDuplicate && !isFixed && !cardProblem && (
-                      <span className="px-2 py-0.5 bg-red-600 rounded text-xs font-bold">DUP</span>
-                    )}
-                    {issue?.isUnmapped && !isFixed && !cardProblem && (
-                      <span className="px-2 py-0.5 bg-orange-600 rounded text-xs font-bold">NO LINK</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Two images side by side */}
-                <div className="p-3 flex gap-3">
-                  {/* Our image */}
-                  <div className="flex-1">
-                    <div className="text-[10px] font-bold text-green-400 mb-1 text-center">OURS</div>
-                    <div className="aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-800 ring-2 ring-green-500">
-                      <Image
-                        src={card.imageUrl}
-                        alt={card.name}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
+              <div className="space-y-6">
+                {sortedGroups.map(([prodId, groupCards]) => (
+                  <div key={prodId}>
+                    <div className="text-xs text-zinc-500 mb-2">{groupCards[0]?.name} — TCGPlayer #{prodId}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {groupCards.map(card => renderCard(card))}
                     </div>
                   </div>
-
-                  {/* TCGPlayer image */}
-                  <div className="flex-1">
-                    <div className="text-[10px] font-bold text-yellow-400 mb-1 text-center">TCG</div>
-                    {productId ? (
-                      <div className={`aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-800 ring-2 ${isFixed ? 'ring-green-500' : 'ring-yellow-500'}`}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={getTcgplayerImageUrl(productId)}
-                          alt="TCGPlayer"
-                          className="absolute inset-0 w-full h-full object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="aspect-[2.5/3.5] rounded-lg bg-zinc-800 ring-2 ring-red-500 flex items-center justify-center">
-                        <span className="text-zinc-500 text-xs">None</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Card name and price */}
-                <div className="px-3 pb-2">
-                  <div className="text-xs text-zinc-400 truncate">{card.name}</div>
-                  <div className="text-sm font-bold mt-1">
-                    {marketPrice != null && marketPrice !== undefined ? (
-                      <span className="text-green-400">${Number(marketPrice).toFixed(2)}</span>
-                    ) : (
-                      <span className="text-zinc-600">No price</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Quick confirm button - only show if card has TCG mapping but not fixed */}
-                {!isFixed && productId && (
-                  <div className="px-3 pb-3">
-                    <button
-                      onClick={(e) => confirmLooksRight(card, e)}
-                      disabled={saving}
-                      className="w-full px-3 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 rounded text-xs font-bold transition-colors"
-                    >
-                      ✓ Looks Right
-                    </button>
-                  </div>
-                )}
-
-                {/* Revert button - only show for fixed cards */}
-                {isFixed && (
-                  <div className="px-3 pb-3">
-                    <button
-                      onClick={(e) => revertMapping(card, e)}
-                      disabled={saving}
-                      className="w-full px-3 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500 disabled:bg-zinc-700 rounded text-xs font-bold transition-colors text-red-300 hover:text-white"
-                    >
-                      ↩ Revert
-                    </button>
-                  </div>
-                )}
-
-                {/* Problem info - only show for problem cards */}
-                {cardProblem && (
-                  <div className="px-3 pb-3">
-                    <div className="text-xs text-orange-300 mb-2 truncate" title={cardProblem.reason}>
-                      ⚠️ {cardProblem.reason}
+                ))}
+                {ungrouped.length > 0 && (
+                  <div>
+                    {(filter === 'issues') && <div className="text-xs text-zinc-500 mb-2">Unmapped</div>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {ungrouped.map(card => renderCard(card))}
                     </div>
-                    <div className="text-[10px] text-zinc-500 mb-2">
-                      by {cardProblem.reported_by}
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dismissProblem(cardProblem.id, card.id);
-                      }}
-                      disabled={saving}
-                      className="w-full px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 rounded text-xs font-bold transition-colors"
-                    >
-                      ✕ Dismiss
-                    </button>
                   </div>
                 )}
               </div>
             );
-          })}
-        </div>
+          })()
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {filteredCards.map(card => renderCard(card))}
+          </div>
+        )}
 
         {filteredCards.length === 0 && (
           <div className="text-center py-16 text-zinc-500">

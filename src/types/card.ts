@@ -64,3 +64,24 @@ export interface SetImagesDatabase {
   sets: Record<string, SetImageData>;
   lastUpdated: string;
 }
+
+export type ProductCategory = 'boosters' | 'decks' | 'other';
+
+export interface Product {
+  id: string;                   // e.g., "op13", "st29", "sleeve030"
+  name: string;
+  category: ProductCategory;
+  releaseDate: string | null;   // Raw text, e.g., "November 7, 2025"
+  msrp: string | null;         // Raw text, e.g., "USD $4.99 per pack"
+  detailUrl: string;
+  thumbnailUrl: string;
+  description: string | null;   // From detail page
+  contents: string | null;      // From detail page
+  detailImages: string[];       // Product shots from detail page
+  cardImages: string[];         // Card previews from detail page
+}
+
+export interface ProductDatabase {
+  products: Product[];
+  lastUpdated: string;
+}

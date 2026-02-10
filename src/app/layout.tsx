@@ -4,7 +4,6 @@ import Link from "next/link";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BreathingReminder } from "@/components/BreathingReminder";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, TWITTER_HANDLE, DEFAULT_OG_IMAGE, BASE_KEYWORDS, getOrganizationSchema, getWebSiteSchema } from "@/lib/seo";
 
 const inter = Inter({
@@ -133,7 +132,6 @@ export default function RootLayout({
               <p>One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
             </div>
           </footer>
-          <BreathingReminder />
         </ThemeProvider>
       </body>
     </html>
