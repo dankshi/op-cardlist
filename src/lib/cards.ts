@@ -83,11 +83,11 @@ export function getCardsBySet(setId: string): Card[] {
 }
 
 export function searchCards(query: string): Card[] {
-  const lowercaseQuery = query.toLowerCase();
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`\\b${escaped}\\b`, 'i');
   return getAllCards().filter(card =>
-    card.name.toLowerCase().includes(lowercaseQuery) ||
-    card.effect.toLowerCase().includes(lowercaseQuery) ||
-    card.traits.some(trait => trait.toLowerCase().includes(lowercaseQuery))
+    regex.test(card.name) ||
+    card.traits.some(trait => regex.test(trait))
   );
 }
 
@@ -103,4 +103,28 @@ export function getSetImage(setId: string): SetImageData | null {
 export function getAllSetImages(): Record<string, SetImageData> {
   if (!setImagesData) return {};
   return setImagesData.sets;
+}
+
+export interface SearchIndexEntry {
+  id: string;
+  name: string;
+  setId: string;
+  imageUrl: string;
+  marketPrice: number | null;
+  rarity: string;
+  type: string;
+  colors: string[];
+}
+
+export function getSearchIndex(): SearchIndexEntry[] {
+  return getAllCards().map(card => ({
+    id: card.id,
+    name: card.name,
+    setId: card.setId,
+    imageUrl: card.imageUrl,
+    marketPrice: card.price?.marketPrice ?? null,
+    rarity: card.rarity,
+    type: card.type,
+    colors: card.colors,
+  }));
 }

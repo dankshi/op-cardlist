@@ -39,15 +39,19 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
   const [sortBy, setSortBy] = useState<SortOption>('price-desc');
 
   const filteredCards = useMemo(() => {
+    let searchRegex: RegExp | null = null;
+    if (searchQuery) {
+      const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      searchRegex = new RegExp(`\\b${escaped}\\b`, 'i');
+    }
+
     const filtered = cards.filter((card) => {
       // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
+      if (searchRegex) {
         const matchesSearch =
-          card.name.toLowerCase().includes(query) ||
-          card.effect.toLowerCase().includes(query) ||
-          card.id.toLowerCase().includes(query) ||
-          card.traits.some((t) => t.toLowerCase().includes(query));
+          searchRegex.test(card.name) ||
+          searchRegex.test(card.id) ||
+          card.traits.some((t) => searchRegex!.test(t));
         if (!matchesSearch) return false;
       }
 
@@ -294,14 +298,19 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
       </div>
 
       {/* Card Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredCards.map((card) => (
           <Link
             key={card.id}
             href={`/card/${card.id.toLowerCase()}`}
-            className="block"
+            className="block group"
           >
             <CardThumbnail card={card} />
+            {card.price?.marketPrice != null && (
+              <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 rounded-md bg-gradient-to-r from-green-500/10 to-emerald-500/10 ring-1 ring-green-500/20 text-green-400 text-sm font-semibold tracking-wide">
+                ${card.price.marketPrice.toFixed(2)}
+              </span>
+            )}
           </Link>
         ))}
       </div>
@@ -311,7 +320,7 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
           <p>No cards found matching your filters.</p>
           <button
             onClick={clearFilters}
-            className="mt-2 text-red-400 hover:text-red-300 transition-colors"
+            className="mt-2 text-sky-500 hover:text-sky-400 light:text-sky-600 light:hover:text-sky-700 transition-colors"
           >
             Clear all filters
           </button>
