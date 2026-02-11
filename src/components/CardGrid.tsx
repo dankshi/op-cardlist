@@ -39,20 +39,31 @@ export default function CardGrid({ cards, setId }: CardGridProps) {
   const [sortBy, setSortBy] = useState<SortOption>('price-desc');
 
   const filteredCards = useMemo(() => {
-    let searchRegex: RegExp | null = null;
-    if (searchQuery) {
-      const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      searchRegex = new RegExp(`\\b${escaped}\\b`, 'i');
+    let searchTokens: string[] = [];
+    if (searchQuery.trim()) {
+      const noiseWords = new Set(['one', 'piece', 'card', 'tcg', 'the', 'a', 'of', 'and', 'in', 'from']);
+      const tokens = searchQuery.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
+      const meaningful = tokens.filter(t => !noiseWords.has(t));
+      searchTokens = meaningful.length > 0 ? meaningful : tokens;
     }
 
     const filtered = cards.filter((card) => {
-      // Search filter
-      if (searchRegex) {
-        const matchesSearch =
-          searchRegex.test(card.name) ||
-          searchRegex.test(card.id) ||
-          card.traits.some((t) => searchRegex!.test(t));
-        if (!matchesSearch) return false;
+      // Tokenized search filter — every token must match at least one field
+      if (searchTokens.length > 0) {
+        const nameLower = card.name.toLowerCase();
+        const idLower = card.id.toLowerCase();
+        const effectLower = card.effect.toLowerCase();
+        const traitsLower = card.traits.join(' ').toLowerCase();
+        const typeLower = card.type.toLowerCase();
+
+        const allMatch = searchTokens.every(token =>
+          nameLower.includes(token) ||
+          idLower.includes(token) ||
+          traitsLower.includes(token) ||
+          effectLower.includes(token) ||
+          typeLower.includes(token)
+        );
+        if (!allMatch) return false;
       }
 
       // Color filter

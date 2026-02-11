@@ -21,16 +21,28 @@ export const BASE_KEYWORDS = [
   'deck building',
 ];
 
+// Extract short human name from set name like "OP-10 - Royal Blood" → "Royal Blood"
+export function getSetShortName(setName: string): string {
+  const match = setName.match(/^[A-Z0-9-]+ - (.+)$/i);
+  return match ? match[1] : setName;
+}
+
 // Set-specific keyword templates
 export function getSetKeywords(setId: string, setName: string): string[] {
   const setUpper = setId.toUpperCase();
   const setNoHyphen = setId.replace('-', '').toUpperCase();
+  const shortName = getSetShortName(setName);
 
   return [
     `${setUpper} card list`,
     `${setNoHyphen} card list`,
+    `${setUpper} price list`,
+    `${setNoHyphen} price list`,
+    `${shortName} card list`,
+    `${shortName} price guide`,
     `One Piece ${setUpper}`,
     `One Piece TCG ${setUpper}`,
+    `One Piece ${shortName}`,
     `${setUpper} spoilers`,
     `${setUpper} cards`,
     `${setName} card list`,
@@ -46,11 +58,14 @@ export function getCardKeywords(cardName: string, cardId: string, setId: string)
   return [
     cardName,
     `${cardName} One Piece`,
+    `${cardName} One Piece card`,
     `${cardName} ${setUpper}`,
     cardId,
     `${cardId} price`,
+    `${cardId} effect`,
     `${cardName} TCG`,
     `${cardName} card`,
+    `${cardName} card effect`,
     'One Piece TCG',
   ];
 }
@@ -75,6 +90,7 @@ export function getWebSiteSchema() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: SITE_NAME,
+    alternateName: ['OPCardlist', 'OP Cardlist', 'opcardlist'],
     url: SITE_URL,
     description: SITE_DESCRIPTION,
     potentialAction: {

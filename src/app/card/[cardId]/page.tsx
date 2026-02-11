@@ -46,7 +46,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   ].filter(Boolean).join(' | ');
 
   const pricePrefix = priceText ? `${priceText} - ` : '';
-  const description = `${pricePrefix}${card.name} (${card.id}) from ${setUpper}. ${stats}. ${card.effect.slice(0, 100)}...`;
+  const effectSnippet = card.effect ? card.effect.slice(0, 150) : '';
+  const description = `${pricePrefix}${card.name} (${card.id}) - One Piece TCG ${setUpper} ${card.type} card. ${stats}. ${effectSnippet}`;
 
   // Dynamic OG image with price overlay
   const ogImageUrl = `${SITE_URL}/api/og/${card.id.toLowerCase()}`;
@@ -299,6 +300,16 @@ export default async function CardPage({ params }: PageProps) {
                 value: card.colors.join(", "),
               }] : []),
             ],
+            ...(card.price?.marketPrice != null && {
+              offers: {
+                "@type": "Offer",
+                price: card.price.marketPrice,
+                priceCurrency: "USD",
+                priceValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                availability: "https://schema.org/InStock",
+                url: card.price.tcgplayerUrl || `${SITE_URL}/card/${card.id.toLowerCase()}`,
+              },
+            }),
           }),
         }}
       />

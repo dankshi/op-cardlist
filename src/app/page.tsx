@@ -8,9 +8,9 @@ import { CardCarousel } from "@/components/home/CardCarousel";
 import type { Card } from "@/types/card";
 
 export const metadata: Metadata = {
-  title: "One Piece TCG Card List - The Ultimate Database with Prices | All Sets",
-  description: `${SITE_DESCRIPTION} Browse OP-13, EB-03, and all One Piece TCG sets with TCGPlayer market prices.`,
-  keywords: [...BASE_KEYWORDS, "all sets", "complete database", "OP-13", "EB-03", "price guide"],
+  title: { absolute: "OPCardlist - One Piece TCG Card List with Prices | All Sets" },
+  description: `OPCardlist is the fastest One Piece TCG card database with daily prices. Browse OP-13, OP14-EB04, and all sets with TCGPlayer market prices, card effects, and images.`,
+  keywords: [...BASE_KEYWORDS, "OPCardlist", "opcardlist", "all sets", "complete database", "OP-13", "EB-03", "price guide"],
   alternates: {
     canonical: SITE_URL,
   },

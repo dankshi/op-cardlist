@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getSetBySlug, getAllSets } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
 import SetStats from "@/components/SetStats";
-import { SITE_URL, SITE_NAME, getSetKeywords, getBreadcrumbSchema } from "@/lib/seo";
+import { SITE_URL, SITE_NAME, getSetKeywords, getSetShortName, getBreadcrumbSchema } from "@/lib/seo";
 
 interface PageProps {
   params: Promise<{ setId: string }>;
@@ -29,6 +29,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const setUpper = set.id.toUpperCase();
   const setNoHyphen = set.id.replace('-', '').toUpperCase();
+  const shortName = getSetShortName(set.name);
   const pageUrl = `${SITE_URL}/${set.id}`;
 
   // Get first card with an image for OG
@@ -36,12 +37,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const ogImage = firstCard?.imageUrl;
 
   return {
-    title: `${setUpper} Card List - All ${set.cardCount} Cards with Prices`,
-    description: `Complete ${setUpper} (${setNoHyphen}) card list for One Piece TCG. Browse all ${set.cardCount} cards from ${set.name} with images, prices, stats, and effects. Updated daily.`,
+    title: `${setUpper} ${shortName} Card List & Price Guide - ${set.cardCount} Cards`,
+    description: `Complete ${setUpper} (${setNoHyphen}) ${shortName} card list and price guide for One Piece TCG. Browse all ${set.cardCount} cards with images, prices, and effects. Updated daily.`,
     keywords: getSetKeywords(set.id, set.name),
     openGraph: {
-      title: `${setUpper} Card List - ${set.cardCount} Cards | One Piece TCG`,
-      description: `Browse all ${set.cardCount} cards from ${set.name}. Complete ${setUpper} spoilers, card images, and TCGPlayer prices.`,
+      title: `${setUpper} ${shortName} Card List - ${set.cardCount} Cards | One Piece TCG`,
+      description: `Browse all ${set.cardCount} cards from ${shortName}. Complete ${setUpper} spoilers, card images, and TCGPlayer prices.`,
       url: pageUrl,
       siteName: SITE_NAME,
       type: "website",
@@ -58,8 +59,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     twitter: {
       card: "summary_large_image",
-      title: `${setUpper} Card List - ${set.cardCount} Cards`,
-      description: `Complete ${setUpper} card list for One Piece TCG. ${set.cardCount} cards with prices.`,
+      title: `${setUpper} ${shortName} Card List - ${set.cardCount} Cards`,
+      description: `Complete ${setUpper} ${shortName} card list and price guide for One Piece TCG. ${set.cardCount} cards with prices.`,
       ...(ogImage && { images: [ogImage] }),
     },
     alternates: {
@@ -75,6 +76,8 @@ export default async function SetPage({ params }: PageProps) {
   if (!set) {
     notFound();
   }
+
+  const shortName = getSetShortName(set.name);
 
   // Count card types
   const leaders = set.cards.filter((c) => c.type === "LEADER").length;
@@ -95,7 +98,7 @@ export default async function SetPage({ params }: PageProps) {
 
       {/* Header */}
       <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{set.id.toUpperCase()} Card List</h1>
+        <h1 className="text-3xl font-bold mb-2">{set.id.toUpperCase()} {shortName} Card List</h1>
         <p className="text-zinc-400 light:text-zinc-600 mb-4">{set.name}</p>
 
         {/* Quick Stats */}

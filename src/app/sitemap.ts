@@ -6,13 +6,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const sets = getAllSets();
   const cards = await getAllCards();
 
-  // Homepage
+  // Homepage and key pages
   const staticPages: MetadataRoute.Sitemap = [
     {
       url: SITE_URL,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 1.0,
+    },
+    {
+      url: `${SITE_URL}/hot`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    {
+      url: `${SITE_URL}/products`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.7,
     },
   ];
 

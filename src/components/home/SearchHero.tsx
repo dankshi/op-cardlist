@@ -3,7 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { SearchIndexEntry } from "@/lib/cards";
+import type { SearchIndexEntry, SetIndexEntry } from "@/lib/cards";
+
+type DropdownItem =
+  | { type: "set"; data: SetIndexEntry }
+  | { type: "card"; data: SearchIndexEntry };
 
 export function SearchHero() {
   const router = useRouter();
@@ -12,8 +16,9 @@ export function SearchHero() {
   const fetchInitiated = useRef(false);
 
   const [query, setQuery] = useState("");
-  const [index, setIndex] = useState<SearchIndexEntry[] | null>(null);
-  const [results, setResults] = useState<SearchIndexEntry[]>([]);
+  const [cardIndex, setCardIndex] = useState<SearchIndexEntry[] | null>(null);
+  const [setIndex, setSetIndex] = useState<SetIndexEntry[] | null>(null);
+  const [items, setItems] = useState<DropdownItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,31 +30,109 @@ export function SearchHero() {
     try {
       const res = await fetch("/api/search-index");
       const data = await res.json();
-      setIndex(data.cards);
+      setCardIndex(data.cards);
+      setSetIndex(data.sets || []);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Filter results when query or index changes
+  // Tokenized, scored search when query or index changes
   useEffect(() => {
-    if (!index || !query.trim()) {
-      setResults([]);
+    if (!cardIndex || !query.trim()) {
+      setItems([]);
       return;
     }
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
-    const filtered = index
-      .filter(
-        (card) =>
-          regex.test(card.name) ||
-          regex.test(card.id) ||
-          (card.tcgName && regex.test(card.tcgName))
-      )
-      .slice(0, 8);
-    setResults(filtered);
+
+    const noiseWords = new Set(['one', 'piece', 'card', 'tcg', 'the', 'a', 'of', 'and', 'in', 'from', 'list', 'price', 'guide', 'cards']);
+    const tokens = query.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
+    const meaningful = tokens.filter(t => !noiseWords.has(t));
+    const searchTokens = meaningful.length > 0 ? meaningful : tokens;
+
+    if (searchTokens.length === 0) {
+      setItems([]);
+      return;
+    }
+
+    // --- Match sets ---
+    const matchedSets: SetIndexEntry[] = [];
+    if (setIndex) {
+      for (const set of setIndex) {
+        const idLower = set.id.toLowerCase();
+        const idNoHyphen = set.id.replace(/-/g, '').toLowerCase();
+        const shortLower = set.shortName.toLowerCase();
+        const fullLower = set.name.toLowerCase();
+
+        const allMatch = searchTokens.every(token =>
+          idLower.includes(token) ||
+          idNoHyphen.includes(token) ||
+          shortLower.includes(token) ||
+          fullLower.includes(token)
+        );
+        if (allMatch) matchedSets.push(set);
+      }
+    }
+
+    // --- Score cards ---
+    const scored: { card: SearchIndexEntry; score: number }[] = [];
+
+    for (const card of cardIndex) {
+      const nameLower = card.name.toLowerCase();
+      const idLower = card.id.toLowerCase();
+      const setIdLower = card.setId.toLowerCase();
+      const setNameLower = (card.setName || '').toLowerCase();
+      const tcgLower = (card.tcgName || '').toLowerCase();
+      const traitsLower = (card.traits || '').toLowerCase();
+      const typeLower = card.type.toLowerCase();
+
+      let allMatch = true;
+      let score = 0;
+
+      for (const token of searchTokens) {
+        const matchesName = nameLower.includes(token);
+        const matchesId = idLower.includes(token);
+        const matchesSetId = setIdLower.includes(token);
+        const matchesSetName = setNameLower.includes(token);
+        const matchesTcg = tcgLower.includes(token);
+        const matchesTraits = traitsLower.includes(token);
+        const matchesType = typeLower.includes(token);
+
+        if (!matchesName && !matchesId && !matchesSetId && !matchesSetName && !matchesTcg && !matchesTraits && !matchesType) {
+          allMatch = false;
+          break;
+        }
+
+        if (matchesName) score += 10;
+        if (matchesId) score += 8;
+        if (matchesSetName) score += 3;
+        if (matchesSetId) score += 3;
+        if (matchesTcg) score += 2;
+        if (matchesTraits) score += 2;
+        if (matchesType) score += 1;
+      }
+
+      if (allMatch) {
+        if (nameLower === query.trim().toLowerCase()) score += 50;
+        if (nameLower.startsWith(searchTokens[0])) score += 5;
+        // Boost by price so higher-value cards surface first
+        if (card.marketPrice != null && card.marketPrice > 0) {
+          score += Math.min(Math.log10(card.marketPrice + 1) * 5, 20);
+        }
+        scored.push({ card, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+
+    // Build unified items: sets first, then top cards
+    const combined: DropdownItem[] = [
+      ...matchedSets.slice(0, 3).map(s => ({ type: "set" as const, data: s })),
+      ...scored.slice(0, 8).map(s => ({ type: "card" as const, data: s.card })),
+    ];
+
+    setItems(combined);
     setSelectedIndex(-1);
-  }, [query, index]);
+  }, [query, cardIndex, setIndex]);
 
   // Global Ctrl+K / Cmd+K shortcut
   useEffect(() => {
@@ -78,19 +161,24 @@ export function SearchHero() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const getItemHref = (item: DropdownItem): string => {
+    if (item.type === "set") return `/${item.data.id}`;
+    return `/card/${item.data.id.toLowerCase()}`;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((prev) =>
-        prev < results.length - 1 ? prev + 1 : prev
+        prev < items.length - 1 ? prev + 1 : prev
       );
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (selectedIndex >= 0 && results[selectedIndex]) {
-        router.push(`/card/${results[selectedIndex].id.toLowerCase()}`);
+      if (selectedIndex >= 0 && items[selectedIndex]) {
+        router.push(getItemHref(items[selectedIndex]));
         setIsOpen(false);
       } else if (query.trim()) {
         router.push(`/search?q=${encodeURIComponent(query.trim())}`);
@@ -126,7 +214,7 @@ export function SearchHero() {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Search cards by name or ID..."
+          placeholder="Search by name, ID, set, or trait..."
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -153,7 +241,7 @@ export function SearchHero() {
           <button
             onClick={() => {
               setQuery("");
-              setResults([]);
+              setItems([]);
               inputRef.current?.focus();
             }}
             className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white light:hover:text-zinc-900 transition-colors"
@@ -173,41 +261,87 @@ export function SearchHero() {
               <div className="animate-spin w-5 h-5 border-2 border-zinc-500 border-t-transparent rounded-full mx-auto mb-2" />
               Loading cards...
             </div>
-          ) : results.length > 0 ? (
+          ) : items.length > 0 ? (
             <>
-              {results.map((card, i) => (
-                <Link
-                  key={card.id}
-                  href={`/card/${card.id.toLowerCase()}`}
-                  className={`flex items-center gap-3 px-4 py-3 transition-colors ${
-                    i === selectedIndex
-                      ? "bg-zinc-800 light:bg-zinc-100"
-                      : "hover:bg-zinc-800/50 light:hover:bg-zinc-50"
-                  }`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => setIsOpen(false)}
-                  onMouseEnter={() => setSelectedIndex(i)}
-                >
-                  <img
-                    src={card.imageUrl}
-                    alt=""
-                    className="w-10 h-14 object-cover rounded flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-sm">
-                      {card.name}
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      {card.id} &middot; {card.setId.toUpperCase()}
-                    </p>
-                  </div>
-                  {card.marketPrice != null && (
-                    <span className="text-green-400 font-bold text-sm flex-shrink-0">
-                      ${card.marketPrice.toFixed(2)}
-                    </span>
-                  )}
-                </Link>
-              ))}
+              {items.map((item, i) => {
+                if (item.type === "set") {
+                  const set = item.data;
+                  return (
+                    <Link
+                      key={`set-${set.id}`}
+                      href={`/${set.id}`}
+                      className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                        i === selectedIndex
+                          ? "bg-zinc-800 light:bg-zinc-100"
+                          : "hover:bg-zinc-800/50 light:hover:bg-zinc-50"
+                      }`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setIsOpen(false)}
+                      onMouseEnter={() => setSelectedIndex(i)}
+                    >
+                      {set.imageUrl ? (
+                        <img
+                          src={set.imageUrl}
+                          alt=""
+                          className="w-10 h-14 object-contain rounded flex-shrink-0 bg-white"
+                        />
+                      ) : (
+                        <div className="w-10 h-14 rounded flex-shrink-0 bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate text-sm">
+                          {set.id.toUpperCase()} {set.shortName}
+                        </p>
+                        <p className="text-xs text-zinc-500">
+                          Set &middot; {set.cardCount} cards
+                        </p>
+                      </div>
+                      <span className="text-sky-400 text-xs font-medium flex-shrink-0 px-2 py-0.5 bg-sky-500/10 rounded">
+                        VIEW SET
+                      </span>
+                    </Link>
+                  );
+                }
+
+                const card = item.data;
+                return (
+                  <Link
+                    key={card.id}
+                    href={`/card/${card.id.toLowerCase()}`}
+                    className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                      i === selectedIndex
+                        ? "bg-zinc-800 light:bg-zinc-100"
+                        : "hover:bg-zinc-800/50 light:hover:bg-zinc-50"
+                    }`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setIsOpen(false)}
+                    onMouseEnter={() => setSelectedIndex(i)}
+                  >
+                    <img
+                      src={card.imageUrl}
+                      alt=""
+                      className="w-10 h-14 object-cover rounded flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-sm">
+                        {card.name}
+                      </p>
+                      <p className="text-xs text-zinc-500">
+                        {card.id} &middot; {card.setId.toUpperCase()}{card.setName ? ` ${card.setName}` : ''}
+                      </p>
+                    </div>
+                    {card.marketPrice != null && (
+                      <span className="text-green-400 font-bold text-sm flex-shrink-0">
+                        ${card.marketPrice.toFixed(2)}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
               <Link
                 href={`/search?q=${encodeURIComponent(query)}`}
                 className="block px-4 py-3 text-sm text-center text-sky-400 light:text-sky-600 hover:text-sky-300 light:hover:text-sky-700 hover:bg-zinc-800/50 light:hover:bg-zinc-50 border-t border-zinc-800 light:border-zinc-200 transition-colors"

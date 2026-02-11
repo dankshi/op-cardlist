@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getSearchIndex } from '@/lib/cards';
+import { getSearchIndex, getSetIndex } from '@/lib/cards';
 
 export async function GET() {
-  const index = await getSearchIndex();
+  const cards = await getSearchIndex();
+  const sets = getSetIndex();
   return NextResponse.json(
-    { cards: index },
+    { cards, sets },
     {
       headers: {
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',

@@ -136,14 +136,81 @@ export async function getCardsBySet(setId: string): Promise<Card[]> {
   return set?.cards ?? [];
 }
 
-export async function searchCards(query: string): Promise<Card[]> {
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`\\b${escaped}\\b`, 'i');
-  return (await getAllCards()).filter(card =>
-    regex.test(card.name) ||
-    card.traits.some(trait => regex.test(trait)) ||
-    (card.price?.tcgplayerProductName && regex.test(card.price.tcgplayerProductName))
+// Build a set ID → short name lookup for searching by set name
+function getSetNameLookup(): Record<string, string> {
+  const lookup: Record<string, string> = {};
+  for (const set of database.sets) {
+    const match = set.name.match(/^[A-Z0-9-]+ - (.+)$/i);
+    lookup[set.id] = match ? match[1].toLowerCase() : set.name.toLowerCase();
+  }
+  return lookup;
+}
+
+const setNameLookup = getSetNameLookup();
+
+// Check if a single token matches any field on a card
+function tokenMatchesCard(token: string, card: Card): boolean {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escaped, 'i');
+  const wordRegex = new RegExp(`\\b${escaped}\\b`, 'i');
+
+  return (
+    wordRegex.test(card.name) ||
+    regex.test(card.id) ||
+    regex.test(card.setId) ||
+    (setNameLookup[card.setId] ? regex.test(setNameLookup[card.setId]) : false) ||
+    card.traits.some(trait => wordRegex.test(trait)) ||
+    wordRegex.test(card.effect) ||
+    wordRegex.test(card.type) ||
+    (card.price?.tcgplayerProductName ? regex.test(card.price.tcgplayerProductName) : false)
   );
+}
+
+export async function searchCards(query: string): Promise<Card[]> {
+  // Tokenize: split on whitespace, filter out empty/noise tokens
+  const noiseWords = new Set(['one', 'piece', 'card', 'tcg', 'the', 'a', 'of', 'and', 'in', 'from']);
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
+  // Keep meaningful tokens; if all are noise, use them anyway
+  const meaningful = tokens.filter(t => !noiseWords.has(t));
+  const searchTokens = meaningful.length > 0 ? meaningful : tokens;
+
+  if (searchTokens.length === 0) return [];
+
+  const allCards = await getAllCards();
+  return allCards
+    .filter(card => searchTokens.every(token => tokenMatchesCard(token, card)))
+    .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0));
+}
+
+// Search sets by name or ID — returns matching sets for set-level results
+export function searchSets(query: string): { id: string; name: string; shortName: string; cardCount: number }[] {
+  const noiseWords = new Set(['one', 'piece', 'card', 'tcg', 'the', 'a', 'of', 'and', 'in', 'from', 'list', 'price', 'guide', 'cards']);
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
+  const meaningful = tokens.filter(t => !noiseWords.has(t));
+  const searchTokens = meaningful.length > 0 ? meaningful : tokens;
+
+  if (searchTokens.length === 0) return [];
+
+  return database.sets
+    .filter(set => {
+      const idLower = set.id.toLowerCase();
+      const idNoHyphen = set.id.replace(/-/g, '').toLowerCase();
+      const shortName = (setNameLookup[set.id] || '').toLowerCase();
+      const fullNameLower = set.name.toLowerCase();
+
+      return searchTokens.every(token =>
+        idLower.includes(token) ||
+        idNoHyphen.includes(token) ||
+        shortName.includes(token) ||
+        fullNameLower.includes(token)
+      );
+    })
+    .map(set => ({
+      id: set.id,
+      name: set.name,
+      shortName: setNameLookup[set.id] || set.name,
+      cardCount: set.cardCount,
+    }));
 }
 
 export function getLastUpdated(): string {
@@ -165,11 +232,32 @@ export interface SearchIndexEntry {
   name: string;
   tcgName: string | null;
   setId: string;
+  setName: string;
+  traits: string;
   imageUrl: string;
   marketPrice: number | null;
   rarity: string;
   type: string;
   colors: string[];
+}
+
+export interface SetIndexEntry {
+  id: string;
+  name: string;
+  shortName: string;
+  cardCount: number;
+  imageUrl: string | null;
+}
+
+export function getSetIndex(): SetIndexEntry[] {
+  const images = getAllSetImages();
+  return database.sets.map(set => ({
+    id: set.id,
+    name: set.name,
+    shortName: setNameLookup[set.id] || set.name,
+    cardCount: set.cardCount,
+    imageUrl: images[set.id]?.boosterBoxImageUrl || null,
+  }));
 }
 
 export async function getSearchIndex(): Promise<SearchIndexEntry[]> {
@@ -178,6 +266,8 @@ export async function getSearchIndex(): Promise<SearchIndexEntry[]> {
     name: card.name,
     tcgName: card.price?.tcgplayerProductName ?? null,
     setId: card.setId,
+    setName: setNameLookup[card.setId] || '',
+    traits: card.traits.join(' '),
     imageUrl: card.imageUrl,
     marketPrice: card.price?.marketPrice ?? null,
     rarity: card.rarity,
