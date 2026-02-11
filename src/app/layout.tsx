@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -14,8 +15,8 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "One Piece TCG Card List - Complete Database with Prices",
-    template: "%s | One Piece TCG Card List",
+    default: "One Piece TCG Card List - Complete Database with Prices | OPCardlist",
+    template: "%s | OPCardlist",
   },
   description: SITE_DESCRIPTION,
   keywords: [...BASE_KEYWORDS, "card prices", "TCGPlayer prices", "OP-13", "EB-03", "Luffy", "Ace"],
@@ -57,6 +58,10 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  icons: {
+    icon: "/opcardlist-logo.png",
+    apple: "/opcardlist-logo.png",
+  },
   alternates: {
     canonical: SITE_URL,
   },
@@ -94,10 +99,13 @@ export default function RootLayout({
         <ThemeProvider>
           <header className="border-b border-zinc-800 dark:border-zinc-800 light:border-zinc-200 sticky top-0 bg-zinc-950/95 dark:bg-zinc-950/95 light:bg-white/95 backdrop-blur z-50">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-              <Link href="/" className="group flex items-baseline gap-0.5 hover:opacity-90 transition-opacity">
-                <span className="text-2xl font-black italic text-sky-500 drop-shadow-[0_0_10px_rgba(14,165,233,0.5)]">OP</span>
-                <span className="text-xl font-bold text-white dark:text-white light:text-zinc-900 tracking-tight">Card</span>
-                <span className="text-xl font-bold text-zinc-400 dark:text-zinc-400 light:text-zinc-500 tracking-tight">list</span>
+              <Link href="/" className="group flex items-center gap-2 hover:opacity-90 transition-opacity">
+                <Image src="/opcardlist-logo.png" alt="OPCardlist logo" width={32} height={32} className="rounded" />
+                <span className="flex items-baseline gap-0.5">
+                  <span className="text-2xl font-black italic text-sky-500 drop-shadow-[0_0_10px_rgba(14,165,233,0.5)]">OP</span>
+                  <span className="text-xl font-bold text-white dark:text-white light:text-zinc-900 tracking-tight">Card</span>
+                  <span className="text-xl font-bold text-zinc-400 dark:text-zinc-400 light:text-zinc-500 tracking-tight">list</span>
+                </span>
               </Link>
               <div className="flex items-center gap-4">
                 <Link href="/" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors">
