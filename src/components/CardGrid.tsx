@@ -8,6 +8,7 @@ import { CardThumbnail } from "./card/CardThumbnail";
 interface CardGridProps {
   cards: Card[];
   setId: string;
+  initialSearch?: string;
 }
 
 const COLORS: CardColor[] = ["Red", "Green", "Blue", "Purple", "Black", "Yellow"];
@@ -30,8 +31,8 @@ const unselectedClass = "bg-zinc-800 dark:bg-zinc-800 light:bg-zinc-100 text-zin
 
 type SortOption = 'price-desc' | 'name-asc' | 'id-asc';
 
-export default function CardGrid({ cards, setId }: CardGridProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+export default function CardGrid({ cards, setId, initialSearch }: CardGridProps) {
+  const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
   const [selectedColors, setSelectedColors] = useState<CardColor[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<CardType[]>([]);
   const [selectedRarities, setSelectedRarities] = useState<Rarity[]>([]);

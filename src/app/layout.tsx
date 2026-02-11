@@ -100,7 +100,7 @@ export default function RootLayout({
           <header className="border-b border-zinc-800 dark:border-zinc-800 light:border-zinc-200 sticky top-0 bg-zinc-950/95 dark:bg-zinc-950/95 light:bg-white/95 backdrop-blur z-50">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
               <Link href="/" className="group flex items-center gap-2 hover:opacity-90 transition-opacity">
-                <Image src="/opcardlist-logo.png" alt="OPCardlist logo" width={32} height={32} className="rounded" />
+                <Image src="/logo.png" alt="OPCardlist logo" width={32} height={32} className="rounded" />
                 <span className="flex items-baseline gap-0.5">
                   <span className="text-2xl font-black italic text-sky-500 drop-shadow-[0_0_10px_rgba(14,165,233,0.5)]">OP</span>
                   <span className="text-xl font-bold text-white dark:text-white light:text-zinc-900 tracking-tight">Card</span>

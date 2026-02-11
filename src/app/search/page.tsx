@@ -30,7 +30,7 @@ export async function generateMetadata({
 
 export default async function SearchPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
-  const cards = q ? await searchCards(q) : await getAllCards();
+  const allCards = await getAllCards();
   const matchedSets = q ? searchSets(q) : [];
 
   return (
@@ -50,9 +50,6 @@ export default async function SearchPage({ searchParams }: PageProps) {
         <h1 className="text-3xl font-bold mb-2">
           {q ? <>Results for &ldquo;{q}&rdquo;</> : "Search All Cards"}
         </h1>
-        <p className="text-zinc-400 light:text-zinc-600">
-          {cards.length} card{cards.length !== 1 ? "s" : ""} found
-        </p>
       </header>
 
       {/* Set matches banner */}
@@ -76,7 +73,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <CardGrid cards={cards} setId="search" />
+      <CardGrid cards={allCards} setId="search" initialSearch={q ?? ""} />
     </div>
   );
 }
