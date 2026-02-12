@@ -8,41 +8,26 @@ const STATE_FILE = path.join(__dirname, "..", "data", "pbandai-state.json");
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 const DISCORD_WEBHOOK_URL = process.env.PBANDAI_DISCORD_WEBHOOK;
 
-interface WatchItem {
-  id: string;
-  imageUrl: string; // first image from sitemap, used to check if live
-  firstSeen: string; // ISO timestamp
-}
+// Only track N-prefix products (all One Piece Card Game products use this prefix)
+const PRODUCT_PREFIX = "N";
 
 interface State {
   etag: string;
-  productIds: string[];
-  watchList: WatchItem[]; // products detected but not yet live
+  productIds: string[]; // only N-prefix products
 }
 
 // ── State management ────────────────────────────────────────────────
 function loadState(): State {
   try {
     const data = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
-    return { watchList: [], ...data };
+    return { etag: data.etag || "", productIds: data.productIds || [] };
   } catch {
-    return { etag: "", productIds: [], watchList: [] };
+    return { etag: "", productIds: [] };
   }
 }
 
 function saveState(state: State) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-}
-
-// ── Product liveness check ──────────────────────────────────────────
-async function isProductLive(imageUrl: string): Promise<boolean> {
-  if (!imageUrl) return false;
-  try {
-    const res = await fetch(imageUrl, { method: "HEAD", headers: { "User-Agent": "Mozilla/5.0" } });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }
 
 // ── Sitemap fetching ────────────────────────────────────────────────
@@ -73,41 +58,57 @@ async function checkSitemap(
 
   const xml = await res.text();
 
-  // Parse each <url> entry for product ID and first image
+  // Parse each <url> entry — only keep N-prefix products
   const products: SitemapProduct[] = [];
   const entries = xml.matchAll(/<url>([\s\S]*?)<\/url>/g);
   for (const entry of entries) {
     const block = entry[1];
     const idMatch = block.match(/\/item\/([A-Z0-9]+)/);
+    if (!idMatch || !idMatch[1].startsWith(PRODUCT_PREFIX)) continue;
+
     const imgMatch = block.match(/<image:loc>([^<]+)<\/image:loc>/);
-    if (idMatch) {
-      products.push({
-        id: idMatch[1],
-        imageUrl: imgMatch ? imgMatch[1] : "",
-      });
-    }
+    products.push({
+      id: idMatch[1],
+      imageUrl: imgMatch ? imgMatch[1] : "",
+    });
   }
 
   return { changed: true, etag, products };
 }
 
 // ── Discord notification ────────────────────────────────────────────
-async function notifyDiscord(message: string) {
+async function notifyDiscord(products: SitemapProduct[]) {
   if (!DISCORD_WEBHOOK_URL) {
     console.log("  (Discord not configured — set PBANDAI_DISCORD_WEBHOOK in .env)");
     return;
   }
 
-  const res = await fetch(DISCORD_WEBHOOK_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: message }),
-  });
+  // Send with embeds that include product thumbnails
+  const embeds = products.map((p) => ({
+    title: `New product: ${p.id}`,
+    url: `https://p-bandai.com/us/item/${p.id}`,
+    color: 0xff0000,
+    ...(p.imageUrl ? { thumbnail: { url: p.imageUrl } } : {}),
+    timestamp: new Date().toISOString(),
+  }));
 
-  if (!res.ok) {
-    console.error(`  Discord webhook failed: ${res.status}`);
-  } else {
-    console.log("  Discord notification sent!");
+  // Discord allows max 10 embeds per message
+  for (let i = 0; i < embeds.length; i += 10) {
+    const batch = embeds.slice(i, i + 10);
+    const res = await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: `🚨 **${batch.length} new product(s) on Premium Bandai USA!**\nCould be One Piece Card Game — check the images below:`,
+        embeds: batch,
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`  Discord webhook failed: ${res.status}`);
+    } else {
+      console.log("  Discord notification sent!");
+    }
   }
 }
 
@@ -119,127 +120,38 @@ async function poll(): Promise<{ newCount: number }> {
   const time = new Date().toLocaleTimeString();
 
   try {
-    // ── Check watch list for products that went live ──
-    if (state.watchList.length > 0) {
-      console.log(`  👀 Checking ${state.watchList.length} watched product(s)...`);
-      const stillWatching: WatchItem[] = [];
-      const nowLive: WatchItem[] = [];
-
-      for (const item of state.watchList) {
-        const live = await isProductLive(item.imageUrl);
-        if (live) {
-          nowLive.push(item);
-        } else {
-          stillWatching.push(item);
-        }
-      }
-
-      if (nowLive.length > 0) {
-        console.log(`  ✅ ${nowLive.length} product(s) NOW LIVE:`);
-        for (const item of nowLive) {
-          console.log(`    → https://p-bandai.com/us/item/${item.id}`);
-        }
-        const links = nowLive
-          .map((item) => `- https://p-bandai.com/us/item/${item.id}`)
-          .join("\n");
-        await notifyDiscord(
-          [
-            `✅ **${nowLive.length} product(s) now LIVE on Premium Bandai USA!**`,
-            "(Previously detected but were 404 — now accessible)",
-            "",
-            links,
-          ].join("\n")
-        );
-      }
-
-      state.watchList = stillWatching;
-    }
-
-    // ── Check sitemap for new products ──
     const result = await checkSitemap(state.etag);
 
     if (!result.changed) {
-      process.stdout.write(`\r[${time}] No changes (304) | watching: ${state.watchList.length}          `);
-      saveState(state); // save updated watch list
+      process.stdout.write(`\r[${time}] No changes (304)          `);
       consecutiveErrors = 0;
       return { newCount: 0 };
     }
 
     const productIds = result.products.map((p) => p.id);
-    console.log(`\n[${time}] Sitemap updated! ${productIds.length} products`);
+    console.log(`\n[${time}] Sitemap updated! ${productIds.length} N-prefix products (of ~8700 total)`);
 
     if (state.productIds.length === 0) {
       console.log(`  First run — saving ${productIds.length} products as baseline`);
-      saveState({ etag: result.etag, productIds, watchList: state.watchList });
+      saveState({ etag: result.etag, productIds });
       consecutiveErrors = 0;
       return { newCount: 0 };
     }
 
-    // Build lookup for image URLs
-    const imageMap = new Map(result.products.map((p) => [p.id, p.imageUrl]));
-
     // Find new products
     const oldSet = new Set(state.productIds);
-    const newProducts = productIds.filter((id) => !oldSet.has(id));
+    const newProducts = result.products.filter((p) => !oldSet.has(p.id));
 
     // Find removed products
     const newSet = new Set(productIds);
     const removedProducts = state.productIds.filter((id) => !newSet.has(id));
 
     if (newProducts.length > 0) {
-      console.log(`  🆕 ${newProducts.length} NEW PRODUCT(S) — checking liveness...`);
-
-      const liveProducts: string[] = [];
-      const stagedProducts: { id: string; imageUrl: string }[] = [];
-
-      for (const id of newProducts) {
-        const imageUrl = imageMap.get(id) || "";
-        const live = await isProductLive(imageUrl);
-        if (live) {
-          liveProducts.push(id);
-          console.log(`    ✅ https://p-bandai.com/us/item/${id} (LIVE)`);
-        } else {
-          stagedProducts.push({ id, imageUrl });
-          console.log(`    ⏳ https://p-bandai.com/us/item/${id} (staged/404 — watching)`);
-        }
+      console.log(`  🆕 ${newProducts.length} NEW PRODUCT(S):`);
+      for (const p of newProducts) {
+        console.log(`    → https://p-bandai.com/us/item/${p.id}`);
       }
-
-      // Notify about live products
-      if (liveProducts.length > 0) {
-        const links = liveProducts
-          .map((id) => `- https://p-bandai.com/us/item/${id}`)
-          .join("\n");
-        await notifyDiscord(
-          [
-            `🚨 **${liveProducts.length} new product(s) on Premium Bandai USA!**`,
-            "",
-            links,
-            "",
-            "Check immediately — could be One Piece Card Game drop!",
-          ].join("\n")
-        );
-      }
-
-      // Notify about staged products (but let user know they might 404)
-      if (stagedProducts.length > 0) {
-        const links = stagedProducts
-          .map((p) => `- https://p-bandai.com/us/item/${p.id}`)
-          .join("\n");
-        await notifyDiscord(
-          [
-            `⏳ **${stagedProducts.length} new product(s) detected but NOT YET LIVE**`,
-            "(Page may 404 — will notify again when accessible)",
-            "",
-            links,
-          ].join("\n")
-        );
-
-        // Add to watch list
-        const now = new Date().toISOString();
-        for (const p of stagedProducts) {
-          state.watchList.push({ id: p.id, imageUrl: p.imageUrl, firstSeen: now });
-        }
-      }
+      await notifyDiscord(newProducts);
     }
 
     if (removedProducts.length > 0) {
@@ -250,7 +162,7 @@ async function poll(): Promise<{ newCount: number }> {
       console.log("  Sitemap changed (metadata) but no new/removed products");
     }
 
-    saveState({ etag: result.etag, productIds, watchList: state.watchList });
+    saveState({ etag: result.etag, productIds });
     consecutiveErrors = 0;
     return { newCount: newProducts.length };
   } catch (err) {
@@ -268,8 +180,9 @@ async function poll(): Promise<{ newCount: number }> {
 const ONCE = process.argv.includes("--once");
 
 async function main() {
-  console.log("🔍 Premium Bandai USA Product Monitor");
+  console.log("🔍 Premium Bandai USA Monitor (One Piece Card Game)");
   console.log(`   Sitemap:  ${SITEMAP_URL}`);
+  console.log(`   Filter:   ${PRODUCT_PREFIX}-prefix products only`);
   console.log(`   Mode:     ${ONCE ? "single check" : `loop (${POLL_INTERVAL_MS / 1000}s)`}`);
   console.log(
     `   Discord:  ${DISCORD_WEBHOOK_URL ? "configured ✓" : "NOT SET (set PBANDAI_DISCORD_WEBHOOK in .env)"}`
@@ -280,9 +193,6 @@ async function main() {
     console.log(`   Baseline: ${state.productIds.length} known products`);
   } else {
     console.log("   Baseline: none (first run will save current products)");
-  }
-  if (state.watchList.length > 0) {
-    console.log(`   Watching: ${state.watchList.length} staged product(s)`);
   }
   console.log("");
 
