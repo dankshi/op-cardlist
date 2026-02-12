@@ -8,12 +8,9 @@ const STATE_FILE = path.join(__dirname, "..", "data", "pbandai-state.json");
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 const DISCORD_WEBHOOK_URL = process.env.PBANDAI_DISCORD_WEBHOOK;
 
-// Only track N-prefix products (all One Piece Card Game products use this prefix)
-const PRODUCT_PREFIX = "N";
-
 interface State {
   etag: string;
-  productIds: string[]; // only N-prefix products
+  productIds: string[];
 }
 
 // ── State management ────────────────────────────────────────────────
@@ -58,13 +55,13 @@ async function checkSitemap(
 
   const xml = await res.text();
 
-  // Parse each <url> entry — only keep N-prefix products
+  // Parse each <url> entry
   const products: SitemapProduct[] = [];
   const entries = xml.matchAll(/<url>([\s\S]*?)<\/url>/g);
   for (const entry of entries) {
     const block = entry[1];
     const idMatch = block.match(/\/item\/([A-Z0-9]+)/);
-    if (!idMatch || !idMatch[1].startsWith(PRODUCT_PREFIX)) continue;
+    if (!idMatch) continue;
 
     const imgMatch = block.match(/<image:loc>([^<]+)<\/image:loc>/);
     products.push({
@@ -129,7 +126,7 @@ async function poll(): Promise<{ newCount: number }> {
     }
 
     const productIds = result.products.map((p) => p.id);
-    console.log(`\n[${time}] Sitemap updated! ${productIds.length} N-prefix products (of ~8700 total)`);
+    console.log(`\n[${time}] Sitemap updated! ${productIds.length} products`);
 
     if (state.productIds.length === 0) {
       console.log(`  First run — saving ${productIds.length} products as baseline`);
@@ -180,9 +177,8 @@ async function poll(): Promise<{ newCount: number }> {
 const ONCE = process.argv.includes("--once");
 
 async function main() {
-  console.log("🔍 Premium Bandai USA Monitor (One Piece Card Game)");
+  console.log("🔍 Premium Bandai USA Monitor");
   console.log(`   Sitemap:  ${SITEMAP_URL}`);
-  console.log(`   Filter:   ${PRODUCT_PREFIX}-prefix products only`);
   console.log(`   Mode:     ${ONCE ? "single check" : `loop (${POLL_INTERVAL_MS / 1000}s)`}`);
   console.log(
     `   Discord:  ${DISCORD_WEBHOOK_URL ? "configured ✓" : "NOT SET (set PBANDAI_DISCORD_WEBHOOK in .env)"}`
