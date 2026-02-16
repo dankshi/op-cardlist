@@ -386,6 +386,8 @@ async function main() {
     return `[${totalProcessed}/${totalCards}] ${percent}% | ETA: ${eta}`;
   }
 
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD for history snapshots
+
   // Collect rows per set for batch upsert to Supabase
   interface CardPriceRow {
     card_id: string;
@@ -420,6 +422,7 @@ async function main() {
     }
 
     const setRows: CardPriceRow[] = [];
+    const historyRows: { tcgplayer_product_id: number; recorded_date: string; market_price: number | null; lowest_price: number | null; median_price: number | null; total_listings: number | null }[] = [];
 
     // Match each of our cards to TCGPlayer products
     for (const card of set.cards) {
@@ -480,6 +483,15 @@ async function main() {
           manually_mapped: isManual,
         });
 
+        historyRows.push({
+          tcgplayer_product_id: product.productId,
+          recorded_date: today,
+          market_price: product.marketPrice,
+          lowest_price: product.lowestPrice,
+          median_price: product.medianPrice,
+          total_listings: product.totalListings,
+        });
+
         matchedProductIds.push({ cardId: card.id, productId: product.productId });
         const prefix = isManual ? '[manual] ' : '';
         const displayPrice = product.marketPrice?.toFixed(2) || product.lowestPrice?.toFixed(2) || 'N/A';
@@ -512,6 +524,22 @@ async function main() {
         }
       }
       if (debug) console.log(`  Upserted ${setRows.length} rows to Supabase`);
+    }
+
+    // Snapshot today's prices into history (deduplicate by product ID, keep last seen)
+    if (historyRows.length > 0) {
+      const uniqueHistory = [...new Map(historyRows.map(r => [r.tcgplayer_product_id, r])).values()];
+      const HIST_BATCH = 500;
+      for (let i = 0; i < uniqueHistory.length; i += HIST_BATCH) {
+        const batch = uniqueHistory.slice(i, i + HIST_BATCH);
+        const { error } = await supabase
+          .from('card_price_history')
+          .upsert(batch, { onConflict: 'tcgplayer_product_id,recorded_date', ignoreDuplicates: false });
+        if (error) {
+          console.error(`  History upsert error for ${set.id}:`, error.message);
+        }
+      }
+      if (debug) console.log(`  Saved ${uniqueHistory.length} history rows for ${today}`);
     }
   }
 
