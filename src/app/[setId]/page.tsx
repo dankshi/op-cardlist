@@ -37,8 +37,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const ogImage = firstCard?.imageUrl;
 
   return {
-    title: `${setUpper} ${shortName} Card List & Price Guide - ${set.cardCount} Cards`,
-    description: `Complete ${setUpper} (${setNoHyphen}) ${shortName} card list and price guide for One Piece TCG. Browse all ${set.cardCount} cards with images, prices, and effects. Updated daily.`,
+    title: `${setUpper} (${setNoHyphen}) ${shortName} Card List & Price Guide - ${set.cardCount} Cards`,
+    description: `Complete ${setNoHyphen} / ${setUpper} ${shortName} card list and price guide for One Piece TCG. Browse all ${set.cardCount} ${setNoHyphen} cards with images, prices, and effects. Updated daily.`,
     keywords: getSetKeywords(set.id, set.name),
     openGraph: {
       title: `${setUpper} ${shortName} Card List - ${set.cardCount} Cards | One Piece TCG`,
@@ -98,7 +98,7 @@ export default async function SetPage({ params }: PageProps) {
 
       {/* Header */}
       <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{set.id.toUpperCase()} {shortName} Card List</h1>
+        <h1 className="text-3xl font-bold mb-2">{set.id.toUpperCase()} ({set.id.replace('-', '').toUpperCase()}) {shortName} Card List</h1>
         <p className="text-zinc-400 light:text-zinc-600 mb-4">{set.name}</p>
 
         {/* Quick Stats */}

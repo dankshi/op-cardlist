@@ -1,5 +1,5 @@
 // SEO Configuration
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://opcardlist.com';
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.opcardlist.com';
 
 export const SITE_NAME = 'One Piece TCG Card List';
 export const SITE_DESCRIPTION = 'The fastest, most comprehensive One Piece TCG card database with prices. Browse all cards, sets, and filter by color, type, rarity and more.';
