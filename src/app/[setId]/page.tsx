@@ -156,7 +156,10 @@ export default async function SetPage({ params }: PageProps) {
             name: `${set.id.toUpperCase()} Card List - One Piece TCG`,
             description: `Complete card list of all ${set.cardCount} cards from ${set.name} (${set.id.toUpperCase()}) for One Piece Trading Card Game`,
             numberOfItems: set.cardCount,
-            itemListElement: set.cards.slice(0, 50).map((card, index) => ({
+            itemListElement: set.cards
+              .filter((card) => card.price?.marketPrice != null)
+              .slice(0, 50)
+              .map((card, index) => ({
               "@type": "ListItem",
               position: index + 1,
               url: `${SITE_URL}/card/${card.id.toLowerCase()}`,
@@ -170,15 +173,13 @@ export default async function SetPage({ params }: PageProps) {
                   "@type": "Brand",
                   name: "One Piece TCG",
                 },
-                ...(card.price?.marketPrice != null && {
-                  offers: {
-                    "@type": "Offer",
-                    price: card.price.marketPrice,
-                    priceCurrency: "USD",
-                    availability: "https://schema.org/InStock",
-                    url: card.price.tcgplayerUrl,
-                  },
-                }),
+                offers: {
+                  "@type": "Offer",
+                  price: card.price!.marketPrice,
+                  priceCurrency: "USD",
+                  availability: "https://schema.org/InStock",
+                  url: card.price!.tcgplayerUrl,
+                },
               },
             })),
           }),
