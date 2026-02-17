@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSetBySlug, getAllSets } from "@/lib/cards";
@@ -12,9 +12,15 @@ interface PageProps {
 
 export async function generateStaticParams() {
   const sets = getAllSets();
-  return sets.map((set) => ({
-    setId: set.id,
-  }));
+  return sets.flatMap((set) => {
+    const noHyphen = set.id.replace('-', '');
+    const params = [{ setId: set.id }];
+    // Also pre-render no-hyphen variants (e.g. "eb03") so they redirect
+    if (noHyphen !== set.id) {
+      params.push({ setId: noHyphen });
+    }
+    return params;
+  });
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -75,6 +81,11 @@ export default async function SetPage({ params }: PageProps) {
 
   if (!set) {
     notFound();
+  }
+
+  // Redirect non-canonical URLs (e.g. /prb01 → /prb-01, /EB-03 → /eb-03)
+  if (setId !== set.id) {
+    redirect(`/${set.id}`);
   }
 
   const shortName = getSetShortName(set.name);
