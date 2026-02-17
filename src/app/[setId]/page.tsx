@@ -42,9 +42,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const firstCard = set.cards[0];
   const ogImage = firstCard?.imageUrl;
 
+  // Find chase card for description
+  const chaseCard = [...set.cards]
+    .filter((c) => c.price?.marketPrice != null)
+    .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))[0];
+  const chaseSuffix = chaseCard?.price?.marketPrice
+    ? ` Most expensive: ${chaseCard.name} at $${chaseCard.price.marketPrice.toFixed(2)}.`
+    : '';
+
   return {
     title: `${setUpper} (${setNoHyphen}) ${shortName} Card List & Price Guide - ${set.cardCount} Cards`,
-    description: `Complete ${setNoHyphen} / ${setUpper} ${shortName} card list and price guide for One Piece TCG. Browse all ${set.cardCount} ${setNoHyphen} cards with images, prices, and effects. Updated daily.`,
+    description: `Complete ${setNoHyphen} / ${setUpper} ${shortName} card list and price guide for One Piece TCG. Browse all ${set.cardCount} ${setNoHyphen} cards with images, prices, and effects.${chaseSuffix} Updated daily.`,
     keywords: getSetKeywords(set.id, set.name),
     openGraph: {
       title: `${setUpper} ${shortName} Card List - ${set.cardCount} Cards | One Piece TCG`,
@@ -110,7 +118,13 @@ export default async function SetPage({ params }: PageProps) {
       {/* Header */}
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{set.id.toUpperCase()} ({set.id.replace('-', '').toUpperCase()}) {shortName} Card List</h1>
-        <p className="text-zinc-400 light:text-zinc-600 mb-4">{set.name}</p>
+        <div className="flex items-center gap-3 mb-4">
+          <p className="text-zinc-400 light:text-zinc-600">{set.name}</p>
+          <span className="text-xs text-zinc-600 light:text-zinc-400">·</span>
+          <p className="text-xs text-zinc-600 light:text-zinc-400">
+            Prices updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </p>
+        </div>
 
         {/* Quick Stats */}
         <div className="flex flex-wrap gap-4 text-sm">
@@ -143,7 +157,49 @@ export default async function SetPage({ params }: PageProps) {
       {/* Set Value Metrics */}
       <SetStats cards={set.cards} setId={set.id} />
 
+      {/* Most Valuable Cards - SEO content for price-related searches */}
+      {(() => {
+        const topCards = set.cards
+          .filter((c) => c.price?.marketPrice != null && c.price.marketPrice > 0)
+          .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))
+          .slice(0, 10);
+        if (topCards.length === 0) return null;
+        const setUpper = set.id.toUpperCase();
+        const setNoHyphen = set.id.replace('-', '').toUpperCase();
+        return (
+          <section className="mb-8">
+            <h2 className="text-xl font-bold mb-4">
+              Most Valuable {setUpper} ({setNoHyphen}) Cards
+            </h2>
+            <div className="grid gap-2">
+              {topCards.map((card, i) => (
+                <Link
+                  key={card.id}
+                  href={`/card/${card.id.toLowerCase()}`}
+                  className="flex items-center gap-3 px-4 py-3 bg-zinc-800/50 light:bg-zinc-100 border border-zinc-700/50 light:border-zinc-200 rounded-lg hover:border-zinc-600 light:hover:border-zinc-300 transition-colors"
+                >
+                  <span className="text-zinc-500 font-mono text-sm w-6 text-right shrink-0">
+                    {i + 1}.
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="font-medium truncate block">{card.name}</span>
+                    <span className="text-xs text-zinc-500">{card.id} · {card.rarity} · {card.type}</span>
+                  </span>
+                  <span className="text-green-400 font-bold shrink-0">
+                    ${card.price!.marketPrice!.toFixed(2)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-500 mt-3">
+              Prices updated daily from TCGPlayer. The most expensive {setNoHyphen} card is {topCards[0].name} at ${topCards[0].price!.marketPrice!.toFixed(2)}.
+            </p>
+          </section>
+        );
+      })()}
+
       {/* Card Grid with Filters */}
+      <h2 className="text-xl font-bold mb-4">All {set.id.toUpperCase()} Cards</h2>
       <CardGrid cards={set.cards} setId={set.id} />
 
       {/* BreadcrumbList Schema */}
