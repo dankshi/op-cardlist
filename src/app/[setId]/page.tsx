@@ -4,6 +4,8 @@ import Link from "next/link";
 import { getSetBySlug, getAllSets } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
 import SetStats from "@/components/SetStats";
+import BoxEVCalculator from "@/components/BoxEVCalculator";
+import { calculateBatchPriceChanges } from "@/lib/price-history";
 import { SITE_URL, SITE_NAME, getSetKeywords, getSetShortName, getBreadcrumbSchema } from "@/lib/seo";
 
 interface PageProps {
@@ -38,9 +40,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const shortName = getSetShortName(set.name);
   const pageUrl = `${SITE_URL}/${set.id}`;
 
-  // Get first card with an image for OG
-  const firstCard = set.cards[0];
-  const ogImage = firstCard?.imageUrl;
+  const ogImageUrl = `${SITE_URL}/api/og/set/${set.id}`;
 
   // Find chase card for description
   const chaseCard = [...set.cards]
@@ -60,22 +60,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url: pageUrl,
       siteName: SITE_NAME,
       type: "website",
-      ...(ogImage && {
-        images: [
-          {
-            url: ogImage,
-            width: 245,
-            height: 342,
-            alt: `${setUpper} Card List - One Piece TCG`,
-          },
-        ],
-      }),
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${setUpper} ${shortName} Card List - One Piece TCG`,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: `${setUpper} ${shortName} Card List - ${set.cardCount} Cards`,
       description: `Complete ${setUpper} ${shortName} card list and price guide for One Piece TCG. ${set.cardCount} cards with prices.`,
-      ...(ogImage && { images: [ogImage] }),
+      images: [ogImageUrl],
     },
     alternates: {
       canonical: pageUrl,
@@ -97,6 +95,15 @@ export default async function SetPage({ params }: PageProps) {
   }
 
   const shortName = getSetShortName(set.name);
+
+  // Compute weekly price changes for badges
+  const currentPrices: Record<string, number> = {};
+  for (const card of set.cards) {
+    if (card.price?.marketPrice != null) {
+      currentPrices[card.id] = card.price.marketPrice;
+    }
+  }
+  const priceChanges = calculateBatchPriceChanges(currentPrices);
 
   // Count card types
   const leaders = set.cards.filter((c) => c.type === "LEADER").length;
@@ -157,50 +164,28 @@ export default async function SetPage({ params }: PageProps) {
       {/* Set Value Metrics */}
       <SetStats cards={set.cards} setId={set.id} />
 
-      {/* Most Valuable Cards - SEO content for price-related searches */}
+      {/* Box Expected Value */}
+      <BoxEVCalculator cards={set.cards} />
+
+      {/* Inline SEO text for price-related searches */}
       {(() => {
         const topCards = set.cards
           .filter((c) => c.price?.marketPrice != null && c.price.marketPrice > 0)
           .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))
-          .slice(0, 10);
+          .slice(0, 5);
         if (topCards.length === 0) return null;
-        const setUpper = set.id.toUpperCase();
         const setNoHyphen = set.id.replace('-', '').toUpperCase();
+        const topList = topCards.map((c) => `${c.name} ($${c.price!.marketPrice!.toFixed(2)})`).join(', ');
         return (
-          <section className="mb-8">
-            <h2 className="text-xl font-bold mb-4">
-              Most Valuable {setUpper} ({setNoHyphen}) Cards
-            </h2>
-            <div className="grid gap-2">
-              {topCards.map((card, i) => (
-                <Link
-                  key={card.id}
-                  href={`/card/${card.id.toLowerCase()}`}
-                  className="flex items-center gap-3 px-4 py-3 bg-zinc-800/50 light:bg-zinc-100 border border-zinc-700/50 light:border-zinc-200 rounded-lg hover:border-zinc-600 light:hover:border-zinc-300 transition-colors"
-                >
-                  <span className="text-zinc-500 font-mono text-sm w-6 text-right shrink-0">
-                    {i + 1}.
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="font-medium truncate block">{card.name}</span>
-                    <span className="text-xs text-zinc-500">{card.id} · {card.rarity} · {card.type}</span>
-                  </span>
-                  <span className="text-green-400 font-bold shrink-0">
-                    ${card.price!.marketPrice!.toFixed(2)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-            <p className="text-xs text-zinc-500 mt-3">
-              Prices updated daily from TCGPlayer. The most expensive {setNoHyphen} card is {topCards[0].name} at ${topCards[0].price!.marketPrice!.toFixed(2)}.
-            </p>
-          </section>
+          <p className="text-xs text-zinc-500 mb-6">
+            Most valuable {setNoHyphen} cards: {topList}. Prices updated daily from TCGPlayer.
+          </p>
         );
       })()}
 
       {/* Card Grid with Filters */}
       <h2 className="text-xl font-bold mb-4">All {set.id.toUpperCase()} Cards</h2>
-      <CardGrid cards={set.cards} setId={set.id} />
+      <CardGrid cards={set.cards} setId={set.id} priceChanges={priceChanges} />
 
       {/* BreadcrumbList Schema */}
       <script

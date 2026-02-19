@@ -4,11 +4,13 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { Card, CardColor, CardType, Rarity } from "@/types/card";
 import { CardThumbnail } from "./card/CardThumbnail";
+import { PriceChangeBadge } from "./PriceChangeBadge";
 
 interface CardGridProps {
   cards: Card[];
   setId: string;
   initialSearch?: string;
+  priceChanges?: Record<string, number>;
 }
 
 const COLORS: CardColor[] = ["Red", "Green", "Blue", "Purple", "Black", "Yellow"];
@@ -31,7 +33,7 @@ const unselectedClass = "bg-zinc-800 dark:bg-zinc-800 light:bg-zinc-100 text-zin
 
 type SortOption = 'price-desc' | 'name-asc' | 'id-asc';
 
-export default function CardGrid({ cards, setId, initialSearch }: CardGridProps) {
+export default function CardGrid({ cards, setId, initialSearch, priceChanges }: CardGridProps) {
   const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
   const [selectedColors, setSelectedColors] = useState<CardColor[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<CardType[]>([]);
@@ -318,11 +320,16 @@ export default function CardGrid({ cards, setId, initialSearch }: CardGridProps)
             className="block group"
           >
             <CardThumbnail card={card} />
-            {card.price?.marketPrice != null && (
-              <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 rounded-md bg-gradient-to-r from-green-500/10 to-emerald-500/10 ring-1 ring-green-500/20 text-green-400 text-sm font-semibold tracking-wide">
-                ${card.price.marketPrice.toFixed(2)}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              {card.price?.marketPrice != null && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gradient-to-r from-green-500/10 to-emerald-500/10 ring-1 ring-green-500/20 text-green-400 text-sm font-semibold tracking-wide">
+                  ${card.price.marketPrice.toFixed(2)}
+                </span>
+              )}
+              {priceChanges?.[card.id] != null && (
+                <PriceChangeBadge changePercent={priceChanges[card.id]} />
+              )}
+            </div>
           </Link>
         ))}
       </div>

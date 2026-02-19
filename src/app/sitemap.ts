@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { getAllSets, getAllCards } from '@/lib/cards';
+import { getAllCharacterSlugs } from '@/lib/characters';
 import { SITE_URL } from '@/lib/seo';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -36,6 +37,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.9,
   }));
 
+  // Character pages
+  const characterSlugs = getAllCharacterSlugs();
+  const characterPages: MetadataRoute.Sitemap = characterSlugs.map((slug) => ({
+    url: `${SITE_URL}/character/${slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.7,
+  }));
+
   // All card pages (medium priority)
   const cardPages: MetadataRoute.Sitemap = cards.map((card) => ({
     url: `${SITE_URL}/card/${card.id.toLowerCase()}`,
@@ -44,5 +54,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...staticPages, ...setPages, ...cardPages];
+  return [...staticPages, ...setPages, ...characterPages, ...cardPages];
 }

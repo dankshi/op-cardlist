@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "lounge", "mx-sdk-dapp", "mx-template-dapp", "drifters-frontend-stacking", "v2-generator-raji", "scripts/backup-images.ts"]
+  "exclude": ["node_modules", "lounge", "mx-sdk-dapp", "mx-template-dapp", "drifters-frontend-stacking", "v2-generator-raji", "scripts/backup-images.ts", "scripts/backfill-price-history.ts", "scripts/scrape-all-sets.ts"]
 }

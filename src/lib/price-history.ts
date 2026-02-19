@@ -131,6 +131,37 @@ export function getTopPriceMovers(
 }
 
 /**
+ * Calculate price changes for all cards in a single batch (reads filesystem ONCE).
+ * Returns only significant changes (>= 5%).
+ */
+export function calculateBatchPriceChanges(
+  currentPrices: Record<string, number>,
+  daysAgo: number = 7
+): Record<string, number> {
+  const files = getPriceHistoryFiles();
+  if (files.length <= daysAgo) return {};
+
+  const previousSnapshot = loadPriceSnapshot(files[daysAgo]);
+  if (!previousSnapshot) return {};
+
+  const changes: Record<string, number> = {};
+
+  for (const [cardId, currentPrice] of Object.entries(currentPrices)) {
+    const previousPrice = previousSnapshot.prices[cardId];
+    if (previousPrice == null || previousPrice === 0) continue;
+
+    const changePercent =
+      ((currentPrice - previousPrice) / previousPrice) * 100;
+
+    if (Math.abs(changePercent) >= 5) {
+      changes[cardId] = changePercent;
+    }
+  }
+
+  return changes;
+}
+
+/**
  * Get price history for a specific card (last N days)
  */
 export function getCardPriceHistory(
