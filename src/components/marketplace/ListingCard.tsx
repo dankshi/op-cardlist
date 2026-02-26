@@ -1,0 +1,52 @@
+import Link from 'next/link'
+import { ConditionBadge } from './ConditionBadge'
+import { AddToCartButton } from './AddToCartButton'
+import type { Listing } from '@/types/database'
+
+export function ListingCard({ listing }: { listing: Listing }) {
+  const seller = listing.seller
+
+  return (
+    <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 hover:border-zinc-700 light:hover:border-gray-300 transition-colors">
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <ConditionBadge condition={listing.condition} />
+            {listing.language !== 'EN' && (
+              <span className="px-1.5 py-0.5 rounded text-xs bg-zinc-700 light:bg-gray-200 text-zinc-300 light:text-gray-600">{listing.language}</span>
+            )}
+            {listing.is_first_edition && (
+              <span className="px-1.5 py-0.5 rounded text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20">1st Ed</span>
+            )}
+          </div>
+          {seller && (
+            <Link
+              href={seller.username ? `/seller/${seller.username}` : '#'}
+              className="text-sm text-zinc-400 light:text-gray-500 hover:text-sky-400 transition-colors"
+            >
+              {seller.display_name || 'Unknown Seller'}
+              {seller.rating_count > 0 && (
+                <span className="ml-1 text-yellow-400">
+                  {'★'.repeat(Math.round(seller.rating_avg))} ({seller.rating_count})
+                </span>
+              )}
+            </Link>
+          )}
+          {listing.description && (
+            <p className="text-xs text-zinc-500 light:text-gray-400 mt-1 line-clamp-1">{listing.description}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 flex-shrink-0">
+        <div className="text-right">
+          <p className="text-lg font-bold text-zinc-100 light:text-gray-900">${Number(listing.price).toFixed(2)}</p>
+          {listing.quantity_available > 1 && (
+            <p className="text-xs text-zinc-500 light:text-gray-400">{listing.quantity_available} available</p>
+          )}
+        </div>
+        <AddToCartButton listingId={listing.id} maxQuantity={listing.quantity_available} />
+      </div>
+    </div>
+  )
+}

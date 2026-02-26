@@ -1,0 +1,196 @@
+{
+  "source": "https://en.onepiece-cardgame.com/rules/errata_card/",
+  "lastUpdated": "2025-05-16",
+  "description": "Cards with official errata from Bandai. TCGPlayer may list pre-errata and post-errata versions as separate products.",
+  "errataCards": [
+    {
+      "date": "2022-09-26",
+      "category": "up-to-clarification",
+      "description": "Starter deck 'up to' clarifications for consistency with Japanese text",
+      "cards": [
+        { "id": "ST01-001", "name": "Monkey.D.Luffy" },
+        { "id": "ST01-005", "name": "Jinbe" },
+        { "id": "ST01-007", "name": "Nami" },
+        { "id": "ST01-014", "name": "Guard Point" },
+        { "id": "ST01-015", "name": "Gum-Gum Jet Pistol" },
+        { "id": "ST01-016", "name": "Diable Jambe" },
+        { "id": "ST01-017", "name": "Thousand Sunny" },
+        { "id": "ST02-005", "name": "Killer" },
+        { "id": "ST02-008", "name": "Scratchmen Apoo" },
+        { "id": "ST02-009", "name": "Trafalgar Law" },
+        { "id": "ST02-015", "name": "Scalpel" },
+        { "id": "ST02-016", "name": "Repel" },
+        { "id": "ST02-017", "name": "Straw Sword" },
+        { "id": "ST03-001", "name": "Crocodile" },
+        { "id": "ST03-003", "name": "Crocodile" },
+        { "id": "ST03-004", "name": "Gecko Moria" },
+        { "id": "ST03-007", "name": "Sentomaru" },
+        { "id": "ST03-009", "name": "Donquixote Doflamingo" },
+        { "id": "ST03-014", "name": "Marshall D. Teach" },
+        { "id": "ST03-015", "name": "Sables" },
+        { "id": "ST04-001", "name": "Kaido" },
+        { "id": "ST04-002", "name": "Ulti" },
+        { "id": "ST04-003", "name": "Kaido" },
+        { "id": "ST04-004", "name": "King" },
+        { "id": "ST04-005", "name": "Queen" },
+        { "id": "ST04-006", "name": "Sasaki" },
+        { "id": "ST04-008", "name": "Jack" },
+        { "id": "ST04-010", "name": "Who's.Who" },
+        { "id": "ST04-014", "name": "Lead Performer \"Disaster\"" },
+        { "id": "ST04-015", "name": "Brachio Bomber" },
+        { "id": "ST04-016", "name": "Blast Breath" },
+        { "id": "ST04-017", "name": "Onigashima Island" }
+      ]
+    },
+    {
+      "date": "2023-02-17",
+      "category": "up-to-clarification",
+      "description": "OP-01 and ST02 'up to' clarifications for consistency with Japanese text",
+      "cards": [
+        { "id": "OP01-002", "name": "Trafalgar Law" },
+        { "id": "OP01-003", "name": "Monkey.D.Luffy" },
+        { "id": "OP01-005", "name": "Uta" },
+        { "id": "OP01-006", "name": "Otama" },
+        { "id": "OP01-007", "name": "Caribou" },
+        { "id": "OP01-014", "name": "Jinbe" },
+        { "id": "OP01-015", "name": "Tony Tony Chopper" },
+        { "id": "OP01-016", "name": "Nami" },
+        { "id": "OP01-017", "name": "Nico Robin" },
+        { "id": "OP01-020", "name": "Hyogoro" },
+        { "id": "OP01-026", "name": "Gum-Gum Fire-Fist Pistol Red Hawk" },
+        { "id": "OP01-027", "name": "Round Table" },
+        { "id": "OP01-028", "name": "Green Star Rafflesia" },
+        { "id": "OP01-029", "name": "Radical Beam!!" },
+        { "id": "OP01-030", "name": "In Two Years!! At the Sabaody Archipelago!!" },
+        { "id": "OP01-033", "name": "Izo" },
+        { "id": "OP01-034", "name": "Inuarashi" },
+        { "id": "OP01-035", "name": "Okiku" },
+        { "id": "OP01-038", "name": "Kanjuro" },
+        { "id": "OP01-040", "name": "Kin'emon" },
+        { "id": "OP01-041", "name": "Kouzuki Momonosuke" },
+        { "id": "OP01-042", "name": "Komurasaki" },
+        { "id": "OP01-044", "name": "Shachi" },
+        { "id": "OP01-047", "name": "Trafalgar Law" },
+        { "id": "OP01-048", "name": "Nekomamushi" },
+        { "id": "OP01-049", "name": "Bepo" },
+        { "id": "OP01-050", "name": "Penguin" },
+        { "id": "OP01-051", "name": "Eustass \"Captain\" Kid" },
+        { "id": "OP01-054", "name": "X. Drake" },
+        { "id": "OP01-056", "name": "Demon Face" },
+        { "id": "OP01-057", "name": "Paradise Waterfall" },
+        { "id": "OP01-058", "name": "Punk Gibson" },
+        { "id": "OP01-059", "name": "BE-BENG!!" },
+        { "id": "OP01-061", "name": "Kaido" },
+        { "id": "OP01-063", "name": "Arlong" },
+        { "id": "OP01-064", "name": "Alvida" },
+        { "id": "OP01-069", "name": "Caesar Clown" },
+        { "id": "OP01-070", "name": "Dracule Mihawk" },
+        { "id": "OP01-071", "name": "Jinbe" },
+        { "id": "OP01-074", "name": "Bartholomew Kuma" },
+        { "id": "OP01-079", "name": "Ms. All Sunday" },
+        { "id": "OP01-084", "name": "Mr. 2 Bon Kurei" },
+        { "id": "OP01-085", "name": "Mr. 3" },
+        { "id": "OP01-086", "name": "Overheat" },
+        { "id": "OP01-087", "name": "Officer Agents" },
+        { "id": "OP01-088", "name": "Desert Spada" },
+        { "id": "OP01-089", "name": "Crescent Cutlass" },
+        { "id": "OP01-090", "name": "Baroque Works" },
+        { "id": "OP01-093", "name": "Ulti" },
+        { "id": "OP01-096", "name": "King" },
+        { "id": "OP01-097", "name": "Queen" },
+        { "id": "OP01-098", "name": "Kurozumi Orochi" },
+        { "id": "OP01-101", "name": "Sasaki" },
+        { "id": "OP01-106", "name": "Basil Hawkins" },
+        { "id": "OP01-108", "name": "Hitokiri Kamazo" },
+        { "id": "OP01-113", "name": "Holedem" },
+        { "id": "OP01-115", "name": "Elephant's Marchoo" },
+        { "id": "OP01-116", "name": "Artificial Devil Fruit SMILE" },
+        { "id": "OP01-117", "name": "Sheep's Horn" },
+        { "id": "OP01-118", "name": "Ulti-Mortar" },
+        { "id": "OP01-119", "name": "Thunder Bagua" },
+        { "id": "ST02-007", "name": "Jewelry Bonney" }
+      ]
+    },
+    {
+      "date": "2023-03-03",
+      "category": "wording-fix",
+      "description": "Changed '1 of your Characters' to 'any of your Characters'",
+      "cards": [
+        { "id": "OP02-002", "name": "Monkey D. Garp" }
+      ]
+    },
+    {
+      "date": "2023-03-31",
+      "category": "wording-fix",
+      "description": "Changed 'this card' to 'this Character'",
+      "cards": [
+        { "id": "ST02-013", "name": "Eustass \"Captain\" Kid" }
+      ]
+    },
+    {
+      "date": "2023-04-21",
+      "category": "wording-fix",
+      "description": "Changed 'your field' to 'the field' for DON card mechanics",
+      "cards": [
+        { "id": "OP02-071", "name": "Magellan" }
+      ]
+    },
+    {
+      "date": "2023-07-14",
+      "category": "mechanic-change",
+      "description": "Changed optional/mandatory effect wording",
+      "cards": [
+        { "id": "OP03-047", "name": "Zeff" },
+        { "id": "OP03-054", "name": "Usopp's Rubber Band of Doom!!!" }
+      ]
+    },
+    {
+      "date": "2023-12-08",
+      "category": "mechanic-change",
+      "description": "Removed 'up to' making rest mandatory",
+      "cards": [
+        { "id": "OP05-032", "name": "Pica" }
+      ]
+    },
+    {
+      "date": "2024-08-16",
+      "category": "wording-fix",
+      "description": "Changed 'if you have' to 'if there is'",
+      "cards": [
+        { "id": "ST14-014", "name": "Gum-Gum Giant Rifle" }
+      ]
+    },
+    {
+      "date": "2024-12-06",
+      "category": "type-fix",
+      "description": "Changed creature type from 'Fish-Man' to 'Merfolk'",
+      "cards": [
+        { "id": "OP06-034", "name": "Hyouzou" }
+      ]
+    },
+    {
+      "date": "2024-12-13",
+      "category": "mechanic-change",
+      "description": "Changed from player choice to opponent selection",
+      "cards": [
+        { "id": "OP09-058", "name": "Special Muggy Ball" }
+      ]
+    },
+    {
+      "date": "2025-05-16",
+      "category": "text-fix",
+      "description": "Removed redundant text duplication in ability",
+      "cards": [
+        { "id": "OP07-097", "name": "Vegapunk" }
+      ]
+    },
+    {
+      "date": "2025-05-16",
+      "category": "mechanic-change",
+      "description": "Complete effect revision for Wanted Poster version",
+      "cards": [
+        { "id": "OP13-119", "name": "Portgas D. Ace" }
+      ]
+    }
+  ]
+}

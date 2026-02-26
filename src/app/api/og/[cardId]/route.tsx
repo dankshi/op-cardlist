@@ -257,7 +257,7 @@ export async function GET(
                 fontSize: '20px',
               }}
             >
-              opcardlist.com
+              nomimarket.com
             </span>
           </div>
         </div>

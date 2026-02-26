@@ -5,6 +5,7 @@ import CardModalClient from "./CardModalClient";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
 import { ShareButtons } from "@/components/ShareButtons";
+import { ListingsGrid } from "@/components/marketplace/ListingsGrid";
 
 interface PageProps {
   params: Promise<{ cardId: string }>;
@@ -224,6 +225,12 @@ export default async function CardPage({ params }: PageProps) {
               {/* Share Buttons */}
               <div className="mb-4">
                 <ShareButtons card={card} />
+              </div>
+
+              {/* Marketplace Listings */}
+              <div className="mb-4 p-4 bg-sky-500/5 border border-sky-500/20 rounded-lg">
+                <h3 className="text-sm font-semibold text-sky-400 uppercase tracking-wide mb-3">Buy on NOMI Market</h3>
+                <ListingsGrid cardId={card.id} />
               </div>
 
               {/* Set Info */}

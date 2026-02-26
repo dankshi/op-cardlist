@@ -39,13 +39,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Prettify a TCGPlayer URL slug into a display name
-// e.g. "romance-dawn-pre-release-cards" -> "Romance Dawn Pre Release Cards"
-function slugToDisplayName(slug: string): string {
-  return slug
-    .split('-')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+// Convert a TCGPlayer display name to a URL slug
+// e.g. "Romance Dawn" -> "romance-dawn"
+// e.g. "Extra Booster: Memorial Collection" -> "extra-booster-memorial-collection"
+// e.g. "The Azure Sea's Seven" -> "the-azure-seas-seven"
+function displayNameToSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/['']/g, '')       // Remove apostrophes (Sea's -> Seas)
+    .replace(/[.:,!?()]/g, '')  // Remove punctuation
+    .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
+    .replace(/^-+|-+$/g, '')    // Trim leading/trailing hyphens
+    .replace(/-+/g, '-');       // Collapse multiple hyphens
 }
 
 // Discover all TCGPlayer sets by paginating through all One Piece products
@@ -114,14 +119,15 @@ async function discoverSets(debug: boolean): Promise<Map<string, SetStats>> {
       }
 
       for (const product of products) {
-        const setName = product.setName;
-        if (setName) {
-          const existing = setStats.get(setName);
+        const rawSetName = product.setName;
+        if (rawSetName) {
+          const slug = displayNameToSlug(rawSetName);
+          const existing = setStats.get(slug);
           if (existing) {
             existing.count++;
           } else {
-            setStats.set(setName, {
-              displayName: slugToDisplayName(setName),
+            setStats.set(slug, {
+              displayName: rawSetName,
               count: 1,
             });
           }
@@ -152,13 +158,14 @@ async function seedMappings(supabase: any, debug: boolean) {
   console.log('\nSeeding set_mappings from SET_NAME_MAP...');
 
   // First ensure all referenced TCGPlayer set names exist in tcgplayer_sets (for FK)
+  // SET_NAME_MAP values are already URL slugs, so use them directly as set_name
   const allTcgNames: { set_name: string; display_name: string; product_count: number }[] = [];
   for (const tcgNames of Object.values(SET_NAME_MAP)) {
-    for (const name of tcgNames) {
+    for (const slug of tcgNames) {
       allTcgNames.push({
-        set_name: name,
-        display_name: slugToDisplayName(name),
-        product_count: 0, // Will be updated by discovery
+        set_name: slug,
+        display_name: slug, // Placeholder — will be overwritten by discovery with real name
+        product_count: 0,   // Will be updated by discovery
       });
     }
   }

@@ -1,5 +1,5 @@
 {
-  "name": "op-cardlist",
+  "name": "nomi-market",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -24,14 +24,17 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
+    "@stripe/stripe-js": "^8.8.0",
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
     "@vercel/og": "^0.8.6",
     "cheerio": "^1.2.0",
     "dotenv": "^17.2.4",
     "next": "16.1.6",
-    "op-cardlist": "file:",
+    "nomi-market": "file:",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "stripe": "^20.4.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

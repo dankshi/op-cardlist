@@ -1,11 +1,11 @@
 // SEO Configuration
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.opcardlist.com';
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.nomimarket.com';
 
-export const SITE_NAME = 'One Piece TCG Card List';
-export const SITE_DESCRIPTION = 'The fastest, most comprehensive One Piece TCG card database with prices. Browse all cards, sets, and filter by color, type, rarity and more.';
+export const SITE_NAME = 'NOMI Market';
+export const SITE_DESCRIPTION = 'Buy and sell One Piece TCG cards on NOMI Market. The fastest marketplace with price guide, collection tracker, deck builder, and daily price updates.';
 
-// Social media handles (update with your actual handles)
-export const TWITTER_HANDLE = '@opcardlist';
+// Social media handles
+export const TWITTER_HANDLE = '@nomimarket';
 
 // Default OG Image (create this image for social sharing)
 export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
@@ -77,10 +77,9 @@ export function getOrganizationSchema() {
     '@type': 'Organization',
     name: SITE_NAME,
     url: SITE_URL,
-    logo: `${SITE_URL}/logo.svg`,
+    logo: `${SITE_URL}/nomi-logo.png`,
     sameAs: [
-      // Add your social media URLs here
-      // 'https://twitter.com/opcardlist',
+      // 'https://twitter.com/nomimarket',
     ],
   };
 }
@@ -90,7 +89,7 @@ export function getWebSiteSchema() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: SITE_NAME,
-    alternateName: ['OPCardlist', 'OP Cardlist', 'opcardlist'],
+    alternateName: ['NOMI Market', 'NomiMarket', 'nomi market'],
     url: SITE_URL,
     description: SITE_DESCRIPTION,
     potentialAction: {

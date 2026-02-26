@@ -214,21 +214,16 @@ export async function GET(
                 fontStyle: 'italic',
               }}
             >
-              OP
-            </span>
-            <span
-              style={{ color: '#e4e4e7', fontSize: '20px', fontWeight: 'bold' }}
-            >
-              Card
+              NOMI
             </span>
             <span
               style={{ color: '#71717a', fontSize: '20px', fontWeight: 'bold' }}
             >
-              list
+              Market
             </span>
           </div>
           <span style={{ color: '#52525b', fontSize: '16px' }}>
-            opcardlist.com
+            nomimarket.com
           </span>
         </div>
       </div>

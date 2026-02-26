@@ -136,7 +136,7 @@ export async function GET(
       </div>
       <div class="colors">${colorDots}</div>
       ${priceHtml}
-      <div class="branding"><span>OP</span>Cardlist &middot; opcardlist.com</div>
+      <div class="branding"><span>NOMI</span>Market &middot; nomimarket.com</div>
     </div>
   </a>
 </body>

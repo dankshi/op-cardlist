@@ -8,9 +8,9 @@ import { CardCarousel } from "@/components/home/CardCarousel";
 import type { Card } from "@/types/card";
 
 export const metadata: Metadata = {
-  title: { absolute: "OPCardlist - One Piece TCG Card List with Prices | All Sets" },
-  description: `OPCardlist is the fastest One Piece TCG card database with daily prices. Browse OP-13, OP14-EB04, and all sets with TCGPlayer market prices, card effects, and images.`,
-  keywords: [...BASE_KEYWORDS, "OPCardlist", "opcardlist", "all sets", "complete database", "OP-13", "EB-03", "price guide"],
+  title: { absolute: "nomi market — Buy & Sell One Piece TCG Cards" },
+  description: `The marketplace for One Piece TCG. Buy, sell, and trade authenticated cards with daily market prices across every set.`,
+  keywords: [...BASE_KEYWORDS, "NOMI Market", "nomimarket", "buy sell cards", "marketplace", "OP-13", "EB-03", "price guide"],
   alternates: {
     canonical: SITE_URL,
   },
@@ -67,25 +67,18 @@ export default async function Home() {
         />
 
         <div className="relative max-w-3xl mx-auto text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-6 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-500 light:text-sky-600 text-sm font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
-            {totalCards.toLocaleString()} cards indexed
-          </div>
-
           {/* Heading */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-4 sm:mb-6">
-            The Ultimate
-            <span className="block text-sky-500 drop-shadow-[0_0_30px_rgba(14,165,233,0.3)]">
-              One Piece TCG
+            Buy &amp; sell TCG cards.
+            <span className="block text-zinc-500 dark:text-zinc-500 light:text-zinc-400">
+              Verified. Priced. Simple.
             </span>
-            Database
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg sm:text-xl text-zinc-400 light:text-zinc-600 mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed">
-            Every card. Every set. Every price. The fastest way to search,
-            browse, and track the One Piece Trading Card Game.
+          <p className="text-lg sm:text-xl text-zinc-400 light:text-zinc-600 mb-8 sm:mb-10 max-w-lg mx-auto leading-relaxed">
+            The marketplace for One Piece TCG. Every card authenticated,
+            every price tracked.
           </p>
 
           {/* Search Bar */}
@@ -95,9 +88,9 @@ export default async function Home() {
           <div className="flex items-center justify-center gap-6 sm:gap-8 mt-8 text-sm text-zinc-500">
             <div className="text-center">
               <p className="text-lg sm:text-xl font-bold text-zinc-200 light:text-zinc-800">
-                {totalCards.toLocaleString()}
+                {totalCards.toLocaleString()}+
               </p>
-              <p>Cards</p>
+              <p>Listed cards</p>
             </div>
             <div className="w-px h-8 bg-zinc-800 light:bg-zinc-200" />
             <div className="text-center">
@@ -111,7 +104,7 @@ export default async function Home() {
               <p className="text-lg sm:text-xl font-bold text-zinc-200 light:text-zinc-800">
                 Daily
               </p>
-              <p>Price Updates</p>
+              <p>Prices</p>
             </div>
           </div>
         </div>
@@ -225,8 +218,8 @@ export default async function Home() {
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "CollectionPage",
-            name: "One Piece TCG Card List - All Sets",
-            description: `Complete database of ${totalCards} One Piece TCG cards across ${sets.length} sets with prices`,
+            name: "NOMI Market - One Piece TCG Marketplace",
+            description: `Buy and sell ${totalCards} One Piece TCG cards across ${sets.length} sets with daily price updates`,
             url: SITE_URL,
             mainEntity: {
               "@type": "ItemList",
