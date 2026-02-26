@@ -35,8 +35,8 @@ export default function ForgotPasswordPage() {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-full max-w-md p-8 rounded-2xl bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 text-center">
-          <div className="w-16 h-16 bg-sky-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-16 h-16 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
           </p>
           <Link
             href="/auth/sign-in"
-            className="inline-block mt-6 text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium"
+            className="inline-block mt-6 text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium"
           >
             Back to sign in
           </Link>
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
 
         <p className="text-center text-zinc-400 light:text-gray-500 text-sm mt-6">
           Remember your password?{' '}
-          <Link href="/auth/sign-in" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">
+          <Link href="/auth/sign-in" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">
             Sign in
           </Link>
         </p>

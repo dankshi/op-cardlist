@@ -137,7 +137,7 @@ export default function SellPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by card name or ID..."
-                  className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 {searching && <p className="text-sm text-zinc-500 light:text-gray-400 mt-1">Searching...</p>}
                 {searchResults.length > 0 && (
@@ -168,7 +168,7 @@ export default function SellPage() {
             <select
               value={condition}
               onChange={(e) => setCondition(e.target.value as CardCondition)}
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
               {Object.entries(CONDITION_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -190,7 +190,7 @@ export default function SellPage() {
                   onChange={(e) => setPrice(e.target.value)}
                   required
                   placeholder="0.00"
-                  className="w-full pl-7 pr-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full pl-7 pr-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
             </div>
@@ -201,7 +201,7 @@ export default function SellPage() {
                 min="1"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function SellPage() {
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
               <option value="EN">English</option>
               <option value="JP">Japanese</option>
@@ -227,7 +227,7 @@ export default function SellPage() {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Any additional notes about the card..."
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
             />
           </div>
 

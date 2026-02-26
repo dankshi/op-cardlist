@@ -104,7 +104,7 @@ export default function OrderDetailPage() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -146,7 +146,7 @@ export default function OrderDetailPage() {
                   <img src={item.snapshot_photo_url} alt="" className="w-10 h-14 object-contain rounded" />
                 )}
                 <div>
-                  <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-sky-400 transition-colors">
+                  <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-orange-400 transition-colors">
                     {item.card_name || item.card_id}
                   </Link>
                   <div className="flex items-center gap-2 mt-1">
@@ -166,7 +166,7 @@ export default function OrderDetailPage() {
         <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4">
           <h2 className="font-medium text-zinc-100 light:text-gray-900 mb-3">{isBuyer ? 'Seller' : 'Buyer'}</h2>
           {isBuyer && order.seller ? (
-            <Link href={`/seller/${(order.seller as { username: string }).username}`} className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600">
+            <Link href={`/seller/${(order.seller as { username: string }).username}`} className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500">
               {(order.seller as { display_name: string }).display_name}
             </Link>
           ) : order.buyer ? (
@@ -237,7 +237,7 @@ export default function OrderDetailPage() {
               <input name="carrier" placeholder="Carrier (e.g., USPS)" className="px-3 py-2 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 text-sm" />
               <input name="tracking" placeholder="Tracking number" className="px-3 py-2 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 text-sm" />
             </div>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-colors cursor-pointer">
+            <button type="submit" className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold text-sm transition-colors cursor-pointer">
               Mark as Shipped
             </button>
           </form>
@@ -306,7 +306,7 @@ export default function OrderDetailPage() {
           <button
             onClick={submitReview}
             disabled={submittingReview}
-            className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
           >
             {submittingReview ? 'Submitting...' : 'Submit Review'}
           </button>

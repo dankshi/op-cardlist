@@ -43,7 +43,7 @@ export function AddToCartButton({ listingId, maxQuantity = 1 }: { listingId: str
       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
         added
           ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-          : 'bg-sky-600 hover:bg-sky-500 text-white disabled:bg-sky-800 disabled:cursor-not-allowed'
+          : 'bg-orange-500 hover:bg-orange-500 text-white disabled:bg-orange-700 disabled:cursor-not-allowed'
       }`}
     >
       {loading ? '...' : added ? 'Added!' : 'Add to Cart'}

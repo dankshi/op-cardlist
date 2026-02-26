@@ -55,7 +55,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -72,7 +72,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900">Seller Dashboard</h1>
         <Link
           href="/sell"
-          className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-colors"
+          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
         >
           + List a Card
         </Link>
@@ -113,7 +113,7 @@ export default function DashboardPage() {
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer capitalize ${
               tab === t
-                ? 'text-sky-400 border-b-2 border-sky-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
             }`}
           >
@@ -196,7 +196,7 @@ export default function DashboardPage() {
             {profile?.stripe_onboarding_complete ? (
               <p className="text-green-400 text-sm">Connected and ready to receive payments</p>
             ) : (
-              <button onClick={connectStripe} className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium cursor-pointer">
+              <button onClick={connectStripe} className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white text-sm font-medium cursor-pointer">
                 {profile?.stripe_account_id ? 'Complete Stripe Setup' : 'Connect Stripe'}
               </button>
             )}

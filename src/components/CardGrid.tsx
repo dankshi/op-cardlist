@@ -339,7 +339,7 @@ export default function CardGrid({ cards, setId, initialSearch, priceChanges }: 
           <p>No cards found matching your filters.</p>
           <button
             onClick={clearFilters}
-            className="mt-2 text-sky-500 hover:text-sky-400 light:text-sky-600 light:hover:text-sky-700 transition-colors"
+            className="mt-2 text-orange-500 hover:text-orange-400 light:text-orange-500 light:hover:text-orange-600 transition-colors"
           >
             Clear all filters
           </button>

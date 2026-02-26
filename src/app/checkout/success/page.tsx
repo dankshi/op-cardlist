@@ -27,7 +27,7 @@ export default async function CheckoutSuccessPage({ searchParams }: { searchPara
       <div className="flex gap-4 justify-center">
         <Link
           href={orderId ? `/orders/${orderId}` : '/orders'}
-          className="px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-colors"
+          className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
         >
           View Order
         </Link>

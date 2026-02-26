@@ -48,7 +48,7 @@ export default async function SellerStorefrontPage({ params }: { params: Promise
           {profile.avatar_url ? (
             <img src={profile.avatar_url} alt="" className="w-20 h-20 rounded-full" />
           ) : (
-            <div className="w-20 h-20 rounded-full bg-sky-600 flex items-center justify-center text-white text-2xl font-bold">
+            <div className="w-20 h-20 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-bold">
               {(profile.display_name || 'S')[0].toUpperCase()}
             </div>
           )}

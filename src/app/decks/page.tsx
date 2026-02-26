@@ -45,7 +45,7 @@ export default function DecksPage() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -58,7 +58,7 @@ export default function DecksPage() {
         <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900">Decks</h1>
         <Link
           href="/decks/new"
-          className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-colors"
+          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
         >
           + New Deck
         </Link>
@@ -69,7 +69,7 @@ export default function DecksPage() {
         <button
           onClick={() => setTab('my')}
           className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-            tab === 'my' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
+            tab === 'my' ? 'text-orange-400 border-b-2 border-orange-400' : 'text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
           }`}
         >
           My Decks
@@ -77,7 +77,7 @@ export default function DecksPage() {
         <button
           onClick={() => setTab('public')}
           className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-            tab === 'public' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
+            tab === 'public' ? 'text-orange-400 border-b-2 border-orange-400' : 'text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
           }`}
         >
           Public Decks
@@ -90,7 +90,7 @@ export default function DecksPage() {
             {tab === 'my' ? "You haven't created any decks yet." : 'No public decks available.'}
           </p>
           {tab === 'my' && (
-            <Link href="/decks/new" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">
+            <Link href="/decks/new" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">
               Create your first deck
             </Link>
           )}

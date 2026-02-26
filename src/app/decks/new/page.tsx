@@ -135,7 +135,7 @@ export default function NewDeckPage() {
               onChange={e => setName(e.target.value)}
               required
               placeholder="My Red Luffy Deck"
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
           <div>
@@ -159,7 +159,7 @@ export default function NewDeckPage() {
             onChange={e => setDescription(e.target.value)}
             rows={2}
             placeholder="Describe your deck strategy..."
-            className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+            className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
           />
         </div>
 
@@ -193,7 +193,7 @@ export default function NewDeckPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search cards to add..."
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             {searchResults.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 rounded-lg shadow-xl max-h-60 overflow-y-auto">
@@ -222,7 +222,7 @@ export default function NewDeckPage() {
             {entries.map(entry => (
               <div key={entry.card.id} className="flex items-center justify-between px-3 py-2 rounded bg-zinc-800 light:bg-gray-100">
                 <div className="flex items-center gap-2">
-                  <span className="text-sky-400 font-mono text-sm">{entry.quantity}x</span>
+                  <span className="text-orange-400 font-mono text-sm">{entry.quantity}x</span>
                   <span className="text-zinc-100 light:text-gray-900 text-sm">{entry.card.name}</span>
                   <span className="text-zinc-500 light:text-gray-400 text-xs">{entry.card.id}</span>
                 </div>

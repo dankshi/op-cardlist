@@ -88,7 +88,7 @@ export default function CartPage() {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -101,7 +101,7 @@ export default function CartPage() {
         </svg>
         <h1 className="text-2xl font-bold text-zinc-100 light:text-gray-900 mb-2">Your cart is empty</h1>
         <p className="text-zinc-400 light:text-gray-500 mb-6">Browse cards and add listings to your cart.</p>
-        <Link href="/" className="px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-colors">
+        <Link href="/" className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors">
           Browse Cards
         </Link>
       </div>
@@ -124,7 +124,7 @@ export default function CartPage() {
               <div>
                 <Link
                   href={group.sellerUsername ? `/seller/${group.sellerUsername}` : '#'}
-                  className="font-medium text-zinc-100 light:text-gray-900 hover:text-sky-400 transition-colors"
+                  className="font-medium text-zinc-100 light:text-gray-900 hover:text-orange-400 transition-colors"
                 >
                   {group.sellerName}
                 </Link>
@@ -169,7 +169,7 @@ export default function CartPage() {
               <button
                 onClick={() => handleCheckout(group.sellerId)}
                 disabled={checkingOut === group.sellerId || !group.stripeReady}
-                className="w-full px-4 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer"
+                className="w-full px-4 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer"
               >
                 {checkingOut === group.sellerId ? 'Processing...' : !group.stripeReady ? 'Seller not ready for payments' : `Checkout — $${group.subtotal.toFixed(2)}`}
               </button>

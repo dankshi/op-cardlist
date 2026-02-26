@@ -228,8 +228,8 @@ export default async function CardPage({ params }: PageProps) {
               </div>
 
               {/* Marketplace Listings */}
-              <div className="mb-4 p-4 bg-sky-500/5 border border-sky-500/20 rounded-lg">
-                <h3 className="text-sm font-semibold text-sky-400 uppercase tracking-wide mb-3">Buy on NOMI Market</h3>
+              <div className="mb-4 p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide mb-3">Buy on NOMI Market</h3>
                 <ListingsGrid cardId={card.id} />
               </div>
 

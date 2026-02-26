@@ -102,16 +102,10 @@ export default function RootLayout({
                 <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto" />
               </Link>
               <div className="flex items-center gap-4">
-                <Link href="/" className="text-zinc-600 hover:text-zinc-900 transition-colors">
-                  Sets
+                <Link href="/about" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
+                  How It Works
                 </Link>
-                <Link href="/products" className="text-zinc-600 hover:text-zinc-900 transition-colors">
-                  Products
-                </Link>
-                <Link href="/hot" className="text-zinc-600 hover:text-zinc-900 transition-colors flex items-center gap-1">
-                  Hot
-                </Link>
-                <Link href="/sell" className="text-sky-600 hover:text-sky-700 transition-colors font-medium">
+                <Link href="/sell" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
                   Sell
                 </Link>
                 <Suspense>
@@ -128,11 +122,18 @@ export default function RootLayout({
           </main>
           {modal}
           <footer className="border-t border-zinc-200 mt-16">
-            <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-2">
+            <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-3">
               <div className="flex items-center justify-center">
                 <Image src="/nomi-slab.png" alt="nomi" width={60} height={20} className="h-5 w-auto" />
               </div>
               <p>Authenticated cards. Market prices. Los Angeles, CA.</p>
+              <div className="flex items-center justify-center gap-4 text-xs text-zinc-400">
+                <Link href="/about" className="hover:text-zinc-900 transition-colors">How It Works</Link>
+                <span className="text-zinc-300">|</span>
+                <span>One Piece TCG</span>
+                <span className="text-zinc-300">&middot;</span>
+                <span>Pokemon TCG</span>
+              </div>
             </div>
           </footer>
       </body>

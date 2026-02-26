@@ -134,7 +134,7 @@ export default async function CharacterPage({ params }: PageProps) {
             <h2 className="text-lg font-semibold mb-3">
               <Link
                 href={`/${setId}`}
-                className="hover:text-sky-400 transition-colors"
+                className="hover:text-orange-400 transition-colors"
               >
                 {setId.toUpperCase()}
               </Link>

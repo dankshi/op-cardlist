@@ -93,15 +93,15 @@ export default function SetStats({ cards, setId }: SetStatsProps) {
         {/* Chase Card */}
         <div className="bg-zinc-800/50 light:bg-zinc-100 border border-zinc-700/50 light:border-zinc-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-1">
-            <svg className="w-4 h-4 text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-orange-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="text-xs text-zinc-400 light:text-zinc-500 font-medium uppercase tracking-wider">Chase Card</span>
           </div>
-          <p className="text-2xl font-bold text-sky-400">{formatPrice(chasePrice)}</p>
+          <p className="text-2xl font-bold text-orange-400">{formatPrice(chasePrice)}</p>
           <Link
             href={`/card/${chaseCard.id.toLowerCase()}`}
-            className="text-xs text-zinc-500 hover:text-sky-400 transition-colors mt-1 block truncate"
+            className="text-xs text-zinc-500 hover:text-orange-400 transition-colors mt-1 block truncate"
             title={chaseCard.name}
           >
             {chaseCard.name}

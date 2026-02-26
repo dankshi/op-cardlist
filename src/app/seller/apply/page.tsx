@@ -58,7 +58,7 @@ export default function SellerApplyPage() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -78,7 +78,7 @@ export default function SellerApplyPage() {
           </p>
           <Link
             href="/dashboard"
-            className="inline-block mt-6 px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-colors"
+            className="inline-block mt-6 px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
           >
             Go to Dashboard
           </Link>
@@ -102,7 +102,7 @@ export default function SellerApplyPage() {
               { title: 'Growing Community', desc: 'Join the fastest growing OP TCG marketplace' },
             ].map((perk) => (
               <div key={perk.title} className="flex gap-3 p-3 rounded-lg bg-zinc-800 light:bg-gray-100">
-                <svg className="w-5 h-5 text-sky-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div>

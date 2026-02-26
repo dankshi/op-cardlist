@@ -49,7 +49,7 @@ export default function SignInPage() {
           <FormInput label="Password" type="password" name="password" placeholder="Your password" autoComplete="current-password" />
 
           <div className="flex justify-end">
-            <Link href="/auth/forgot-password" className="text-sm text-sky-400 hover:text-sky-300 light:hover:text-sky-600">
+            <Link href="/auth/forgot-password" className="text-sm text-orange-400 hover:text-orange-300 light:hover:text-orange-500">
               Forgot password?
             </Link>
           </div>
@@ -59,7 +59,7 @@ export default function SignInPage() {
 
         <p className="text-center text-zinc-400 light:text-gray-500 text-sm mt-6">
           Don&apos;t have an account?{' '}
-          <Link href="/auth/sign-up" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">
+          <Link href="/auth/sign-up" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">
             Sign up
           </Link>
         </p>

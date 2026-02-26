@@ -38,7 +38,7 @@ export default function WantsPage() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -53,14 +53,14 @@ export default function WantsPage() {
         <div className="text-center py-16">
           <p className="text-zinc-400 light:text-gray-500 mb-4">Your want list is empty.</p>
           <p className="text-zinc-500 light:text-gray-400 text-sm mb-6">Add cards you want to buy from any card page.</p>
-          <Link href="/" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">Browse Cards</Link>
+          <Link href="/" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">Browse Cards</Link>
         </div>
       ) : (
         <div className="space-y-2">
           {items.map(item => (
             <div key={item.id} className="flex items-center justify-between p-4 rounded-lg bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200">
               <div>
-                <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-sky-400 transition-colors">
+                <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-orange-400 transition-colors">
                   {item.card_id}
                 </Link>
                 <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500 light:text-gray-400">

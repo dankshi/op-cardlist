@@ -56,7 +56,7 @@ export default function AuthButton() {
     return (
       <Link
         href="/auth/sign-in"
-        className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold transition-colors"
+        className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white text-sm font-semibold transition-colors"
       >
         Sign In
       </Link>
@@ -75,7 +75,7 @@ export default function AuthButton() {
         {avatarUrl ? (
           <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full" />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-white text-sm font-bold">
+          <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold">
             {displayName[0].toUpperCase()}
           </div>
         )}
@@ -128,14 +128,14 @@ export default function AuthButton() {
             <Link
               href="/dashboard"
               onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2 text-sm text-sky-400 hover:bg-zinc-800 light:hover:bg-gray-50"
+              className="block px-4 py-2 text-sm text-orange-400 hover:bg-zinc-800 light:hover:bg-gray-50"
             >
               Seller Dashboard
             </Link>
             <Link
               href="/sell"
               onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2 text-sm text-sky-400 hover:bg-zinc-800 light:hover:bg-gray-50"
+              className="block px-4 py-2 text-sm text-orange-400 hover:bg-zinc-800 light:hover:bg-gray-50"
             >
               Sell a Card
             </Link>

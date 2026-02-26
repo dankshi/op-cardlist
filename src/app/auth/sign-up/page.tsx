@@ -56,7 +56,7 @@ export default function SignUpPage() {
           </p>
           <Link
             href="/auth/sign-in"
-            className="inline-block mt-6 text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium"
+            className="inline-block mt-6 text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium"
           >
             Back to sign in
           </Link>
@@ -87,7 +87,7 @@ export default function SignUpPage() {
 
         <p className="text-center text-zinc-400 light:text-gray-500 text-sm mt-6">
           Already have an account?{' '}
-          <Link href="/auth/sign-in" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">
+          <Link href="/auth/sign-in" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">
             Sign in
           </Link>
         </p>

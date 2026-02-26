@@ -11,7 +11,7 @@ type FilterCategory = 'all' | ProductCategory;
 
 const CATEGORY_TABS: { value: FilterCategory; label: string; color: string }[] = [
   { value: 'all', label: 'All', color: 'bg-blue-600 text-white border-blue-600' },
-  { value: 'boosters', label: 'Boosters', color: 'bg-sky-600 text-white border-sky-600' },
+  { value: 'boosters', label: 'Boosters', color: 'bg-orange-500 text-white border-orange-500' },
   { value: 'decks', label: 'Decks', color: 'bg-blue-600 text-white border-blue-600' },
   { value: 'other', label: 'Accessories', color: 'bg-purple-600 text-white border-purple-600' },
 ];
@@ -42,7 +42,7 @@ const TAG_CONFIG: { value: ProductTag; label: string }[] = [
 ];
 
 const tagBadgeColors: Record<string, string> = {
-  'booster-packs': 'bg-sky-500/20 text-sky-400',
+  'booster-packs': 'bg-orange-500/20 text-orange-400',
   'extra-boosters': 'bg-orange-500/20 text-orange-400',
   'premium-boosters': 'bg-amber-500/20 text-amber-400',
   'starter-decks': 'bg-blue-500/20 text-blue-400',
@@ -58,7 +58,7 @@ const tagBadgeColors: Record<string, string> = {
   'card-cases': 'bg-teal-500/20 text-teal-400',
   'don-sets': 'bg-rose-500/20 text-rose-400',
   'devil-fruits': 'bg-violet-500/20 text-violet-400',
-  'tin-packs': 'bg-sky-500/20 text-sky-400',
+  'tin-packs': 'bg-orange-500/20 text-orange-400',
   binders: 'bg-indigo-500/20 text-indigo-400',
   misc: 'bg-zinc-500/20 text-zinc-400',
 };
@@ -293,7 +293,7 @@ export default function ProductGrid({ products }: ProductGridProps) {
               />
             </div>
             <div className="p-3">
-              <h3 className="font-semibold text-sm group-hover:text-sky-500 transition-colors line-clamp-2 leading-snug">
+              <h3 className="font-semibold text-sm group-hover:text-orange-500 transition-colors line-clamp-2 leading-snug">
                 {product.name}
               </h3>
               {product.msrp && (
@@ -311,7 +311,7 @@ export default function ProductGrid({ products }: ProductGridProps) {
           <p>No products found matching your filters.</p>
           <button
             onClick={clearFilters}
-            className="mt-2 text-sky-500 hover:text-sky-400 light:text-sky-600 light:hover:text-sky-700 transition-colors"
+            className="mt-2 text-orange-500 hover:text-orange-400 light:text-orange-500 light:hover:text-orange-600 transition-colors"
           >
             Clear all filters
           </button>

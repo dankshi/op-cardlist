@@ -39,7 +39,7 @@ function OnboardingCompleteContent() {
   if (status === 'checking') {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
         <p className="text-zinc-400 light:text-gray-500 mt-4">Checking your Stripe setup...</p>
       </div>
     )
@@ -57,7 +57,7 @@ function OnboardingCompleteContent() {
         <p className="text-zinc-400 light:text-gray-500 mb-8">Your Stripe account is connected. You can now receive payments.</p>
         <Link
           href="/dashboard"
-          className="px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-colors"
+          className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
         >
           Go to Dashboard
         </Link>
@@ -75,7 +75,7 @@ function OnboardingCompleteContent() {
           const data = await res.json()
           if (data.url) window.location.href = data.url
         }}
-        className="px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-colors cursor-pointer"
+        className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors cursor-pointer"
       >
         Continue Stripe Setup
       </button>
@@ -87,7 +87,7 @@ export default function OnboardingCompletePage() {
   return (
     <Suspense fallback={
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     }>
       <OnboardingCompleteContent />

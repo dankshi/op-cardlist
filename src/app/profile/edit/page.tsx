@@ -71,7 +71,7 @@ export default function EditProfilePage() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -102,7 +102,7 @@ export default function EditProfilePage() {
               type="text"
               defaultValue={profile.display_name || ''}
               required
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
             />
           </div>
 
@@ -121,7 +121,7 @@ export default function EditProfilePage() {
                 defaultValue={profile.username || ''}
                 placeholder="your-username"
                 pattern="[a-z0-9_\-]{3,30}"
-                className="w-full px-4 py-3 rounded-r-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-3 rounded-r-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
               />
             </div>
             <p className="mt-1 text-xs text-zinc-500 light:text-gray-400">This will be your seller storefront URL</p>
@@ -137,7 +137,7 @@ export default function EditProfilePage() {
               rows={4}
               defaultValue={profile.bio || ''}
               placeholder="Tell buyers about yourself..."
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors resize-none"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors resize-none"
             />
           </div>
 

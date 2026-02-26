@@ -38,7 +38,7 @@ export default function OrdersPage() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -50,7 +50,7 @@ export default function OrdersPage() {
       {orders.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-zinc-400 light:text-gray-500 mb-4">You haven&apos;t placed any orders yet.</p>
-          <Link href="/" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">Browse cards</Link>
+          <Link href="/" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">Browse cards</Link>
         </div>
       ) : (
         <div className="space-y-3">

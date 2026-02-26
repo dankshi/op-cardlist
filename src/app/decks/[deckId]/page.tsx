@@ -66,7 +66,7 @@ export default function DeckViewPage() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -76,7 +76,7 @@ export default function DeckViewPage() {
       <div className="max-w-3xl mx-auto text-center py-20">
         <h1 className="text-2xl font-bold text-zinc-100 light:text-gray-900 mb-4">Deck not found</h1>
         <p className="text-zinc-400 light:text-gray-500 mb-6">This deck may be private or doesn&apos;t exist.</p>
-        <Link href="/decks" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">Browse Decks</Link>
+        <Link href="/decks" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">Browse Decks</Link>
       </div>
     )
   }
@@ -97,7 +97,7 @@ export default function DeckViewPage() {
           {deck.user && (
             <p className="text-sm text-zinc-400 light:text-gray-500 mt-1">
               by{' '}
-              <Link href={`/seller/${(deck.user as { username: string }).username}`} className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600">
+              <Link href={`/seller/${(deck.user as { username: string }).username}`} className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500">
                 {(deck.user as { display_name: string }).display_name}
               </Link>
             </p>
@@ -117,7 +117,7 @@ export default function DeckViewPage() {
       {deck.leader_card_id && (
         <div className="p-4 bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg mb-6">
           <h3 className="text-sm font-medium text-zinc-400 light:text-gray-500 mb-2">Leader</h3>
-          <Link href={`/card/${deck.leader_card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-sky-400 transition-colors">
+          <Link href={`/card/${deck.leader_card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-orange-400 transition-colors">
             {deck.leader_card_id}
           </Link>
         </div>
@@ -147,8 +147,8 @@ export default function DeckViewPage() {
             {mainDeck.map(card => (
               <div key={card.id} className="flex items-center justify-between px-3 py-2 rounded bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200">
                 <div className="flex items-center gap-2">
-                  <span className="text-sky-400 font-mono text-sm">{card.quantity}x</span>
-                  <Link href={`/card/${card.card_id.toLowerCase()}`} className="text-zinc-100 light:text-gray-900 text-sm hover:text-sky-400 transition-colors">
+                  <span className="text-orange-400 font-mono text-sm">{card.quantity}x</span>
+                  <Link href={`/card/${card.card_id.toLowerCase()}`} className="text-zinc-100 light:text-gray-900 text-sm hover:text-orange-400 transition-colors">
                     {card.card_id}
                   </Link>
                 </div>
@@ -166,8 +166,8 @@ export default function DeckViewPage() {
             {sideboard.map(card => (
               <div key={card.id} className="flex items-center justify-between px-3 py-2 rounded bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200">
                 <div className="flex items-center gap-2">
-                  <span className="text-sky-400 font-mono text-sm">{card.quantity}x</span>
-                  <Link href={`/card/${card.card_id.toLowerCase()}`} className="text-zinc-100 light:text-gray-900 text-sm hover:text-sky-400 transition-colors">
+                  <span className="text-orange-400 font-mono text-sm">{card.quantity}x</span>
+                  <Link href={`/card/${card.card_id.toLowerCase()}`} className="text-zinc-100 light:text-gray-900 text-sm hover:text-orange-400 transition-colors">
                     {card.card_id}
                   </Link>
                 </div>

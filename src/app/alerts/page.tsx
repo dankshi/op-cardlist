@@ -42,7 +42,7 @@ export default function AlertsPage() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -55,19 +55,19 @@ export default function AlertsPage() {
         <div className="text-center py-16">
           <p className="text-zinc-400 light:text-gray-500 mb-4">No price alerts set.</p>
           <p className="text-zinc-500 light:text-gray-400 text-sm mb-6">Set alerts on card pages to be notified when prices change.</p>
-          <Link href="/" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">Browse Cards</Link>
+          <Link href="/" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">Browse Cards</Link>
         </div>
       ) : (
         <div className="space-y-2">
           {alerts.map(alert => (
             <div key={alert.id} className={`flex items-center justify-between p-4 rounded-lg bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 ${!alert.is_active ? 'opacity-50' : ''}`}>
               <div>
-                <Link href={`/card/${alert.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-sky-400 transition-colors">
+                <Link href={`/card/${alert.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-orange-400 transition-colors">
                   {alert.card_id}
                 </Link>
                 <p className="text-sm text-zinc-400 light:text-gray-500 mt-1">
                   Alert when price {alert.alert_type === 'below' ? 'drops below' : alert.alert_type === 'above' ? 'rises above' : 'changes'}{' '}
-                  <span className="text-sky-400 font-medium">${Number(alert.target_price).toFixed(2)}</span>
+                  <span className="text-orange-400 font-medium">${Number(alert.target_price).toFixed(2)}</span>
                 </p>
               </div>
               <div className="flex items-center gap-3">

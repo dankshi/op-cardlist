@@ -225,7 +225,7 @@ export function SearchHero() {
             loadIndex();
           }}
           onKeyDown={handleKeyDown}
-          className="w-full pl-14 pr-20 py-4 text-lg bg-zinc-900/80 light:bg-white/80 backdrop-blur-xl border border-zinc-700/50 light:border-zinc-300/50 rounded-2xl text-white light:text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:border-sky-500/50 focus:ring-2 focus:ring-sky-500/20 shadow-2xl shadow-black/20 light:shadow-zinc-300/30 transition-all"
+          className="w-full pl-14 pr-20 py-4 text-lg bg-zinc-900/80 light:bg-white/80 backdrop-blur-xl border border-zinc-700/50 light:border-zinc-300/50 rounded-2xl text-white light:text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 shadow-2xl shadow-black/20 light:shadow-zinc-300/30 transition-all"
         />
 
         {/* Keyboard shortcut hint */}
@@ -286,8 +286,8 @@ export function SearchHero() {
                           className="w-10 h-14 object-contain rounded flex-shrink-0 bg-white"
                         />
                       ) : (
-                        <div className="w-10 h-14 rounded flex-shrink-0 bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-                          <svg className="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <div className="w-10 h-14 rounded flex-shrink-0 bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                           </svg>
                         </div>
@@ -300,7 +300,7 @@ export function SearchHero() {
                           Set &middot; {set.cardCount} cards
                         </p>
                       </div>
-                      <span className="text-sky-400 text-xs font-medium flex-shrink-0 px-2 py-0.5 bg-sky-500/10 rounded">
+                      <span className="text-orange-400 text-xs font-medium flex-shrink-0 px-2 py-0.5 bg-orange-500/10 rounded">
                         VIEW SET
                       </span>
                     </Link>
@@ -344,7 +344,7 @@ export function SearchHero() {
               })}
               <Link
                 href={`/search?q=${encodeURIComponent(query)}`}
-                className="block px-4 py-3 text-sm text-center text-sky-400 light:text-sky-600 hover:text-sky-300 light:hover:text-sky-700 hover:bg-zinc-800/50 light:hover:bg-zinc-50 border-t border-zinc-800 light:border-zinc-200 transition-colors"
+                className="block px-4 py-3 text-sm text-center text-orange-400 light:text-orange-500 hover:text-orange-300 light:hover:text-orange-600 hover:bg-zinc-800/50 light:hover:bg-zinc-50 border-t border-zinc-800 light:border-zinc-200 transition-colors"
                 onClick={() => setIsOpen(false)}
               >
                 View all results for &ldquo;{query}&rdquo;

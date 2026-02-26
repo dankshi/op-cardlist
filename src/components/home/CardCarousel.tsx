@@ -72,7 +72,7 @@ export function CardCarousel({
         {viewAllHref && (
           <Link
             href={viewAllHref}
-            className="text-sm text-sky-500 light:text-sky-600 hover:text-sky-400 light:hover:text-sky-700 transition-colors flex-shrink-0"
+            className="text-sm text-orange-500 light:text-orange-500 hover:text-orange-400 light:hover:text-orange-600 transition-colors flex-shrink-0"
           >
             View all &rarr;
           </Link>
@@ -120,7 +120,7 @@ export function CardCarousel({
             >
               <CardThumbnail card={card} />
               <div className="mt-2">
-                <p className="text-sm font-medium truncate group-hover/card:text-sky-500 transition-colors">
+                <p className="text-sm font-medium truncate group-hover/card:text-orange-500 transition-colors">
                   {card.name}
                 </p>
                 <p className="text-xs text-zinc-500">{card.id}</p>

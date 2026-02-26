@@ -107,7 +107,7 @@ export default function EditListingPage() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -122,7 +122,7 @@ export default function EditListingPage() {
 
       <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-2">Edit Listing</h1>
       <p className="text-zinc-400 light:text-gray-500 mb-8">
-        <Link href={`/card/${listing.card_id.toLowerCase()}`} className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600">
+        <Link href={`/card/${listing.card_id.toLowerCase()}`} className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500">
           {listing.title || listing.card_id}
         </Link>
       </p>
@@ -132,7 +132,7 @@ export default function EditListingPage() {
           <p className="text-yellow-400 text-sm">This listing is delisted and not visible to buyers.</p>
           <button
             onClick={relistListing}
-            className="px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors cursor-pointer"
+            className="px-3 py-1 rounded bg-orange-500 hover:bg-orange-500 text-white text-sm font-medium transition-colors cursor-pointer"
           >
             Relist
           </button>
@@ -224,7 +224,7 @@ export default function EditListingPage() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold transition-colors cursor-pointer disabled:opacity-50"
+              className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors cursor-pointer disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>

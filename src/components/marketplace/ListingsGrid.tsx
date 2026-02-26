@@ -60,7 +60,7 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
             onClick={() => setConditionFilter(c.value)}
             className={`px-3 py-1 rounded-lg text-sm transition-colors cursor-pointer ${
               conditionFilter === c.value
-                ? 'bg-sky-600 text-white'
+                ? 'bg-orange-500 text-white'
                 : 'bg-zinc-800 light:bg-gray-100 text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
             }`}
           >

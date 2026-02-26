@@ -25,7 +25,7 @@ export default async function ProfilePage() {
         <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900">My Profile</h1>
         <Link
           href="/profile/edit"
-          className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold transition-colors"
+          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white text-sm font-semibold transition-colors"
         >
           Edit Profile
         </Link>
@@ -36,7 +36,7 @@ export default async function ProfilePage() {
           {profile.avatar_url ? (
             <img src={profile.avatar_url} alt="" className="w-20 h-20 rounded-full" />
           ) : (
-            <div className="w-20 h-20 rounded-full bg-sky-600 flex items-center justify-center text-white text-2xl font-bold">
+            <div className="w-20 h-20 rounded-full bg-orange-500 flex items-center justify-center text-white text-2xl font-bold">
               {(profile.display_name || 'U')[0].toUpperCase()}
             </div>
           )}
@@ -82,10 +82,10 @@ export default async function ProfilePage() {
         </div>
 
         {!profile.is_seller && (
-          <div className="mt-6 p-4 bg-sky-500/5 border border-sky-500/20 rounded-lg">
+          <div className="mt-6 p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg">
             <p className="text-zinc-300 light:text-gray-600 text-sm">
               Want to sell cards on NOMI Market?{' '}
-              <Link href="/seller/apply" className="text-sky-400 hover:text-sky-300 light:hover:text-sky-600 font-medium">
+              <Link href="/seller/apply" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">
                 Become a seller
               </Link>
             </p>

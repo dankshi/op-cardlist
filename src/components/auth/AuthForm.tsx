@@ -82,7 +82,7 @@ export function FormInput({
         placeholder={placeholder}
         required={required}
         autoComplete={autoComplete}
-        className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-colors"
+        className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
       />
     </div>
   )
@@ -93,7 +93,7 @@ export function SubmitButton({ children, pending }: { children: React.ReactNode;
     <button
       type="submit"
       disabled={pending}
-      className="w-full px-4 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:bg-sky-800 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer"
+      className="w-full px-4 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 disabled:bg-orange-700 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer"
     >
       {pending ? (
         <span className="flex items-center justify-center gap-2">

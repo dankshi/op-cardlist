@@ -22,7 +22,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
           {seller && (
             <Link
               href={seller.username ? `/seller/${seller.username}` : '#'}
-              className="text-sm text-zinc-400 light:text-gray-500 hover:text-sky-400 transition-colors"
+              className="text-sm text-zinc-400 light:text-gray-500 hover:text-orange-400 transition-colors"
             >
               {seller.display_name || 'Unknown Seller'}
               {seller.rating_count > 0 && (
