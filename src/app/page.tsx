@@ -8,8 +8,8 @@ import { CardCarousel } from "@/components/home/CardCarousel";
 import type { Card } from "@/types/card";
 
 export const metadata: Metadata = {
-  title: { absolute: "nomi market — Buy & Sell One Piece TCG Cards" },
-  description: `The marketplace for One Piece TCG. Buy, sell, and trade authenticated cards with daily market prices across every set.`,
+  title: { absolute: "nomi market — The Trusted One Piece TCG Marketplace" },
+  description: `Buy and sell authenticated One Piece TCG cards. Every order verified in-hand from Los Angeles before it ships. Daily market prices across every set.`,
   keywords: [...BASE_KEYWORDS, "NOMI Market", "nomimarket", "buy sell cards", "marketplace", "OP-13", "EB-03", "price guide"],
   alternates: {
     canonical: SITE_URL,
@@ -55,57 +55,25 @@ export default async function Home() {
   return (
     <div>
       {/* ===== HERO SECTION ===== */}
-      <section className="hero-gradient relative -mx-4 px-4 pt-8 pb-16 sm:pt-12 sm:pb-20 mb-12 sm:mb-16">
-        {/* Subtle dot pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.015]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle, currentColor 1px, transparent 1px)",
-            backgroundSize: "24px 24px",
-          }}
-        />
-
-        <div className="relative max-w-3xl mx-auto text-center">
-          {/* Heading */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-4 sm:mb-6">
-            Buy &amp; sell TCG cards.
-            <span className="block text-zinc-400">
-              Verified. Priced. Simple.
-            </span>
+      <section className="pt-12 pb-16 sm:pt-16 sm:pb-20 mb-12 sm:mb-16">
+        <div className="max-w-2xl mx-auto text-center">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-6">
+            The trusted marketplace for One Piece TCG.
           </h1>
 
-          {/* Subtitle */}
-          <p className="text-lg sm:text-xl text-zinc-600 mb-8 sm:mb-10 max-w-lg mx-auto leading-relaxed">
-            The marketplace for One Piece TCG. Every card authenticated,
-            every price tracked.
+          <p className="text-lg text-zinc-500 mb-10 max-w-lg mx-auto leading-relaxed">
+            Every order authenticated. Every card verified in-hand
+            from Los Angeles, CA before it ships.
           </p>
 
-          {/* Search Bar */}
           <SearchHero />
 
-          {/* Stats row */}
-          <div className="flex items-center justify-center gap-6 sm:gap-8 mt-8 text-sm text-zinc-500">
-            <div className="text-center">
-              <p className="text-lg sm:text-xl font-bold text-zinc-800">
-                {totalCards.toLocaleString()}+
-              </p>
-              <p>Listed cards</p>
-            </div>
-            <div className="w-px h-8 bg-zinc-200" />
-            <div className="text-center">
-              <p className="text-lg sm:text-xl font-bold text-zinc-800">
-                {sets.length}
-              </p>
-              <p>Sets</p>
-            </div>
-            <div className="w-px h-8 bg-zinc-200" />
-            <div className="text-center">
-              <p className="text-lg sm:text-xl font-bold text-zinc-800">
-                Daily
-              </p>
-              <p>Prices</p>
-            </div>
+          <div className="flex items-center justify-center gap-8 mt-10 text-sm text-zinc-400">
+            <span>{totalCards.toLocaleString()}+ cards</span>
+            <span className="text-zinc-300">|</span>
+            <span>{sets.length} sets</span>
+            <span className="text-zinc-300">|</span>
+            <span>Daily prices</span>
           </div>
         </div>
       </section>
