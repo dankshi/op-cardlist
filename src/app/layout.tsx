@@ -128,8 +128,7 @@ export default function RootLayout({
               <p>
                 <span className="font-black text-zinc-900">nomi</span>{" "}<span className="font-medium text-zinc-500">market</span>
               </p>
-              <p>Based in Los Angeles, CA</p>
-              <p className="text-zinc-400">One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
+              <p>Authenticated cards. Fair prices. Based in Los Angeles, CA.</p>
             </div>
           </footer>
       </body>
