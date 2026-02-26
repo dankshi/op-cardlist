@@ -38,12 +38,12 @@ export default async function SearchPage({ searchParams }: PageProps) {
       <nav className="text-sm text-zinc-500 mb-6">
         <Link
           href="/"
-          className="hover:text-white light:hover:text-zinc-900 transition-colors"
+          className="hover:text-zinc-900 transition-colors"
         >
           Home
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-white light:text-zinc-900">Search</span>
+        <span className="text-zinc-900">Search</span>
       </nav>
 
       <header className="mb-8">

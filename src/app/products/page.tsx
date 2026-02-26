@@ -23,17 +23,17 @@ export default function ProductsPage() {
     <div>
       <section className="mb-8">
         <h1 className="text-4xl font-bold mb-4">Products</h1>
-        <p className="text-zinc-400 light:text-zinc-600 text-lg mb-4">
+        <p className="text-zinc-600 text-lg mb-4">
           Browse {products.length} official One Piece TCG products.
         </p>
         <div className="flex flex-wrap gap-3 text-sm">
-          <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full text-zinc-300 light:text-zinc-700">
+          <span className="px-3 py-1 bg-zinc-100 rounded-full text-zinc-700">
             {boosterCount} Boosters
           </span>
-          <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full text-zinc-300 light:text-zinc-700">
+          <span className="px-3 py-1 bg-zinc-100 rounded-full text-zinc-700">
             {deckCount} Decks
           </span>
-          <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full text-zinc-300 light:text-zinc-700">
+          <span className="px-3 py-1 bg-zinc-100 rounded-full text-zinc-700">
             {otherCount} Accessories
           </span>
         </div>

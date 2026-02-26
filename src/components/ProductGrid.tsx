@@ -72,7 +72,7 @@ function getBadgeColor(product: Product): string {
   return tagBadgeColors[product.tag] ?? tagBadgeColors.misc;
 }
 
-const unselectedClass = "bg-zinc-800 dark:bg-zinc-800 light:bg-zinc-100 text-zinc-400 dark:text-zinc-400 light:text-zinc-600 border-zinc-700 dark:border-zinc-700 light:border-zinc-300 hover:border-zinc-500 dark:hover:border-zinc-500 light:hover:border-zinc-400";
+const unselectedClass = "bg-zinc-100 text-zinc-600 border-zinc-200 hover:border-zinc-400";
 const selectedClass = "bg-blue-600 text-white border-blue-600";
 
 type SortOption = 'newest' | 'oldest' | 'name-asc' | 'price-asc';
@@ -174,12 +174,12 @@ export default function ProductGrid({ products }: ProductGridProps) {
             placeholder="Search products by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-3 bg-zinc-900 dark:bg-zinc-900 light:bg-white border border-zinc-800 dark:border-zinc-800 light:border-zinc-300 rounded-lg text-white dark:text-white light:text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 dark:focus:border-zinc-600 light:focus:border-zinc-400 transition-colors"
+            className="w-full px-4 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 focus:border-zinc-400 transition-colors"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white dark:hover:text-white light:hover:text-zinc-900"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-900"
             >
               &times;
             </button>
@@ -266,7 +266,7 @@ export default function ProductGrid({ products }: ProductGridProps) {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="text-sm text-zinc-400 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors"
+              className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
             >
               Clear filters
             </button>
@@ -282,7 +282,7 @@ export default function ProductGrid({ products }: ProductGridProps) {
             href={product.detailUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="block bg-zinc-900 light:bg-white rounded-lg border border-zinc-800 light:border-zinc-200 hover:border-zinc-700 light:hover:border-zinc-300 hover:bg-zinc-800/50 light:hover:bg-zinc-50 transition-all group overflow-hidden"
+            className="block bg-white rounded-lg border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition-all group overflow-hidden"
           >
             <div className="relative w-full aspect-square bg-white">
               <img
@@ -311,7 +311,7 @@ export default function ProductGrid({ products }: ProductGridProps) {
           <p>No products found matching your filters.</p>
           <button
             onClick={clearFilters}
-            className="mt-2 text-orange-500 hover:text-orange-400 light:text-orange-500 light:hover:text-orange-600 transition-colors"
+            className="mt-2 text-orange-500 hover:text-orange-600 transition-colors"
           >
             Clear all filters
           </button>

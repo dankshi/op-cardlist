@@ -55,7 +55,7 @@ export default function DecksPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900">Decks</h1>
+        <h1 className="text-3xl font-bold text-zinc-900">Decks</h1>
         <Link
           href="/decks/new"
           className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
@@ -65,11 +65,11 @@ export default function DecksPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-zinc-800 light:border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-zinc-200">
         <button
           onClick={() => setTab('my')}
           className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-            tab === 'my' ? 'text-orange-400 border-b-2 border-orange-400' : 'text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
+            tab === 'my' ? 'text-orange-400 border-b-2 border-orange-400' : 'text-zinc-500 hover:text-zinc-700'
           }`}
         >
           My Decks
@@ -77,7 +77,7 @@ export default function DecksPage() {
         <button
           onClick={() => setTab('public')}
           className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-            tab === 'public' ? 'text-orange-400 border-b-2 border-orange-400' : 'text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
+            tab === 'public' ? 'text-orange-400 border-b-2 border-orange-400' : 'text-zinc-500 hover:text-zinc-700'
           }`}
         >
           Public Decks
@@ -86,11 +86,11 @@ export default function DecksPage() {
 
       {decks.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-zinc-400 light:text-gray-500 mb-4">
+          <p className="text-zinc-500 mb-4">
             {tab === 'my' ? "You haven't created any decks yet." : 'No public decks available.'}
           </p>
           {tab === 'my' && (
-            <Link href="/decks/new" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">
+            <Link href="/decks/new" className="text-orange-400 hover:text-orange-600 font-medium">
               Create your first deck
             </Link>
           )}
@@ -101,17 +101,17 @@ export default function DecksPage() {
             <Link
               key={deck.id}
               href={`/decks/${deck.id}`}
-              className="block p-4 rounded-lg bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 hover:border-zinc-700 light:hover:border-gray-300 transition-colors"
+              className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
             >
-              <h3 className="font-medium text-zinc-100 light:text-gray-900">{deck.name}</h3>
-              {deck.description && <p className="text-sm text-zinc-400 light:text-gray-500 mt-1 line-clamp-2">{deck.description}</p>}
-              <div className="flex items-center gap-4 mt-3 text-xs text-zinc-500 light:text-gray-400">
+              <h3 className="font-medium text-zinc-900">{deck.name}</h3>
+              {deck.description && <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{deck.description}</p>}
+              <div className="flex items-center gap-4 mt-3 text-xs text-zinc-500">
                 {deck.leader_card_id && <span>Leader: {deck.leader_card_id}</span>}
                 <span>{deck.view_count} views</span>
                 {deck.is_public && <span className="text-green-400">Public</span>}
               </div>
               {tab === 'public' && deck.user && (
-                <p className="text-xs text-zinc-500 light:text-gray-400 mt-2">
+                <p className="text-xs text-zinc-500 mt-2">
                   by {(deck.user as { display_name: string }).display_name}
                 </p>
               )}

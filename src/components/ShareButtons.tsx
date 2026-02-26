@@ -68,7 +68,7 @@ export function ShareButtons({ card }: ShareButtonsProps) {
       {/* Twitter/X */}
       <button
         onClick={handleTwitterShare}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 light:bg-zinc-200 light:hover:bg-zinc-300 rounded-lg text-sm transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 rounded-lg text-sm transition-colors"
         title="Share on X/Twitter"
       >
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -80,7 +80,7 @@ export function ShareButtons({ card }: ShareButtonsProps) {
       {/* Discord */}
       <button
         onClick={handleDiscordCopy}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 light:bg-zinc-200 light:hover:bg-zinc-300 rounded-lg text-sm transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 rounded-lg text-sm transition-colors"
         title="Copy for Discord"
       >
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -92,7 +92,7 @@ export function ShareButtons({ card }: ShareButtonsProps) {
       {/* WhatsApp */}
       <button
         onClick={handleWhatsAppShare}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 light:bg-zinc-200 light:hover:bg-zinc-300 rounded-lg text-sm transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 rounded-lg text-sm transition-colors"
         title="Share on WhatsApp"
       >
         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -116,7 +116,7 @@ export function ShareButtons({ card }: ShareButtonsProps) {
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
           embedCopied
             ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-            : 'bg-zinc-800 hover:bg-zinc-700 light:bg-zinc-200 light:hover:bg-zinc-300'
+            : 'bg-zinc-200 hover:bg-zinc-300'
         }`}
         title="Copy embed code"
       >
@@ -143,7 +143,7 @@ export function ShareButtons({ card }: ShareButtonsProps) {
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
           copied
             ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-            : 'bg-zinc-800 hover:bg-zinc-700 light:bg-zinc-200 light:hover:bg-zinc-300'
+            : 'bg-zinc-200 hover:bg-zinc-300'
         }`}
         title="Copy link"
       >

@@ -17,12 +17,12 @@ export default async function CheckoutSuccessPage({ searchParams }: { searchPara
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       </div>
-      <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-3">Order Confirmed!</h1>
-      <p className="text-zinc-400 light:text-gray-500 mb-8">
+      <h1 className="text-3xl font-bold text-zinc-900 mb-3">Order Confirmed!</h1>
+      <p className="text-zinc-500 mb-8">
         Your payment was successful. The seller has been notified and will ship your order soon.
       </p>
       {orderId && (
-        <p className="text-sm text-zinc-500 light:text-gray-400 mb-6">Order ID: {orderId.slice(0, 8)}...</p>
+        <p className="text-sm text-zinc-500 mb-6">Order ID: {orderId.slice(0, 8)}...</p>
       )}
       <div className="flex gap-4 justify-center">
         <Link
@@ -33,7 +33,7 @@ export default async function CheckoutSuccessPage({ searchParams }: { searchPara
         </Link>
         <Link
           href="/"
-          className="px-6 py-3 rounded-lg border border-zinc-700 light:border-gray-300 text-zinc-300 light:text-gray-600 hover:bg-zinc-800 light:hover:bg-gray-50 transition-colors"
+          className="px-6 py-3 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors"
         >
           Continue Shopping
         </Link>

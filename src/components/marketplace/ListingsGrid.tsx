@@ -44,7 +44,7 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-20 rounded-lg bg-zinc-800 light:bg-gray-100 animate-pulse" />
+          <div key={i} className="h-20 rounded-lg bg-zinc-100 animate-pulse" />
         ))}
       </div>
     )
@@ -61,7 +61,7 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
             className={`px-3 py-1 rounded-lg text-sm transition-colors cursor-pointer ${
               conditionFilter === c.value
                 ? 'bg-orange-500 text-white'
-                : 'bg-zinc-800 light:bg-gray-100 text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
+                : 'bg-zinc-100 text-zinc-500 hover:text-zinc-700'
             }`}
           >
             {c.label}
@@ -70,7 +70,7 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
       </div>
 
       {listings.length === 0 ? (
-        <div className="text-center py-8 text-zinc-500 light:text-gray-400">
+        <div className="text-center py-8 text-zinc-500">
           <p>No listings available for this card yet.</p>
           <p className="text-sm mt-1">Be the first to list it!</p>
         </div>

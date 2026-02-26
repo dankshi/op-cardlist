@@ -40,7 +40,7 @@ function OnboardingCompleteContent() {
     return (
       <div className="py-20 text-center">
         <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-zinc-400 light:text-gray-500 mt-4">Checking your Stripe setup...</p>
+        <p className="text-zinc-500 mt-4">Checking your Stripe setup...</p>
       </div>
     )
   }
@@ -53,8 +53,8 @@ function OnboardingCompleteContent() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-3">You&apos;re all set!</h1>
-        <p className="text-zinc-400 light:text-gray-500 mb-8">Your Stripe account is connected. You can now receive payments.</p>
+        <h1 className="text-3xl font-bold text-zinc-900 mb-3">You&apos;re all set!</h1>
+        <p className="text-zinc-500 mb-8">Your Stripe account is connected. You can now receive payments.</p>
         <Link
           href="/dashboard"
           className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
@@ -67,8 +67,8 @@ function OnboardingCompleteContent() {
 
   return (
     <div className="max-w-lg mx-auto text-center py-20">
-      <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-3">Almost there!</h1>
-      <p className="text-zinc-400 light:text-gray-500 mb-8">Your Stripe setup isn&apos;t complete yet. Please finish setting up your account.</p>
+      <h1 className="text-3xl font-bold text-zinc-900 mb-3">Almost there!</h1>
+      <p className="text-zinc-500 mb-8">Your Stripe setup isn&apos;t complete yet. Please finish setting up your account.</p>
       <button
         onClick={async () => {
           const res = await fetch('/api/stripe/connect', { method: 'POST' })

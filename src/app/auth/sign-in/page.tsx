@@ -34,10 +34,10 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center">
-      <div className="w-full max-w-md p-8 rounded-2xl bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200">
+      <div className="w-full max-w-md p-8 rounded-2xl bg-white border border-zinc-200">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-zinc-100 light:text-gray-900">Welcome back</h1>
-          <p className="text-zinc-400 light:text-gray-500 mt-2">Sign in to your NOMI Market account</p>
+          <h1 className="text-2xl font-bold text-zinc-900">Welcome back</h1>
+          <p className="text-zinc-500 mt-2">Sign in to your NOMI Market account</p>
         </div>
 
         <OAuthButtons />
@@ -49,7 +49,7 @@ export default function SignInPage() {
           <FormInput label="Password" type="password" name="password" placeholder="Your password" autoComplete="current-password" />
 
           <div className="flex justify-end">
-            <Link href="/auth/forgot-password" className="text-sm text-orange-400 hover:text-orange-300 light:hover:text-orange-500">
+            <Link href="/auth/forgot-password" className="text-sm text-orange-400 hover:text-orange-600">
               Forgot password?
             </Link>
           </div>
@@ -57,9 +57,9 @@ export default function SignInPage() {
           <SubmitButton pending={pending}>Sign In</SubmitButton>
         </form>
 
-        <p className="text-center text-zinc-400 light:text-gray-500 text-sm mt-6">
+        <p className="text-center text-zinc-500 text-sm mt-6">
           Don&apos;t have an account?{' '}
-          <Link href="/auth/sign-up" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">
+          <Link href="/auth/sign-up" className="text-orange-400 hover:text-orange-600 font-medium">
             Sign up
           </Link>
         </p>

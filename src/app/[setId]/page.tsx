@@ -115,46 +115,46 @@ export default async function SetPage({ params }: PageProps) {
     <div>
       {/* Breadcrumb */}
       <nav className="text-sm text-zinc-500 mb-6">
-        <Link href="/" className="hover:text-white light:hover:text-zinc-900 transition-colors">
+        <Link href="/" className="hover:text-zinc-900 transition-colors">
           Home
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-white light:text-zinc-900">{set.id.toUpperCase()}</span>
+        <span className="text-zinc-900">{set.id.toUpperCase()}</span>
       </nav>
 
       {/* Header */}
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{set.id.toUpperCase()} ({set.id.replace('-', '').toUpperCase()}) {shortName} Card List</h1>
         <div className="flex items-center gap-3 mb-4">
-          <p className="text-zinc-400 light:text-zinc-600">{set.name}</p>
-          <span className="text-xs text-zinc-600 light:text-zinc-400">·</span>
-          <p className="text-xs text-zinc-600 light:text-zinc-400">
+          <p className="text-zinc-600">{set.name}</p>
+          <span className="text-xs text-zinc-500">·</span>
+          <p className="text-xs text-zinc-500">
             Prices updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
 
         {/* Quick Stats */}
         <div className="flex flex-wrap gap-4 text-sm">
-          <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
+          <span className="px-3 py-1 bg-zinc-100 rounded-full">
             {set.cardCount} cards
           </span>
           {leaders > 0 && (
-            <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
+            <span className="px-3 py-1 bg-zinc-100 rounded-full">
               {leaders} Leaders
             </span>
           )}
           {characters > 0 && (
-            <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
+            <span className="px-3 py-1 bg-zinc-100 rounded-full">
               {characters} Characters
             </span>
           )}
           {events > 0 && (
-            <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
+            <span className="px-3 py-1 bg-zinc-100 rounded-full">
               {events} Events
             </span>
           )}
           {stages > 0 && (
-            <span className="px-3 py-1 bg-zinc-800 light:bg-zinc-100 rounded-full">
+            <span className="px-3 py-1 bg-zinc-100 rounded-full">
               {stages} Stages
             </span>
           )}

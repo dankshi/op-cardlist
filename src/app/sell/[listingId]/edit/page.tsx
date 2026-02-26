@@ -116,19 +116,19 @@ export default function EditListingPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <Link href="/dashboard" className="text-sm text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700 mb-4 inline-block">
+      <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
         &larr; Back to Dashboard
       </Link>
 
-      <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-2">Edit Listing</h1>
-      <p className="text-zinc-400 light:text-gray-500 mb-8">
-        <Link href={`/card/${listing.card_id.toLowerCase()}`} className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500">
+      <h1 className="text-3xl font-bold text-zinc-900 mb-2">Edit Listing</h1>
+      <p className="text-zinc-500 mb-8">
+        <Link href={`/card/${listing.card_id.toLowerCase()}`} className="text-orange-400 hover:text-orange-600">
           {listing.title || listing.card_id}
         </Link>
       </p>
 
       {listing.status === 'delisted' && (
-        <div className="p-4 bg-zinc-900 light:bg-white border border-yellow-600/30 light:border-yellow-200 rounded-lg mb-6 flex items-center justify-between">
+        <div className="p-4 bg-white border border-yellow-200 rounded-lg mb-6 flex items-center justify-between">
           <p className="text-yellow-400 text-sm">This listing is delisted and not visible to buyers.</p>
           <button
             onClick={relistListing}
@@ -140,25 +140,25 @@ export default function EditListingPage() {
       )}
 
       {listing.status === 'sold' && (
-        <div className="p-4 bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg mb-6">
-          <p className="text-zinc-400 light:text-gray-500 text-sm">This listing has been sold and cannot be edited.</p>
+        <div className="p-4 bg-white border border-zinc-200 rounded-lg mb-6">
+          <p className="text-zinc-500 text-sm">This listing has been sold and cannot be edited.</p>
         </div>
       )}
 
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 light:border-red-200 text-red-400 text-sm mb-6">
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-200 text-red-400 text-sm mb-6">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">Condition</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1.5">Condition</label>
           <select
             value={condition}
             onChange={e => setCondition(e.target.value as CardCondition)}
             disabled={listing.status === 'sold'}
-            className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 disabled:opacity-50"
+            className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 disabled:opacity-50"
           >
             {Object.entries(CONDITION_LABELS).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
@@ -168,7 +168,7 @@ export default function EditListingPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">Price ($)</label>
+            <label className="block text-sm font-medium text-zinc-600 mb-1.5">Price ($)</label>
             <input
               type="number"
               step="0.01"
@@ -177,11 +177,11 @@ export default function EditListingPage() {
               onChange={e => setPrice(e.target.value)}
               disabled={listing.status === 'sold'}
               required
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 disabled:opacity-50"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 disabled:opacity-50"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">Quantity Available</label>
+            <label className="block text-sm font-medium text-zinc-600 mb-1.5">Quantity Available</label>
             <input
               type="number"
               min="1"
@@ -189,18 +189,18 @@ export default function EditListingPage() {
               onChange={e => setQuantity(e.target.value)}
               disabled={listing.status === 'sold'}
               required
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 disabled:opacity-50"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 disabled:opacity-50"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">Language</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1.5">Language</label>
           <select
             value={language}
             onChange={e => setLanguage(e.target.value)}
             disabled={listing.status === 'sold'}
-            className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 disabled:opacity-50"
+            className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 disabled:opacity-50"
           >
             <option value="EN">English</option>
             <option value="JP">Japanese</option>
@@ -208,14 +208,14 @@ export default function EditListingPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">Description (optional)</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1.5">Description (optional)</label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
             rows={3}
             disabled={listing.status === 'sold'}
             placeholder="Any additional details..."
-            className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 resize-none disabled:opacity-50"
+            className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 resize-none disabled:opacity-50"
           />
         </div>
 
@@ -233,7 +233,7 @@ export default function EditListingPage() {
             <button
               type="button"
               onClick={delistListing}
-              className="px-6 py-3 rounded-lg border border-red-800 light:border-red-300 text-red-400 hover:bg-red-500/10 light:hover:bg-red-50 font-semibold transition-colors cursor-pointer"
+              className="px-6 py-3 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 font-semibold transition-colors cursor-pointer"
             >
               Delist
             </button>

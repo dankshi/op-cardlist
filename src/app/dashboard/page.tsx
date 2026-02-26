@@ -69,7 +69,7 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900">Seller Dashboard</h1>
+        <h1 className="text-3xl font-bold text-zinc-900">Seller Dashboard</h1>
         <Link
           href="/sell"
           className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
@@ -98,15 +98,15 @@ export default function DashboardPage() {
           { label: 'Total Sales', value: profile?.total_sales || 0 },
           { label: 'Revenue', value: `$${revenue.toFixed(2)}` },
         ].map(stat => (
-          <div key={stat.label} className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4 text-center">
-            <p className="text-2xl font-bold text-zinc-100 light:text-gray-900">{stat.value}</p>
-            <p className="text-xs text-zinc-400 light:text-gray-500">{stat.label}</p>
+          <div key={stat.label} className="bg-white border border-zinc-200 rounded-lg p-4 text-center">
+            <p className="text-2xl font-bold text-zinc-900">{stat.value}</p>
+            <p className="text-xs text-zinc-500">{stat.label}</p>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-zinc-800 light:border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-zinc-200">
         {(['listings', 'orders', 'settings'] as Tab[]).map(t => (
           <button
             key={t}
@@ -114,7 +114,7 @@ export default function DashboardPage() {
             className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer capitalize ${
               tab === t
                 ? 'text-orange-400 border-b-2 border-orange-400'
-                : 'text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700'
+                : 'text-zinc-500 hover:text-zinc-700'
             }`}
           >
             {t}
@@ -126,25 +126,25 @@ export default function DashboardPage() {
       {tab === 'listings' && (
         <div className="space-y-3">
           {listings.length === 0 ? (
-            <p className="text-zinc-500 light:text-gray-400 text-center py-8">No listings yet. Create your first listing!</p>
+            <p className="text-zinc-500 text-center py-8">No listings yet. Create your first listing!</p>
           ) : (
             listings.map(listing => (
-              <div key={listing.id} className="flex items-center justify-between p-4 rounded-lg bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200">
+              <div key={listing.id} className="flex items-center justify-between p-4 rounded-lg bg-white border border-zinc-200">
                 <div>
-                  <p className="font-medium text-zinc-100 light:text-gray-900">{listing.title}</p>
+                  <p className="font-medium text-zinc-900">{listing.title}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <ConditionBadge condition={listing.condition} />
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       listing.status === 'active' ? 'bg-green-500/10 text-green-400' :
-                      listing.status === 'sold' ? 'bg-zinc-700 light:bg-gray-200 text-zinc-400 light:text-gray-500' :
+                      listing.status === 'sold' ? 'bg-zinc-200 text-zinc-500' :
                       'bg-red-500/10 text-red-400'
                     }`}>
                       {listing.status}
                     </span>
-                    <span className="text-xs text-zinc-500 light:text-gray-400">{listing.quantity_available} avail</span>
+                    <span className="text-xs text-zinc-500">{listing.quantity_available} avail</span>
                   </div>
                 </div>
-                <p className="text-lg font-bold text-zinc-100 light:text-gray-900">${Number(listing.price).toFixed(2)}</p>
+                <p className="text-lg font-bold text-zinc-900">${Number(listing.price).toFixed(2)}</p>
               </div>
             ))
           )}
@@ -154,30 +154,30 @@ export default function DashboardPage() {
       {tab === 'orders' && (
         <div className="space-y-3">
           {orders.length === 0 ? (
-            <p className="text-zinc-500 light:text-gray-400 text-center py-8">No orders yet.</p>
+            <p className="text-zinc-500 text-center py-8">No orders yet.</p>
           ) : (
             orders.map(order => (
               <Link
                 key={order.id}
                 href={`/orders/${order.id}`}
-                className="block p-4 rounded-lg bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 hover:border-zinc-700 light:hover:border-gray-300 transition-colors"
+                className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-zinc-100 light:text-gray-900">
+                    <p className="font-medium text-zinc-900">
                       Order #{order.id.slice(0, 8)}
                     </p>
-                    <p className="text-sm text-zinc-400 light:text-gray-500">
+                    <p className="text-sm text-zinc-500">
                       {order.items?.length || 0} items &middot; {(order.buyer as { display_name: string })?.display_name || 'Unknown buyer'}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-zinc-100 light:text-gray-900">${Number(order.total).toFixed(2)}</p>
+                    <p className="font-bold text-zinc-900">${Number(order.total).toFixed(2)}</p>
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       order.status === 'paid' ? 'bg-yellow-500/10 text-yellow-400' :
                       order.status === 'shipped' ? 'bg-blue-500/10 text-blue-400' :
                       order.status === 'delivered' ? 'bg-green-500/10 text-green-400' :
-                      'bg-zinc-700 light:bg-gray-200 text-zinc-400 light:text-gray-500'
+                      'bg-zinc-200 text-zinc-500'
                     }`}>
                       {order.status}
                     </span>
@@ -190,9 +190,9 @@ export default function DashboardPage() {
       )}
 
       {tab === 'settings' && (
-        <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-6 space-y-4">
+        <div className="bg-white border border-zinc-200 rounded-lg p-6 space-y-4">
           <div>
-            <h3 className="font-medium text-zinc-100 light:text-gray-900 mb-2">Stripe Payments</h3>
+            <h3 className="font-medium text-zinc-900 mb-2">Stripe Payments</h3>
             {profile?.stripe_onboarding_complete ? (
               <p className="text-green-400 text-sm">Connected and ready to receive payments</p>
             ) : (
@@ -202,8 +202,8 @@ export default function DashboardPage() {
             )}
           </div>
           <div>
-            <h3 className="font-medium text-zinc-100 light:text-gray-900 mb-2">Platform Fee</h3>
-            <p className="text-zinc-400 light:text-gray-500 text-sm">9% on each sale</p>
+            <h3 className="font-medium text-zinc-900 mb-2">Platform Fee</h3>
+            <p className="text-zinc-500 text-sm">9% on each sale</p>
           </div>
         </div>
       )}

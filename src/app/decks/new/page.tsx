@@ -121,70 +121,70 @@ export default function NewDeckPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-8">Build a Deck</h1>
+      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Build a Deck</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <AuthError message={error} />
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">Deck Name</label>
+            <label className="block text-sm font-medium text-zinc-600 mb-1.5">Deck Name</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
               required
               placeholder="My Red Luffy Deck"
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">Visibility</label>
-            <label className="flex items-center gap-2 px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 cursor-pointer">
+            <label className="block text-sm font-medium text-zinc-600 mb-1.5">Visibility</label>
+            <label className="flex items-center gap-2 px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 cursor-pointer">
               <input
                 type="checkbox"
                 checked={isPublic}
                 onChange={e => setIsPublic(e.target.checked)}
                 className="rounded"
               />
-              <span className="text-zinc-100 light:text-gray-900 text-sm">Make public</span>
+              <span className="text-zinc-900 text-sm">Make public</span>
             </label>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">Description (optional)</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1.5">Description (optional)</label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
             rows={2}
             placeholder="Describe your deck strategy..."
-            className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+            className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
           />
         </div>
 
         {/* Leader */}
-        <div className="p-4 bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg">
-          <h3 className="text-sm font-medium text-zinc-300 light:text-gray-600 mb-2">Leader</h3>
+        <div className="p-4 bg-white border border-zinc-200 rounded-lg">
+          <h3 className="text-sm font-medium text-zinc-600 mb-2">Leader</h3>
           {leader ? (
             <div className="flex items-center gap-3">
               <img src={leader.imageUrl} alt="" className="w-12 h-16 object-contain rounded" />
               <div>
-                <p className="text-zinc-100 light:text-gray-900 font-medium">{leader.name}</p>
-                <p className="text-xs text-zinc-400 light:text-gray-500">{leader.id}</p>
+                <p className="text-zinc-900 font-medium">{leader.name}</p>
+                <p className="text-xs text-zinc-500">{leader.id}</p>
               </div>
-              <button type="button" onClick={() => setLeader(null)} className="ml-auto text-zinc-500 light:text-gray-400 hover:text-zinc-300 light:hover:text-gray-600 cursor-pointer text-sm">
+              <button type="button" onClick={() => setLeader(null)} className="ml-auto text-zinc-500 hover:text-zinc-600 cursor-pointer text-sm">
                 Change
               </button>
             </div>
           ) : (
-            <p className="text-zinc-500 light:text-gray-400 text-sm">Search below and click a LEADER card to set it</p>
+            <p className="text-zinc-500 text-sm">Search below and click a LEADER card to set it</p>
           )}
         </div>
 
         {/* Card Search */}
         <div>
-          <label className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">
+          <label className="block text-sm font-medium text-zinc-600 mb-1.5">
             Add Cards ({totalCards}/50)
           </label>
           <div className="relative">
@@ -193,21 +193,21 @@ export default function NewDeckPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search cards to add..."
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             {searchResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1 bg-zinc-100 border border-zinc-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                 {searchResults.map(card => (
                   <button
                     key={card.id}
                     type="button"
                     onClick={() => addCard(card)}
-                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-zinc-700 light:hover:bg-gray-100 text-left cursor-pointer"
+                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-zinc-100 text-left cursor-pointer"
                   >
                     <img src={card.imageUrl} alt="" className="w-8 h-11 object-contain rounded" />
                     <div>
-                      <p className="text-sm text-zinc-100 light:text-gray-900">{card.name}</p>
-                      <p className="text-xs text-zinc-400 light:text-gray-500">{card.id} &middot; {card.type} &middot; {card.rarity}</p>
+                      <p className="text-sm text-zinc-900">{card.name}</p>
+                      <p className="text-xs text-zinc-500">{card.id} &middot; {card.type} &middot; {card.rarity}</p>
                     </div>
                   </button>
                 ))}
@@ -220,13 +220,13 @@ export default function NewDeckPage() {
         {entries.length > 0 && (
           <div className="space-y-1">
             {entries.map(entry => (
-              <div key={entry.card.id} className="flex items-center justify-between px-3 py-2 rounded bg-zinc-800 light:bg-gray-100">
+              <div key={entry.card.id} className="flex items-center justify-between px-3 py-2 rounded bg-zinc-100">
                 <div className="flex items-center gap-2">
                   <span className="text-orange-400 font-mono text-sm">{entry.quantity}x</span>
-                  <span className="text-zinc-100 light:text-gray-900 text-sm">{entry.card.name}</span>
-                  <span className="text-zinc-500 light:text-gray-400 text-xs">{entry.card.id}</span>
+                  <span className="text-zinc-900 text-sm">{entry.card.name}</span>
+                  <span className="text-zinc-500 text-xs">{entry.card.id}</span>
                 </div>
-                <button type="button" onClick={() => removeCard(entry.card.id)} className="text-zinc-500 light:text-gray-400 hover:text-red-400 light:hover:text-red-600 cursor-pointer">
+                <button type="button" onClick={() => removeCard(entry.card.id)} className="text-zinc-500 hover:text-red-500 cursor-pointer">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>

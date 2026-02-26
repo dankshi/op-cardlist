@@ -44,19 +44,19 @@ export default function SignUpPage() {
   if (success) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
-        <div className="w-full max-w-md p-8 rounded-2xl bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 text-center">
+        <div className="w-full max-w-md p-8 rounded-2xl bg-white border border-zinc-200 text-center">
           <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-zinc-100 light:text-gray-900">Check your email</h1>
-          <p className="text-zinc-400 light:text-gray-500 mt-2">
+          <h1 className="text-2xl font-bold text-zinc-900">Check your email</h1>
+          <p className="text-zinc-500 mt-2">
             We&apos;ve sent you a confirmation link. Click it to activate your account.
           </p>
           <Link
             href="/auth/sign-in"
-            className="inline-block mt-6 text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium"
+            className="inline-block mt-6 text-orange-400 hover:text-orange-600 font-medium"
           >
             Back to sign in
           </Link>
@@ -67,10 +67,10 @@ export default function SignUpPage() {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center">
-      <div className="w-full max-w-md p-8 rounded-2xl bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200">
+      <div className="w-full max-w-md p-8 rounded-2xl bg-white border border-zinc-200">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-zinc-100 light:text-gray-900">Create your account</h1>
-          <p className="text-zinc-400 light:text-gray-500 mt-2">Join NOMI Market to buy and sell cards</p>
+          <h1 className="text-2xl font-bold text-zinc-900">Create your account</h1>
+          <p className="text-zinc-500 mt-2">Join NOMI Market to buy and sell cards</p>
         </div>
 
         <OAuthButtons />
@@ -85,9 +85,9 @@ export default function SignUpPage() {
           <SubmitButton pending={pending}>Create Account</SubmitButton>
         </form>
 
-        <p className="text-center text-zinc-400 light:text-gray-500 text-sm mt-6">
+        <p className="text-center text-zinc-500 text-sm mt-6">
           Already have an account?{' '}
-          <Link href="/auth/sign-in" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">
+          <Link href="/auth/sign-in" className="text-orange-400 hover:text-orange-600 font-medium">
             Sign in
           </Link>
         </p>

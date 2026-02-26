@@ -47,7 +47,7 @@ export function CardThumbnail({ card }: CardThumbnailProps) {
   return (
     <div
       ref={containerRef}
-      className="aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-900 dark:bg-zinc-900 light:bg-zinc-100"
+      className="aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-100"
       style={{ perspective: "600px" }}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}

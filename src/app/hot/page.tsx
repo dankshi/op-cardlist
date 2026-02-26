@@ -63,18 +63,18 @@ export default async function HotCardsPage() {
   const topValueCards = getTopValueCards(allCards, 20);
 
   return (
-    <div className="min-h-screen bg-zinc-950 light:bg-white text-white light:text-zinc-900">
+    <div className="min-h-screen bg-white text-zinc-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/"
-            className="text-zinc-400 hover:text-white light:hover:text-zinc-900 text-sm mb-4 inline-block"
+            className="text-zinc-400 hover:text-zinc-900 text-sm mb-4 inline-block"
           >
             &larr; Back to Sets
           </Link>
           <h1 className="text-3xl font-bold">Hot Cards</h1>
-          <p className="text-zinc-400 light:text-zinc-600 mt-2">
+          <p className="text-zinc-600 mt-2">
             {hasHistory
               ? "Track price movements and find the hottest cards in the market."
               : "Top value cards in the One Piece TCG market."}
@@ -98,7 +98,7 @@ export default async function HotCardsPage() {
                     <Link
                       key={card.id}
                       href={`/card/${card.id.toLowerCase()}`}
-                      className="flex items-center gap-4 p-3 bg-zinc-900 light:bg-zinc-100 rounded-lg hover:bg-zinc-800 light:hover:bg-zinc-200 transition-colors"
+                      className="flex items-center gap-4 p-3 bg-zinc-100 rounded-lg hover:bg-zinc-100 transition-colors"
                     >
                       <div className="w-12 h-16 relative flex-shrink-0">
                         <CardThumbnail card={card} />
@@ -133,7 +133,7 @@ export default async function HotCardsPage() {
                     <Link
                       key={card.id}
                       href={`/card/${card.id.toLowerCase()}`}
-                      className="flex items-center gap-4 p-3 bg-zinc-900 light:bg-zinc-100 rounded-lg hover:bg-zinc-800 light:hover:bg-zinc-200 transition-colors"
+                      className="flex items-center gap-4 p-3 bg-zinc-100 rounded-lg hover:bg-zinc-100 transition-colors"
                     >
                       <div className="w-12 h-16 relative flex-shrink-0">
                         <CardThumbnail card={card} />
@@ -173,7 +173,7 @@ export default async function HotCardsPage() {
             </svg>
             Highest Value Cards
           </h2>
-          <p className="text-zinc-400 light:text-zinc-600 mb-4">
+          <p className="text-zinc-600 mb-4">
             The most valuable One Piece TCG cards right now.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">

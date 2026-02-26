@@ -49,7 +49,7 @@ export default function AuthButton() {
   }, [router])
 
   if (loading) {
-    return <div className="w-8 h-8 rounded-full bg-zinc-800 light:bg-gray-100 animate-pulse" />
+    return <div className="w-8 h-8 rounded-full bg-zinc-100 animate-pulse" />
   }
 
   if (!user) {
@@ -82,69 +82,69 @@ export default function AuthButton() {
       </button>
 
       {menuOpen && (
-        <div className="absolute right-0 mt-2 w-56 rounded-xl bg-zinc-900 light:bg-white border border-zinc-700 light:border-gray-300 shadow-xl py-2 z-50">
-          <div className="px-4 py-2 border-b border-zinc-700 light:border-gray-300">
-            <p className="text-sm font-medium text-zinc-100 light:text-gray-900 truncate">{displayName}</p>
-            <p className="text-xs text-zinc-400 light:text-gray-500 truncate">{user.email}</p>
+        <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white border border-zinc-200 shadow-xl py-2 z-50">
+          <div className="px-4 py-2 border-b border-zinc-200">
+            <p className="text-sm font-medium text-zinc-900 truncate">{displayName}</p>
+            <p className="text-xs text-zinc-500 truncate">{user.email}</p>
           </div>
 
           <Link
             href="/profile"
             onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-zinc-300 light:text-gray-600 hover:bg-zinc-800 light:hover:bg-gray-50 hover:text-zinc-100 light:hover:text-gray-900"
+            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
           >
             My Profile
           </Link>
           <Link
             href="/orders"
             onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-zinc-300 light:text-gray-600 hover:bg-zinc-800 light:hover:bg-gray-50 hover:text-zinc-100 light:hover:text-gray-900"
+            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
           >
             My Orders
           </Link>
           <Link
             href="/collection"
             onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-zinc-300 light:text-gray-600 hover:bg-zinc-800 light:hover:bg-gray-50 hover:text-zinc-100 light:hover:text-gray-900"
+            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
           >
             My Collection
           </Link>
           <Link
             href="/wants"
             onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-zinc-300 light:text-gray-600 hover:bg-zinc-800 light:hover:bg-gray-50 hover:text-zinc-100 light:hover:text-gray-900"
+            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
           >
             Want List
           </Link>
           <Link
             href="/decks"
             onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-zinc-300 light:text-gray-600 hover:bg-zinc-800 light:hover:bg-gray-50 hover:text-zinc-100 light:hover:text-gray-900"
+            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
           >
             My Decks
           </Link>
 
-          <div className="border-t border-zinc-700 light:border-gray-300 mt-1 pt-1">
+          <div className="border-t border-zinc-200 mt-1 pt-1">
             <Link
               href="/dashboard"
               onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2 text-sm text-orange-400 hover:bg-zinc-800 light:hover:bg-gray-50"
+              className="block px-4 py-2 text-sm text-orange-400 hover:bg-zinc-50"
             >
               Seller Dashboard
             </Link>
             <Link
               href="/sell"
               onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2 text-sm text-orange-400 hover:bg-zinc-800 light:hover:bg-gray-50"
+              className="block px-4 py-2 text-sm text-orange-400 hover:bg-zinc-50"
             >
               Sell a Card
             </Link>
           </div>
 
-          <div className="border-t border-zinc-700 light:border-gray-300 mt-1 pt-1">
+          <div className="border-t border-zinc-200 mt-1 pt-1">
             <button
               onClick={handleSignOut}
-              className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-zinc-800 light:hover:bg-gray-50 cursor-pointer"
+              className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-zinc-50 cursor-pointer"
             >
               Sign Out
             </button>

@@ -44,10 +44,10 @@ export default function UpdatePasswordPage() {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center">
-      <div className="w-full max-w-md p-8 rounded-2xl bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200">
+      <div className="w-full max-w-md p-8 rounded-2xl bg-white border border-zinc-200">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-zinc-100 light:text-gray-900">Set new password</h1>
-          <p className="text-zinc-400 light:text-gray-500 mt-2">Enter your new password below</p>
+          <h1 className="text-2xl font-bold text-zinc-900">Set new password</h1>
+          <p className="text-zinc-500 mt-2">Enter your new password below</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

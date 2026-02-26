@@ -111,17 +111,17 @@ export default async function CharacterPage({ params }: PageProps) {
       <nav className="text-sm text-zinc-500 mb-6">
         <Link
           href="/"
-          className="hover:text-white light:hover:text-zinc-900 transition-colors"
+          className="hover:text-zinc-900 transition-colors"
         >
           Home
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-white light:text-zinc-900">{character.name}</span>
+        <span className="text-zinc-900">{character.name}</span>
       </nav>
 
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{character.name}</h1>
-        <p className="text-zinc-400 light:text-zinc-600">
+        <p className="text-zinc-600">
           {totalVersions} version{totalVersions !== 1 ? 's' : ''} across{' '}
           {setsCount} set{setsCount !== 1 ? 's' : ''}
         </p>
@@ -144,7 +144,7 @@ export default async function CharacterPage({ params }: PageProps) {
                 <Link
                   key={card.id}
                   href={`/card/${card.id.toLowerCase()}`}
-                  className="flex items-center gap-4 px-4 py-3 bg-zinc-800/50 light:bg-zinc-100 border border-zinc-700/50 light:border-zinc-200 rounded-lg hover:border-zinc-600 light:hover:border-zinc-300 transition-colors"
+                  className="flex items-center gap-4 px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-lg hover:border-zinc-300 transition-colors"
                 >
                   <Image
                     src={card.imageUrl}

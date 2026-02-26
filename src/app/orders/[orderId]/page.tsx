@@ -8,12 +8,12 @@ import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
 import type { Order, Review, CardCondition } from '@/types/database'
 
 const STATUS_STYLES: Record<string, string> = {
-  pending_payment: 'bg-zinc-700 light:bg-gray-200 text-zinc-300 light:text-gray-600',
+  pending_payment: 'bg-zinc-200 text-zinc-600',
   paid: 'bg-yellow-500/10 text-yellow-400',
   shipped: 'bg-blue-500/10 text-blue-400',
   delivered: 'bg-green-500/10 text-green-400',
   cancelled: 'bg-red-500/10 text-red-400',
-  refunded: 'bg-zinc-700 light:bg-gray-200 text-zinc-400 light:text-gray-500',
+  refunded: 'bg-zinc-200 text-zinc-500',
   disputed: 'bg-red-500/10 text-red-400',
 }
 
@@ -117,14 +117,14 @@ export default function OrderDetailPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <Link href="/orders" className="text-sm text-zinc-400 light:text-gray-500 hover:text-zinc-200 light:hover:text-gray-700 mb-4 inline-block">
+      <Link href="/orders" className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
         &larr; Back to Orders
       </Link>
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900">Order #{order.id.slice(0, 8)}</h1>
-          <p className="text-sm text-zinc-400 light:text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-zinc-900">Order #{order.id.slice(0, 8)}</h1>
+          <p className="text-sm text-zinc-500 mt-1">
             Placed {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
@@ -134,11 +134,11 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Order Items */}
-      <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-zinc-800 light:border-gray-200">
-          <h2 className="font-medium text-zinc-100 light:text-gray-900">Items</h2>
+      <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden mb-6">
+        <div className="px-4 py-3 border-b border-zinc-200">
+          <h2 className="font-medium text-zinc-900">Items</h2>
         </div>
-        <div className="divide-y divide-zinc-800 light:divide-gray-200">
+        <div className="divide-y divide-zinc-200">
           {order.items?.map(item => (
             <div key={item.id} className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
@@ -146,16 +146,16 @@ export default function OrderDetailPage() {
                   <img src={item.snapshot_photo_url} alt="" className="w-10 h-14 object-contain rounded" />
                 )}
                 <div>
-                  <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-orange-400 transition-colors">
+                  <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-900 hover:text-orange-400 transition-colors">
                     {item.card_name || item.card_id}
                   </Link>
                   <div className="flex items-center gap-2 mt-1">
                     <ConditionBadge condition={item.condition as CardCondition} />
-                    <span className="text-xs text-zinc-500 light:text-gray-400">x{item.quantity}</span>
+                    <span className="text-xs text-zinc-500">x{item.quantity}</span>
                   </div>
                 </div>
               </div>
-              <p className="text-zinc-100 light:text-gray-900 font-medium">${(Number(item.unit_price) * item.quantity).toFixed(2)}</p>
+              <p className="text-zinc-900 font-medium">${(Number(item.unit_price) * item.quantity).toFixed(2)}</p>
             </div>
           ))}
         </div>
@@ -163,31 +163,31 @@ export default function OrderDetailPage() {
 
       {/* Order Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4">
-          <h2 className="font-medium text-zinc-100 light:text-gray-900 mb-3">{isBuyer ? 'Seller' : 'Buyer'}</h2>
+        <div className="bg-white border border-zinc-200 rounded-lg p-4">
+          <h2 className="font-medium text-zinc-900 mb-3">{isBuyer ? 'Seller' : 'Buyer'}</h2>
           {isBuyer && order.seller ? (
-            <Link href={`/seller/${(order.seller as { username: string }).username}`} className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500">
+            <Link href={`/seller/${(order.seller as { username: string }).username}`} className="text-orange-400 hover:text-orange-600">
               {(order.seller as { display_name: string }).display_name}
             </Link>
           ) : order.buyer ? (
-            <p className="text-zinc-300 light:text-gray-600">{(order.buyer as { display_name: string }).display_name}</p>
+            <p className="text-zinc-600">{(order.buyer as { display_name: string }).display_name}</p>
           ) : null}
         </div>
 
-        <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4">
-          <h2 className="font-medium text-zinc-100 light:text-gray-900 mb-3">Summary</h2>
+        <div className="bg-white border border-zinc-200 rounded-lg p-4">
+          <h2 className="font-medium text-zinc-900 mb-3">Summary</h2>
           <div className="space-y-1 text-sm">
-            <div className="flex justify-between text-zinc-400 light:text-gray-500">
+            <div className="flex justify-between text-zinc-500">
               <span>Subtotal</span>
               <span>${Number(order.subtotal).toFixed(2)}</span>
             </div>
             {order.shipping_cost > 0 && (
-              <div className="flex justify-between text-zinc-400 light:text-gray-500">
+              <div className="flex justify-between text-zinc-500">
                 <span>Shipping</span>
                 <span>${Number(order.shipping_cost).toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between text-zinc-100 light:text-gray-900 font-bold pt-1 border-t border-zinc-700 light:border-gray-300">
+            <div className="flex justify-between text-zinc-900 font-bold pt-1 border-t border-zinc-200">
               <span>Total</span>
               <span>${Number(order.total).toFixed(2)}</span>
             </div>
@@ -197,14 +197,14 @@ export default function OrderDetailPage() {
 
       {/* Tracking Info */}
       {order.tracking_number && (
-        <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4 mb-6">
-          <h2 className="font-medium text-zinc-100 light:text-gray-900 mb-2">Tracking</h2>
-          <p className="text-zinc-300 light:text-gray-600">
-            {order.tracking_carrier && <span className="text-zinc-400 light:text-gray-500">{order.tracking_carrier}: </span>}
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+          <h2 className="font-medium text-zinc-900 mb-2">Tracking</h2>
+          <p className="text-zinc-600">
+            {order.tracking_carrier && <span className="text-zinc-500">{order.tracking_carrier}: </span>}
             {order.tracking_number}
           </p>
           {order.shipped_at && (
-            <p className="text-xs text-zinc-500 light:text-gray-400 mt-1">
+            <p className="text-xs text-zinc-500 mt-1">
               Shipped {new Date(order.shipped_at).toLocaleDateString()}
             </p>
           )}
@@ -213,8 +213,8 @@ export default function OrderDetailPage() {
 
       {/* Seller: Mark as shipped */}
       {isSeller && order.status === 'paid' && (
-        <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4 mb-6">
-          <h2 className="font-medium text-zinc-100 light:text-gray-900 mb-3">Ship This Order</h2>
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+          <h2 className="font-medium text-zinc-900 mb-3">Ship This Order</h2>
           <form onSubmit={async (e) => {
             e.preventDefault()
             const form = e.target as HTMLFormElement
@@ -234,8 +234,8 @@ export default function OrderDetailPage() {
             setOrder({ ...order, status: 'shipped', tracking_number: trackingNumber, tracking_carrier: carrier, shipped_at: new Date().toISOString() })
           }} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <input name="carrier" placeholder="Carrier (e.g., USPS)" className="px-3 py-2 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 text-sm" />
-              <input name="tracking" placeholder="Tracking number" className="px-3 py-2 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 text-sm" />
+              <input name="carrier" placeholder="Carrier (e.g., USPS)" className="px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm" />
+              <input name="tracking" placeholder="Tracking number" className="px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm" />
             </div>
             <button type="submit" className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold text-sm transition-colors cursor-pointer">
               Mark as Shipped
@@ -246,8 +246,8 @@ export default function OrderDetailPage() {
 
       {/* Buyer: Confirm delivery */}
       {isBuyer && order.status === 'shipped' && (
-        <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4 mb-6">
-          <p className="text-zinc-300 light:text-gray-600 mb-3">Have you received this order?</p>
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+          <p className="text-zinc-600 mb-3">Have you received this order?</p>
           <button
             onClick={async () => {
               await supabase
@@ -265,8 +265,8 @@ export default function OrderDetailPage() {
 
       {/* Review */}
       {review && (
-        <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4 mb-6">
-          <h2 className="font-medium text-zinc-100 light:text-gray-900 mb-2">Your Review</h2>
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+          <h2 className="font-medium text-zinc-900 mb-2">Your Review</h2>
           <div className="flex items-center gap-1 mb-2">
             {[1, 2, 3, 4, 5].map(star => (
               <svg key={star} className={`w-5 h-5 ${star <= review.rating ? 'text-yellow-400' : 'text-zinc-600'}`} fill="currentColor" viewBox="0 0 20 20">
@@ -274,14 +274,14 @@ export default function OrderDetailPage() {
               </svg>
             ))}
           </div>
-          {review.comment && <p className="text-sm text-zinc-400 light:text-gray-500">{review.comment}</p>}
+          {review.comment && <p className="text-sm text-zinc-500">{review.comment}</p>}
         </div>
       )}
 
       {/* Leave Review */}
       {canReview && (
-        <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-lg p-4 mb-6">
-          <h2 className="font-medium text-zinc-100 light:text-gray-900 mb-3">Leave a Review</h2>
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+          <h2 className="font-medium text-zinc-900 mb-3">Leave a Review</h2>
           <div className="flex items-center gap-1 mb-3">
             {[1, 2, 3, 4, 5].map(star => (
               <button
@@ -301,7 +301,7 @@ export default function OrderDetailPage() {
             onChange={e => setReviewComment(e.target.value)}
             placeholder="How was your experience?"
             rows={3}
-            className="w-full px-3 py-2 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 text-sm resize-none mb-3"
+            className="w-full px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm resize-none mb-3"
           />
           <button
             onClick={submitReview}

@@ -79,21 +79,21 @@ export default function EditProfilePage() {
   if (!profile) {
     return (
       <div className="text-center py-20">
-        <p className="text-zinc-400 light:text-gray-500">Profile not found.</p>
+        <p className="text-zinc-500">Profile not found.</p>
       </div>
     )
   }
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-8">Edit Profile</h1>
+      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Edit Profile</h1>
 
-      <div className="bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 rounded-2xl p-8">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
           <AuthError message={error} />
 
           <div>
-            <label htmlFor="displayName" className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">
+            <label htmlFor="displayName" className="block text-sm font-medium text-zinc-600 mb-1.5">
               Display Name
             </label>
             <input
@@ -102,16 +102,16 @@ export default function EditProfilePage() {
               type="text"
               defaultValue={profile.display_name || ''}
               required
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">
+            <label htmlFor="username" className="block text-sm font-medium text-zinc-600 mb-1.5">
               Username
             </label>
             <div className="flex items-center">
-              <span className="px-3 py-3 rounded-l-lg bg-zinc-700 light:bg-gray-200 border border-r-0 border-zinc-600 text-zinc-400 light:text-gray-500 text-sm">
+              <span className="px-3 py-3 rounded-l-lg bg-zinc-200 border border-r-0 border-zinc-600 text-zinc-500 text-sm">
                 nomimarket.com/seller/
               </span>
               <input
@@ -121,14 +121,14 @@ export default function EditProfilePage() {
                 defaultValue={profile.username || ''}
                 placeholder="your-username"
                 pattern="[a-z0-9_\-]{3,30}"
-                className="w-full px-4 py-3 rounded-r-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-3 rounded-r-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
               />
             </div>
-            <p className="mt-1 text-xs text-zinc-500 light:text-gray-400">This will be your seller storefront URL</p>
+            <p className="mt-1 text-xs text-zinc-500">This will be your seller storefront URL</p>
           </div>
 
           <div>
-            <label htmlFor="bio" className="block text-sm font-medium text-zinc-300 light:text-gray-600 mb-1.5">
+            <label htmlFor="bio" className="block text-sm font-medium text-zinc-600 mb-1.5">
               Bio
             </label>
             <textarea
@@ -137,7 +137,7 @@ export default function EditProfilePage() {
               rows={4}
               defaultValue={profile.bio || ''}
               placeholder="Tell buyers about yourself..."
-              className="w-full px-4 py-3 rounded-lg bg-zinc-800 light:bg-gray-100 border border-zinc-700 light:border-gray-300 text-zinc-100 light:text-gray-900 placeholder-zinc-500 light:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors resize-none"
+              className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors resize-none"
             />
           </div>
 
@@ -146,7 +146,7 @@ export default function EditProfilePage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-6 py-3 rounded-lg border border-zinc-700 light:border-gray-300 text-zinc-300 light:text-gray-600 hover:bg-zinc-800 light:hover:bg-gray-50 transition-colors cursor-pointer"
+              className="px-6 py-3 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors cursor-pointer"
             >
               Cancel
             </button>

@@ -49,23 +49,23 @@ export default function AlertsPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-8">Price Alerts</h1>
+      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Price Alerts</h1>
 
       {alerts.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-zinc-400 light:text-gray-500 mb-4">No price alerts set.</p>
-          <p className="text-zinc-500 light:text-gray-400 text-sm mb-6">Set alerts on card pages to be notified when prices change.</p>
-          <Link href="/" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">Browse Cards</Link>
+          <p className="text-zinc-500 mb-4">No price alerts set.</p>
+          <p className="text-zinc-500 text-sm mb-6">Set alerts on card pages to be notified when prices change.</p>
+          <Link href="/" className="text-orange-400 hover:text-orange-600 font-medium">Browse Cards</Link>
         </div>
       ) : (
         <div className="space-y-2">
           {alerts.map(alert => (
-            <div key={alert.id} className={`flex items-center justify-between p-4 rounded-lg bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200 ${!alert.is_active ? 'opacity-50' : ''}`}>
+            <div key={alert.id} className={`flex items-center justify-between p-4 rounded-lg bg-white border border-zinc-200 ${!alert.is_active ? 'opacity-50' : ''}`}>
               <div>
-                <Link href={`/card/${alert.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-orange-400 transition-colors">
+                <Link href={`/card/${alert.card_id.toLowerCase()}`} className="font-medium text-zinc-900 hover:text-orange-400 transition-colors">
                   {alert.card_id}
                 </Link>
-                <p className="text-sm text-zinc-400 light:text-gray-500 mt-1">
+                <p className="text-sm text-zinc-500 mt-1">
                   Alert when price {alert.alert_type === 'below' ? 'drops below' : alert.alert_type === 'above' ? 'rises above' : 'changes'}{' '}
                   <span className="text-orange-400 font-medium">${Number(alert.target_price).toFixed(2)}</span>
                 </p>
@@ -74,14 +74,14 @@ export default function AlertsPage() {
                 <button
                   onClick={() => toggleAlert(alert.id, alert.is_active)}
                   className={`px-3 py-1 rounded text-xs font-medium cursor-pointer ${
-                    alert.is_active ? 'bg-green-500/10 text-green-400' : 'bg-zinc-700 light:bg-gray-200 text-zinc-400 light:text-gray-500'
+                    alert.is_active ? 'bg-green-500/10 text-green-400' : 'bg-zinc-200 text-zinc-500'
                   }`}
                 >
                   {alert.is_active ? 'Active' : 'Paused'}
                 </button>
                 <button
                   onClick={() => removeAlert(alert.id)}
-                  className="text-zinc-500 light:text-gray-400 hover:text-red-400 light:hover:text-red-600 transition-colors cursor-pointer"
+                  className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

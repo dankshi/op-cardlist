@@ -66,19 +66,19 @@ export default function CardModal({ params }: PageProps) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/90 light:bg-black/60 z-50 flex items-center justify-center p-4 md:p-6 lg:p-8"
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 md:p-6 lg:p-8"
       onClick={handleBackdropClick}
     >
       {/* Modal Container */}
-      <div className="relative w-full max-w-5xl bg-zinc-900 light:bg-white rounded-2xl border border-zinc-800 light:border-zinc-200 overflow-hidden shadow-2xl">
+      <div className="relative w-full max-w-5xl bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-2xl">
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute top-3 right-3 z-10 p-2 rounded-full bg-zinc-800/80 light:bg-zinc-200/80 hover:bg-zinc-700 light:hover:bg-zinc-300 transition-colors group"
+          className="absolute top-3 right-3 z-10 p-2 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-colors group"
           aria-label="Close"
         >
           <svg
-            className="w-5 h-5 text-zinc-400 light:text-zinc-600 group-hover:text-white light:group-hover:text-zinc-900 transition-colors"
+            className="w-5 h-5 text-zinc-600 group-hover:text-zinc-900 transition-colors"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -94,7 +94,7 @@ export default function CardModal({ params }: PageProps) {
 
         <div className="flex flex-col md:flex-row max-h-[90vh]">
           {/* Card Image - Left Side with 3D Preview */}
-          <div className="flex-shrink-0 bg-zinc-950 light:bg-zinc-100 p-4 md:p-6 flex items-center justify-center md:w-[340px] lg:w-[400px]">
+          <div className="flex-shrink-0 bg-zinc-100 p-4 md:p-6 flex items-center justify-center md:w-[340px] lg:w-[400px]">
             <Card3DPreview
               card={card}
               className="w-[200px] h-[280px] md:w-[280px] md:h-[392px] lg:w-[320px] lg:h-[448px]"
@@ -108,9 +108,9 @@ export default function CardModal({ params }: PageProps) {
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-zinc-400 light:text-zinc-600 font-mono">{card.id}</span>
-                  <span className="px-2 py-0.5 bg-zinc-800 light:bg-zinc-200 rounded text-xs font-medium">{card.rarity}</span>
-                  <span className="px-2 py-0.5 bg-zinc-800 light:bg-zinc-200 rounded text-xs">{card.type}</span>
+                  <span className="text-zinc-600 font-mono">{card.id}</span>
+                  <span className="px-2 py-0.5 bg-zinc-200 rounded text-xs font-medium">{card.rarity}</span>
+                  <span className="px-2 py-0.5 bg-zinc-200 rounded text-xs">{card.type}</span>
                   {card.isParallel && (
                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-xs font-medium">
                       {card.artStyle === 'wanted' ? 'WANTED' : card.artStyle === 'manga' ? 'MANGA' : 'ALT'}
@@ -126,26 +126,26 @@ export default function CardModal({ params }: PageProps) {
               {card.colors.map((color) => (
                 <div key={color} className="flex items-center gap-1.5">
                   <span className={`w-4 h-4 rounded-full ${colorClasses[color]}`} />
-                  <span className="text-sm text-zinc-400 light:text-zinc-600">{color}</span>
+                  <span className="text-sm text-zinc-600">{color}</span>
                 </div>
               ))}
             </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-4 gap-3 mb-5">
-              <div className="bg-zinc-800/50 light:bg-zinc-100 rounded-lg p-3 text-center">
+              <div className="bg-zinc-100 rounded-lg p-3 text-center">
                 <p className="text-[10px] text-zinc-500 uppercase tracking-wide">{card.type === "LEADER" ? "Life" : "Cost"}</p>
                 <p className="text-xl font-bold">{card.type === "LEADER" ? (card.life ?? "-") : (card.cost ?? "-")}</p>
               </div>
-              <div className="bg-zinc-800/50 light:bg-zinc-100 rounded-lg p-3 text-center">
+              <div className="bg-zinc-100 rounded-lg p-3 text-center">
                 <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Power</p>
                 <p className="text-xl font-bold">{card.power?.toLocaleString() ?? "-"}</p>
               </div>
-              <div className="bg-zinc-800/50 light:bg-zinc-100 rounded-lg p-3 text-center">
+              <div className="bg-zinc-100 rounded-lg p-3 text-center">
                 <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Counter</p>
                 <p className="text-xl font-bold">{card.counter ? `+${card.counter.toLocaleString()}` : "-"}</p>
               </div>
-              <div className="bg-zinc-800/50 light:bg-zinc-100 rounded-lg p-3 text-center">
+              <div className="bg-zinc-100 rounded-lg p-3 text-center">
                 <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Attribute</p>
                 <p className="text-lg font-bold truncate">{card.attribute ?? "-"}</p>
               </div>
@@ -155,7 +155,7 @@ export default function CardModal({ params }: PageProps) {
             {card.traits.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {card.traits.map((trait) => (
-                  <span key={trait} className="px-2.5 py-1 bg-zinc-800 light:bg-zinc-200 rounded-full text-xs text-zinc-300 light:text-zinc-700">
+                  <span key={trait} className="px-2.5 py-1 bg-zinc-200 rounded-full text-xs text-zinc-700">
                     {trait}
                   </span>
                 ))}
@@ -165,7 +165,7 @@ export default function CardModal({ params }: PageProps) {
             {/* Effect */}
             <div className="mb-4">
               <h3 className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Effect</h3>
-              <p className="text-sm text-zinc-300 light:text-zinc-700 leading-relaxed">
+              <p className="text-sm text-zinc-700 leading-relaxed">
                 {card.effect || "No effect."}
               </p>
             </div>
@@ -174,7 +174,7 @@ export default function CardModal({ params }: PageProps) {
             {card.trigger && (
               <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                 <h3 className="text-xs text-amber-400 uppercase tracking-wide mb-1">Trigger</h3>
-                <p className="text-sm text-zinc-300 light:text-zinc-700">{card.trigger}</p>
+                <p className="text-sm text-zinc-700">{card.trigger}</p>
               </div>
             )}
 
@@ -217,13 +217,13 @@ export default function CardModal({ params }: PageProps) {
             </div>
 
             {/* Set Info */}
-            <div className="mt-4 pt-4 border-t border-zinc-800 light:border-zinc-200">
+            <div className="mt-4 pt-4 border-t border-zinc-200">
               <p className="text-xs text-zinc-500">
-                Set: <span className="text-zinc-300 light:text-zinc-700 font-medium">{card.setId.toUpperCase()}</span>
+                Set: <span className="text-zinc-700 font-medium">{card.setId.toUpperCase()}</span>
               </p>
               {card.price?.tcgplayerProductId != null && (
                 <p className="text-xs text-zinc-500 mt-1">
-                  TCGPlayer ID: <span className="text-zinc-300 light:text-zinc-700 font-mono">{card.price.tcgplayerProductId}</span>
+                  TCGPlayer ID: <span className="text-zinc-700 font-mono">{card.price.tcgplayerProductId}</span>
                 </p>
               )}
             </div>

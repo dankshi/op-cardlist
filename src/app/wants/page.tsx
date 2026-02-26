@@ -47,23 +47,23 @@ export default function WantsPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-zinc-100 light:text-gray-900 mb-8">Want List</h1>
+      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Want List</h1>
 
       {items.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-zinc-400 light:text-gray-500 mb-4">Your want list is empty.</p>
-          <p className="text-zinc-500 light:text-gray-400 text-sm mb-6">Add cards you want to buy from any card page.</p>
-          <Link href="/" className="text-orange-400 hover:text-orange-300 light:hover:text-orange-500 font-medium">Browse Cards</Link>
+          <p className="text-zinc-500 mb-4">Your want list is empty.</p>
+          <p className="text-zinc-500 text-sm mb-6">Add cards you want to buy from any card page.</p>
+          <Link href="/" className="text-orange-400 hover:text-orange-600 font-medium">Browse Cards</Link>
         </div>
       ) : (
         <div className="space-y-2">
           {items.map(item => (
-            <div key={item.id} className="flex items-center justify-between p-4 rounded-lg bg-zinc-900 light:bg-white border border-zinc-800 light:border-gray-200">
+            <div key={item.id} className="flex items-center justify-between p-4 rounded-lg bg-white border border-zinc-200">
               <div>
-                <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-100 light:text-gray-900 hover:text-orange-400 transition-colors">
+                <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-900 hover:text-orange-400 transition-colors">
                   {item.card_id}
                 </Link>
-                <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500 light:text-gray-400">
+                <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
                   {item.max_price && <span>Max: ${Number(item.max_price).toFixed(2)}</span>}
                   <span>Min: {CONDITION_SHORT[item.min_condition as CardCondition] || item.min_condition}</span>
                   {item.priority > 0 && (
@@ -75,7 +75,7 @@ export default function WantsPage() {
               </div>
               <button
                 onClick={() => removeItem(item.id)}
-                className="text-zinc-500 light:text-gray-400 hover:text-red-400 light:hover:text-red-600 transition-colors cursor-pointer"
+                className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

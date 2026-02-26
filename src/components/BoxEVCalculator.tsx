@@ -65,7 +65,7 @@ export default function BoxEVCalculator({ cards, msrp }: BoxEVCalculatorProps) {
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">
               Box MSRP
             </p>
-            <p className="text-2xl font-bold text-zinc-300 light:text-zinc-700">
+            <p className="text-2xl font-bold text-zinc-700">
               {formatPrice(result.msrp)}
             </p>
           </div>
@@ -82,14 +82,14 @@ export default function BoxEVCalculator({ cards, msrp }: BoxEVCalculatorProps) {
               className="flex items-center justify-between text-sm"
             >
               <div className="flex items-center gap-2">
-                <span className="font-medium text-zinc-300 light:text-zinc-700 w-16">
+                <span className="font-medium text-zinc-700 w-16">
                   {r.rarity}
                 </span>
                 <span className="text-zinc-500">
                   {r.count} cards · avg {formatPrice(r.avgPrice)}
                 </span>
               </div>
-              <span className="font-semibold text-zinc-200 light:text-zinc-800">
+              <span className="font-semibold text-zinc-800">
                 {formatPrice(r.evContribution)}
               </span>
             </div>

@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/:path*",
-        has: [{ type: "host", value: "nomimarket.com" }],
+        has: [{ type: "host", value: "^nomimarket\\.com$" }],
         destination: "https://www.nomimarket.com/:path*",
         permanent: true,
       },

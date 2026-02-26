@@ -91,12 +91,12 @@ export default function SetStats({ cards, setId }: SetStatsProps) {
         </div>
 
         {/* Chase Card */}
-        <div className="bg-zinc-800/50 light:bg-zinc-100 border border-zinc-700/50 light:border-zinc-200 rounded-lg p-4">
+        <div className="bg-zinc-100 border border-zinc-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-1">
             <svg className="w-4 h-4 text-orange-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-xs text-zinc-400 light:text-zinc-500 font-medium uppercase tracking-wider">Chase Card</span>
+            <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Chase Card</span>
           </div>
           <p className="text-2xl font-bold text-orange-400">{formatPrice(chasePrice)}</p>
           <Link
@@ -109,36 +109,36 @@ export default function SetStats({ cards, setId }: SetStatsProps) {
         </div>
 
         {/* Total Set Value */}
-        <div className="bg-zinc-800/50 light:bg-zinc-100 border border-zinc-700/50 light:border-zinc-200 rounded-lg p-4">
+        <div className="bg-zinc-100 border border-zinc-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-1">
             <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <span className="text-xs text-zinc-400 light:text-zinc-500 font-medium uppercase tracking-wider">Set Total</span>
+            <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Set Total</span>
           </div>
           <p className="text-2xl font-bold text-green-400">{formatPrice(totalValue)}</p>
           <p className="text-xs text-zinc-500 mt-1">All {pricedCards.length} priced cards</p>
         </div>
 
         {/* Average Price */}
-        <div className="bg-zinc-800/50 light:bg-zinc-100 border border-zinc-700/50 light:border-zinc-200 rounded-lg p-4">
+        <div className="bg-zinc-100 border border-zinc-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-1">
             <svg className="w-4 h-4 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <span className="text-xs text-zinc-400 light:text-zinc-500 font-medium uppercase tracking-wider">Avg Price</span>
+            <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Avg Price</span>
           </div>
           <p className="text-2xl font-bold text-purple-400">{formatPrice(avgPrice)}</p>
           <p className="text-xs text-zinc-500 mt-1">Median: {formatPrice(medianPrice)}</p>
         </div>
 
         {/* Hit Rate */}
-        <div className="bg-zinc-800/50 light:bg-zinc-100 border border-zinc-700/50 light:border-zinc-200 rounded-lg p-4">
+        <div className="bg-zinc-100 border border-zinc-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-1">
             <svg className="w-4 h-4 text-orange-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="text-xs text-zinc-400 light:text-zinc-500 font-medium uppercase tracking-wider">Hit Rate</span>
+            <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Hit Rate</span>
           </div>
           <p className="text-2xl font-bold text-orange-400">{hitRate.toFixed(0)}%</p>
           <p className="text-xs text-zinc-500 mt-1">{hitsCount} cards worth $5+</p>
@@ -148,7 +148,7 @@ export default function SetStats({ cards, setId }: SetStatsProps) {
       {/* Secondary row */}
       <div className="grid grid-cols-3 sm:grid-cols-3 gap-3 mt-3">
         {/* Chase rarities */}
-        <div className="bg-zinc-800/30 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 rounded-lg px-4 py-3 flex items-center justify-between">
+        <div className="bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-3 flex items-center justify-between">
           <span className="text-xs text-zinc-500 font-medium">Chase Rarities</span>
           <div className="flex items-center gap-2">
             {secCount > 0 && (
@@ -173,15 +173,15 @@ export default function SetStats({ cards, setId }: SetStatsProps) {
         </div>
 
         {/* Value concentration */}
-        <div className="bg-zinc-800/30 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 rounded-lg px-4 py-3 flex items-center justify-between">
+        <div className="bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-3 flex items-center justify-between">
           <span className="text-xs text-zinc-500 font-medium">Top 10 Share</span>
-          <span className="text-sm font-semibold text-zinc-300 light:text-zinc-700">{top10Concentration.toFixed(0)}%</span>
+          <span className="text-sm font-semibold text-zinc-700">{top10Concentration.toFixed(0)}%</span>
         </div>
 
         {/* Floor Price */}
-        <div className="bg-zinc-800/30 light:bg-zinc-50 border border-zinc-800 light:border-zinc-200 rounded-lg px-4 py-3 flex items-center justify-between">
+        <div className="bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-3 flex items-center justify-between">
           <span className="text-xs text-zinc-500 font-medium">Floor Price</span>
-          <span className="text-sm font-semibold text-zinc-300 light:text-zinc-700">{formatPrice(floorPrice)}</span>
+          <span className="text-sm font-semibold text-zinc-700">{formatPrice(floorPrice)}</span>
         </div>
       </div>
     </div>
