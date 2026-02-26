@@ -8,9 +8,9 @@ import { CardCarousel } from "@/components/home/CardCarousel";
 import type { Card } from "@/types/card";
 
 export const metadata: Metadata = {
-  title: { absolute: "nomi market — The Trusted One Piece TCG Marketplace" },
-  description: `Buy and sell authenticated One Piece TCG cards. Every order verified in-hand from Los Angeles before it ships. Daily market prices across every set.`,
-  keywords: [...BASE_KEYWORDS, "NOMI Market", "nomimarket", "buy sell cards", "marketplace", "OP-13", "EB-03", "price guide"],
+  title: { absolute: "nomi market — The Trusted TCG Marketplace" },
+  description: `Buy and sell authenticated TCG cards. Every order verified in-hand from Los Angeles before it ships. Daily market prices across every set.`,
+  keywords: [...BASE_KEYWORDS, "NOMI Market", "nomimarket", "buy sell cards", "TCG marketplace", "trading card marketplace", "authenticated cards"],
   alternates: {
     canonical: SITE_URL,
   },
@@ -58,7 +58,7 @@ export default async function Home() {
       <section className="pt-12 pb-16 sm:pt-16 sm:pb-20 mb-12 sm:mb-16">
         <div className="max-w-2xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-6">
-            The trusted marketplace for One Piece TCG.
+            The trusted way to buy &amp; sell TCG cards.
           </h1>
 
           <p className="text-lg text-zinc-500 mb-10 max-w-lg mx-auto leading-relaxed">

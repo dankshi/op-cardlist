@@ -2,7 +2,7 @@
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.nomimarket.com';
 
 export const SITE_NAME = 'NOMI Market';
-export const SITE_DESCRIPTION = 'Buy and sell One Piece TCG cards on NOMI Market. The fastest marketplace with price guide, collection tracker, deck builder, and daily price updates.';
+export const SITE_DESCRIPTION = 'Buy and sell authenticated TCG cards on nomi market. Every order verified in-hand from Los Angeles before it ships. Daily market prices across every set.';
 
 // Social media handles
 export const TWITTER_HANDLE = '@nomimarket';
@@ -12,13 +12,15 @@ export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 // SEO Keywords by category
 export const BASE_KEYWORDS = [
+  'TCG marketplace',
+  'trading card marketplace',
+  'buy sell TCG cards',
+  'authenticated cards',
   'One Piece TCG',
   'One Piece card game',
   'OPTCG',
-  'One Piece trading cards',
   'card list',
   'card database',
-  'deck building',
 ];
 
 // Extract short human name from set name like "OP-10 - Royal Blood" → "Royal Blood"

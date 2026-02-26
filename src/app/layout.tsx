@@ -16,8 +16,8 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "NOMI Market - One Piece TCG Marketplace & Price Guide",
-    template: "%s | NOMI Market",
+    default: "nomi market — The Trusted TCG Marketplace",
+    template: "%s | nomi market",
   },
   description: SITE_DESCRIPTION,
   keywords: [...BASE_KEYWORDS, "card prices", "TCGPlayer prices", "OP-13", "EB-03", "Luffy", "Ace"],
@@ -29,20 +29,20 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: SITE_URL,
     siteName: SITE_NAME,
-    title: "NOMI Market - One Piece TCG Marketplace & Price Guide",
+    title: "nomi market — The Trusted TCG Marketplace",
     description: SITE_DESCRIPTION,
     images: [
       {
         url: DEFAULT_OG_IMAGE,
         width: 1200,
         height: 630,
-        alt: "NOMI Market - One Piece TCG Marketplace",
+        alt: "nomi market — The Trusted TCG Marketplace",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "NOMI Market - One Piece TCG Marketplace & Price Guide",
+    title: "nomi market — The Trusted TCG Marketplace",
     description: SITE_DESCRIPTION,
     site: TWITTER_HANDLE,
     creator: TWITTER_HANDLE,
@@ -127,7 +127,7 @@ export default function RootLayout({
             <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-2">
               <p>
                 <span className="font-black text-zinc-900">nomi</span>{" "}<span className="font-medium text-zinc-500">market</span>
-                {" "}&mdash; The One Piece TCG Marketplace
+                {" "}&mdash; The Trusted TCG Marketplace
               </p>
               <p>One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
             </div>
