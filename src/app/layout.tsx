@@ -128,7 +128,7 @@ export default function RootLayout({
               <p>
                 <span className="font-black text-zinc-900">nomi</span>{" "}<span className="font-medium text-zinc-500">market</span>
               </p>
-              <p>Authenticated cards. Fair prices. Based in Los Angeles, CA.</p>
+              <p>Authenticated cards. Market prices. Los Angeles, CA.</p>
             </div>
           </footer>
       </body>
