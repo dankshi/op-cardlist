@@ -18,10 +18,10 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [conditionFilter, setConditionFilter] = useState<CardCondition | 'all'>('all')
-  const supabase = createClient()
 
   useEffect(() => {
     async function fetchListings() {
+      const supabase = createClient()
       let query = supabase
         .from('listings')
         .select('*, seller:profiles(*)')
@@ -38,7 +38,7 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
       setLoading(false)
     }
     fetchListings()
-  }, [cardId, conditionFilter, supabase])
+  }, [cardId, conditionFilter])
 
   if (loading) {
     return (

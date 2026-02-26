@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function CartButton() {
   const [count, setCount] = useState(0)
-  const supabase = createClient()
 
   useEffect(() => {
+    const supabase = createClient()
+
     async function fetchCount() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -22,13 +23,12 @@ export default function CartButton() {
     }
     fetchCount()
 
-    // Re-fetch when auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       fetchCount()
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase])
+  }, [])
 
   if (count === 0) {
     return (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -12,9 +12,10 @@ export default function AuthButton() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
+    const supabase = createClient()
+
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
@@ -27,7 +28,7 @@ export default function AuthButton() {
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  }, [])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -39,12 +40,13 @@ export default function AuthButton() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
+    const supabase = createClient()
     await supabase.auth.signOut()
     setMenuOpen(false)
     router.push('/')
     router.refresh()
-  }
+  }, [router])
 
   if (loading) {
     return <div className="w-8 h-8 rounded-full bg-zinc-800 light:bg-gray-100 animate-pulse" />
