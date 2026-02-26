@@ -70,13 +70,13 @@ export default async function Home() {
           {/* Heading */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-4 sm:mb-6">
             Buy &amp; sell TCG cards.
-            <span className="block text-zinc-500 dark:text-zinc-500 light:text-zinc-400">
+            <span className="block text-zinc-400">
               Verified. Priced. Simple.
             </span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg sm:text-xl text-zinc-400 light:text-zinc-600 mb-8 sm:mb-10 max-w-lg mx-auto leading-relaxed">
+          <p className="text-lg sm:text-xl text-zinc-600 mb-8 sm:mb-10 max-w-lg mx-auto leading-relaxed">
             The marketplace for One Piece TCG. Every card authenticated,
             every price tracked.
           </p>
@@ -87,21 +87,21 @@ export default async function Home() {
           {/* Stats row */}
           <div className="flex items-center justify-center gap-6 sm:gap-8 mt-8 text-sm text-zinc-500">
             <div className="text-center">
-              <p className="text-lg sm:text-xl font-bold text-zinc-200 light:text-zinc-800">
+              <p className="text-lg sm:text-xl font-bold text-zinc-800">
                 {totalCards.toLocaleString()}+
               </p>
               <p>Listed cards</p>
             </div>
-            <div className="w-px h-8 bg-zinc-800 light:bg-zinc-200" />
+            <div className="w-px h-8 bg-zinc-200" />
             <div className="text-center">
-              <p className="text-lg sm:text-xl font-bold text-zinc-200 light:text-zinc-800">
+              <p className="text-lg sm:text-xl font-bold text-zinc-800">
                 {sets.length}
               </p>
               <p>Sets</p>
             </div>
-            <div className="w-px h-8 bg-zinc-800 light:bg-zinc-200" />
+            <div className="w-px h-8 bg-zinc-200" />
             <div className="text-center">
-              <p className="text-lg sm:text-xl font-bold text-zinc-200 light:text-zinc-800">
+              <p className="text-lg sm:text-xl font-bold text-zinc-800">
                 Daily
               </p>
               <p>Prices</p>
@@ -183,7 +183,7 @@ export default async function Home() {
               <Link
                 key={set.id}
                 href={`/${set.id}`}
-                className="block bg-zinc-900 light:bg-white rounded-lg border border-zinc-800 light:border-zinc-200 hover:border-zinc-700 light:hover:border-zinc-300 hover:bg-zinc-800/50 light:hover:bg-zinc-50 transition-all group overflow-hidden"
+                className="block bg-white rounded-lg border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition-all group overflow-hidden"
               >
                 {setImage?.boosterBoxImageUrl && (
                   <div className="relative w-full aspect-square bg-white">
@@ -198,7 +198,7 @@ export default async function Home() {
                   <h3 className="font-semibold text-sm group-hover:text-sky-500 transition-colors">
                     {set.id.toUpperCase()}
                   </h3>
-                  <p className="text-zinc-400 light:text-zinc-600 text-xs mt-0.5 line-clamp-1">
+                  <p className="text-zinc-600 text-xs mt-0.5 line-clamp-1">
                     {set.name}
                   </p>
                   <span className="text-zinc-500 text-xs mt-1 block">

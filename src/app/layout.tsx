@@ -4,8 +4,6 @@ import { Inter } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
 import "./globals.css";
-import { ThemeProvider } from "@/components/ThemeProvider";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import AuthButton from "@/components/auth/AuthButton";
 import CartButton from "@/components/marketplace/CartButton";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, TWITTER_HANDLE, DEFAULT_OG_IMAGE, BASE_KEYWORDS, getOrganizationSchema, getWebSiteSchema } from "@/lib/seo";
@@ -61,11 +59,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  icons: {
-    icon: "/nomi-logo.png",
-    apple: "/nomi-logo.png",
-  },
-  alternates: {
+alternates: {
     canonical: SITE_URL,
   },
   verification: {
@@ -81,8 +75,8 @@ export default function RootLayout({
   modal: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased bg-zinc-950 dark:bg-zinc-950 light:bg-zinc-50 text-zinc-100 dark:text-zinc-100 light:text-zinc-900 min-h-screen`}>
+    <html lang="en">
+      <body className={`${inter.variable} font-sans antialiased bg-zinc-50 text-zinc-900 min-h-screen`}>
         {/* Organization Schema */}
         <script
           type="application/ld+json"
@@ -97,32 +91,29 @@ export default function RootLayout({
             __html: JSON.stringify(getWebSiteSchema()),
           }}
         />
-        <ThemeProvider>
-          <header className="border-b border-zinc-800 dark:border-zinc-800 light:border-zinc-200 sticky top-0 bg-zinc-950/95 dark:bg-zinc-950/95 light:bg-white/95 backdrop-blur z-50">
+          <header className="border-b border-zinc-200 sticky top-0 bg-white/95 backdrop-blur z-50">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
               <Link href="/" className="group flex items-baseline gap-1.5 hover:opacity-90 transition-opacity">
-                <span className="text-2xl font-black tracking-tight text-white dark:text-white light:text-zinc-900">nomi</span>
-                <span className="text-xl font-medium tracking-tight text-zinc-500 dark:text-zinc-500 light:text-zinc-400">market</span>
+                <span className="text-2xl font-black tracking-tight text-zinc-900">nomi</span>
+                <span className="text-xl font-medium tracking-tight text-zinc-400">market</span>
               </Link>
               <div className="flex items-center gap-4">
-                <Link href="/" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors">
+                <Link href="/" className="text-zinc-600 hover:text-zinc-900 transition-colors">
                   Sets
                 </Link>
-                <Link href="/products" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors">
+                <Link href="/products" className="text-zinc-600 hover:text-zinc-900 transition-colors">
                   Products
                 </Link>
-                <Link href="/hot" className="text-zinc-400 dark:text-zinc-400 light:text-zinc-600 hover:text-white dark:hover:text-white light:hover:text-zinc-900 transition-colors flex items-center gap-1">
-                  <span className="text-orange-400">🔥</span>
+                <Link href="/hot" className="text-zinc-600 hover:text-zinc-900 transition-colors flex items-center gap-1">
                   Hot
                 </Link>
-                <Link href="/sell" className="text-sky-400 dark:text-sky-400 light:text-sky-600 hover:text-sky-300 dark:hover:text-sky-300 light:hover:text-sky-700 transition-colors font-medium">
+                <Link href="/sell" className="text-sky-600 hover:text-sky-700 transition-colors font-medium">
                   Sell
                 </Link>
-                <ThemeToggle />
                 <Suspense>
                   <CartButton />
                 </Suspense>
-                <Suspense fallback={<div className="w-8 h-8 rounded-full bg-zinc-800 animate-pulse" />}>
+                <Suspense fallback={<div className="w-8 h-8 rounded-full bg-zinc-100 animate-pulse" />}>
                   <AuthButton />
                 </Suspense>
               </div>
@@ -132,16 +123,15 @@ export default function RootLayout({
             {children}
           </main>
           {modal}
-          <footer className="border-t border-zinc-800 dark:border-zinc-800 light:border-zinc-200 mt-16">
+          <footer className="border-t border-zinc-200 mt-16">
             <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-2">
               <p>
-                <span className="font-black text-white dark:text-white light:text-zinc-900">nomi</span>{" "}<span className="font-medium text-zinc-500">market</span>
+                <span className="font-black text-zinc-900">nomi</span>{" "}<span className="font-medium text-zinc-500">market</span>
                 {" "}&mdash; The One Piece TCG Marketplace
               </p>
               <p>One Piece is a trademark of Shueisha, Toei Animation, and Bandai.</p>
             </div>
           </footer>
-        </ThemeProvider>
       </body>
     </html>
   );
