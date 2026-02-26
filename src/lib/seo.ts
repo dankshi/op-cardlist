@@ -2,7 +2,7 @@
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.nomimarket.com';
 
 export const SITE_NAME = 'NOMI Market';
-export const SITE_DESCRIPTION = 'Buy and sell authenticated TCG cards on nomi market. Every order verified in-hand from Los Angeles before it ships. Daily market prices across every set.';
+export const SITE_DESCRIPTION = 'Buy and sell authenticated TCG cards on nomi market. Every order verified before it ships. Daily market prices across every set.';
 
 // Social media handles
 export const TWITTER_HANDLE = '@nomimarket';

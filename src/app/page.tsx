@@ -9,7 +9,7 @@ import type { Card } from "@/types/card";
 
 export const metadata: Metadata = {
   title: { absolute: "nomi market — The Trusted TCG Marketplace" },
-  description: `Buy and sell authenticated TCG cards. Every order verified in-hand from Los Angeles before it ships. Daily market prices across every set.`,
+  description: `Buy and sell authenticated TCG cards. Every order verified before it ships. Daily market prices across every set.`,
   keywords: [...BASE_KEYWORDS, "NOMI Market", "nomimarket", "buy sell cards", "TCG marketplace", "trading card marketplace", "authenticated cards"],
   alternates: {
     canonical: SITE_URL,
@@ -62,8 +62,7 @@ export default async function Home() {
           </h1>
 
           <p className="text-lg text-zinc-500 mb-10 max-w-lg mx-auto leading-relaxed">
-            Every order authenticated. Every card verified in-hand
-            from Los Angeles, CA before it ships.
+            Every order authenticated. Every card verified before it ships.
           </p>
 
           <SearchHero />
