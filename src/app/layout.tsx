@@ -98,9 +98,8 @@ export default function RootLayout({
         />
           <header className="border-b border-zinc-200 sticky top-0 bg-white/95 backdrop-blur z-50">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-              <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+              <Link href="/" className="hover:opacity-90 transition-opacity">
                 <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto" />
-                <span className="text-xl font-medium tracking-tight text-zinc-400">market</span>
               </Link>
               <div className="flex items-center gap-4">
                 <Link href="/" className="text-zinc-600 hover:text-zinc-900 transition-colors">
@@ -130,9 +129,8 @@ export default function RootLayout({
           {modal}
           <footer className="border-t border-zinc-200 mt-16">
             <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-2">
-              <div className="flex items-center justify-center gap-1.5">
+              <div className="flex items-center justify-center">
                 <Image src="/nomi-slab.png" alt="nomi" width={60} height={20} className="h-5 w-auto" />
-                <span className="font-medium text-zinc-500">market</span>
               </div>
               <p>Authenticated cards. Market prices. Los Angeles, CA.</p>
             </div>
