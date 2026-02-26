@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 import "./globals.css";
@@ -59,7 +60,11 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-alternates: {
+icons: {
+    icon: "/nomi-slab.png",
+    apple: "/nomi-slab.png",
+  },
+  alternates: {
     canonical: SITE_URL,
   },
   verification: {
@@ -93,8 +98,8 @@ export default function RootLayout({
         />
           <header className="border-b border-zinc-200 sticky top-0 bg-white/95 backdrop-blur z-50">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-              <Link href="/" className="group flex items-baseline gap-1.5 hover:opacity-90 transition-opacity">
-                <span className="text-2xl font-black tracking-tight text-zinc-900">nomi</span>
+              <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+                <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto" />
                 <span className="text-xl font-medium tracking-tight text-zinc-400">market</span>
               </Link>
               <div className="flex items-center gap-4">
@@ -125,9 +130,10 @@ export default function RootLayout({
           {modal}
           <footer className="border-t border-zinc-200 mt-16">
             <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-2">
-              <p>
-                <span className="font-black text-zinc-900">nomi</span>{" "}<span className="font-medium text-zinc-500">market</span>
-              </p>
+              <div className="flex items-center justify-center gap-1.5">
+                <Image src="/nomi-slab.png" alt="nomi" width={60} height={20} className="h-5 w-auto" />
+                <span className="font-medium text-zinc-500">market</span>
+              </div>
               <p>Authenticated cards. Market prices. Los Angeles, CA.</p>
             </div>
           </footer>
