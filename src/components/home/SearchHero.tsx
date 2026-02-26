@@ -225,12 +225,12 @@ export function SearchHero() {
             loadIndex();
           }}
           onKeyDown={handleKeyDown}
-          className="w-full pl-14 pr-20 py-4 text-lg bg-zinc-900/80 light:bg-white/80 backdrop-blur-xl border border-zinc-700/50 light:border-zinc-300/50 rounded-2xl text-white light:text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 shadow-2xl shadow-black/20 light:shadow-zinc-300/30 transition-all"
+          className="w-full pl-14 pr-20 py-4 text-lg bg-white border border-zinc-200 rounded-2xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 shadow-sm transition-all"
         />
 
         {/* Keyboard shortcut hint */}
         {!query && (
-          <kbd className="absolute right-5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs text-zinc-500 bg-zinc-800/80 light:bg-zinc-200/80 rounded border border-zinc-700/50 light:border-zinc-300/50 font-mono">
+          <kbd className="absolute right-5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 bg-zinc-100 rounded border border-zinc-200 font-mono">
             <span className="text-[10px]">Ctrl</span>
             <span>K</span>
           </kbd>
@@ -244,7 +244,7 @@ export function SearchHero() {
               setItems([]);
               inputRef.current?.focus();
             }}
-            className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white light:hover:text-zinc-900 transition-colors"
+            className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-900 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -255,7 +255,7 @@ export function SearchHero() {
 
       {/* Dropdown */}
       {showDropdown && (
-        <div className="absolute top-full mt-2 w-full bg-zinc-900/95 light:bg-white/95 backdrop-blur-xl border border-zinc-700/50 light:border-zinc-300/50 rounded-xl shadow-2xl shadow-black/40 max-h-96 overflow-y-auto z-50">
+        <div className="absolute top-full mt-2 w-full bg-white border border-zinc-200 rounded-xl shadow-lg max-h-96 overflow-y-auto z-50">
           {isLoading ? (
             <div className="p-6 text-center text-zinc-500">
               <div className="animate-spin w-5 h-5 border-2 border-zinc-500 border-t-transparent rounded-full mx-auto mb-2" />
@@ -272,8 +272,8 @@ export function SearchHero() {
                       href={`/${set.id}`}
                       className={`flex items-center gap-3 px-4 py-3 transition-colors ${
                         i === selectedIndex
-                          ? "bg-zinc-800 light:bg-zinc-100"
-                          : "hover:bg-zinc-800/50 light:hover:bg-zinc-50"
+                          ? "bg-zinc-50"
+                          : "hover:bg-zinc-50"
                       }`}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => setIsOpen(false)}
@@ -314,8 +314,8 @@ export function SearchHero() {
                     href={`/card/${card.id.toLowerCase()}`}
                     className={`flex items-center gap-3 px-4 py-3 transition-colors ${
                       i === selectedIndex
-                        ? "bg-zinc-800 light:bg-zinc-100"
-                        : "hover:bg-zinc-800/50 light:hover:bg-zinc-50"
+                        ? "bg-zinc-50"
+                        : "hover:bg-zinc-50"
                     }`}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setIsOpen(false)}
@@ -344,7 +344,7 @@ export function SearchHero() {
               })}
               <Link
                 href={`/search?q=${encodeURIComponent(query)}`}
-                className="block px-4 py-3 text-sm text-center text-orange-400 light:text-orange-500 hover:text-orange-300 light:hover:text-orange-600 hover:bg-zinc-800/50 light:hover:bg-zinc-50 border-t border-zinc-800 light:border-zinc-200 transition-colors"
+                className="block px-4 py-3 text-sm text-center text-orange-500 hover:text-orange-600 hover:bg-zinc-50 border-t border-zinc-100 transition-colors"
                 onClick={() => setIsOpen(false)}
               >
                 View all results for &ldquo;{query}&rdquo;
