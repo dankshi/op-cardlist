@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { sendSellerNewOrderEmail, sendBuyerReceiptEmail } from '@/lib/email'
+import type { ShippingAddress } from '@/types/database'
 import Stripe from 'stripe'
 
 export async function POST(request: Request) {
@@ -30,16 +31,47 @@ export async function POST(request: Request) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
-      const orderId = session.metadata?.order_id
 
-      if (orderId) {
-        // Update order status to paid
+      // Support both single order_id (legacy) and comma-separated order_ids
+      const orderIds = session.metadata?.order_ids
+        ? session.metadata.order_ids.split(',')
+        : session.metadata?.order_id
+          ? [session.metadata.order_id]
+          : []
+
+      if (orderIds.length === 0) break
+
+      const buyerId = session.metadata?.buyer_id
+
+      // Retrieve shipping details from Stripe
+      const fullSession = await getStripe().checkout.sessions.retrieve(session.id, {
+        expand: ['collected_information'],
+      })
+
+      let shippingAddress: ShippingAddress | null = null
+      const stripeShipping = fullSession.collected_information?.shipping_details
+      if (stripeShipping?.address) {
+        shippingAddress = {
+          name: stripeShipping.name || '',
+          line1: stripeShipping.address.line1 || '',
+          line2: stripeShipping.address.line2 || '',
+          city: stripeShipping.address.city || '',
+          state: stripeShipping.address.state || '',
+          zip: stripeShipping.address.postal_code || '',
+          country: stripeShipping.address.country || 'US',
+        }
+      }
+
+      // Process each order
+      for (const orderId of orderIds) {
+        // Update order status to paid + shipping address
         await supabase
           .from('orders')
           .update({
             status: 'paid',
             stripe_payment_intent_id: session.payment_intent as string,
             paid_at: new Date().toISOString(),
+            ...(shippingAddress ? { shipping_address: shippingAddress } : {}),
           })
           .eq('id', orderId)
 
@@ -51,7 +83,6 @@ export async function POST(request: Request) {
 
         if (items) {
           for (const item of items) {
-            // Decrement available quantity
             const { data: listing } = await supabase
               .from('listings')
               .select('quantity_available')
@@ -69,146 +100,103 @@ export async function POST(request: Request) {
                 .eq('id', item.listing_id)
             }
           }
-        }
 
-        // Remove purchased items from buyer's cart
-        const buyerId = session.metadata?.buyer_id
-        const sellerId = session.metadata?.seller_id
-
-        if (buyerId && sellerId) {
-          // Get all listing IDs from this order
-          const listingIds = items?.map(i => i.listing_id) || []
-          if (listingIds.length > 0) {
-            await supabase
-              .from('cart_items')
-              .delete()
-              .eq('user_id', buyerId)
-              .in('listing_id', listingIds)
+          // Remove purchased items from buyer's cart
+          if (buyerId) {
+            const listingIds = items.map(i => i.listing_id)
+            if (listingIds.length > 0) {
+              await supabase
+                .from('cart_items')
+                .delete()
+                .eq('user_id', buyerId)
+                .in('listing_id', listingIds)
+            }
           }
         }
 
-        // Increment seller's total_sales and credit their balance
-        if (session.metadata?.seller_id) {
-          const { data: orderForCredit } = await supabase
-            .from('orders')
-            .select('total, platform_fee')
-            .eq('id', orderId)
-            .single()
+        // Get order to find seller and credit balance
+        const { data: order } = await supabase
+          .from('orders')
+          .select('seller_id, total, platform_fee')
+          .eq('id', orderId)
+          .single()
 
+        if (order) {
           const { data: sellerProfile } = await supabase
             .from('profiles')
             .select('total_sales, balance')
-            .eq('id', session.metadata.seller_id)
+            .eq('id', order.seller_id)
             .single()
 
-          if (sellerProfile && orderForCredit) {
-            const sellerCredit = Number(orderForCredit.total) - Number(orderForCredit.platform_fee)
+          if (sellerProfile) {
+            const sellerCredit = Number(order.total) - Number(order.platform_fee)
             await supabase
               .from('profiles')
               .update({
                 total_sales: (sellerProfile.total_sales || 0) + 1,
                 balance: Number(sellerProfile.balance || 0) + sellerCredit,
               })
-              .eq('id', session.metadata.seller_id)
-          }
-        }
-
-        // Retrieve full session for shipping details
-        const fullSession = await getStripe().checkout.sessions.retrieve(session.id, {
-          expand: ['collected_information'],
-        })
-
-        // Store shipping address on the order
-        const stripeShipping = fullSession.collected_information?.shipping_details
-        let shippingAddress = null
-        if (stripeShipping?.address) {
-          shippingAddress = {
-            name: stripeShipping.name || '',
-            line1: stripeShipping.address.line1 || '',
-            line2: stripeShipping.address.line2 || '',
-            city: stripeShipping.address.city || '',
-            state: stripeShipping.address.state || '',
-            zip: stripeShipping.address.postal_code || '',
-            country: stripeShipping.address.country || 'US',
-          }
-          await supabase
-            .from('orders')
-            .update({ shipping_address: shippingAddress })
-            .eq('id', orderId)
-        }
-
-        // Send email notifications
-        try {
-          const sellerId = session.metadata?.seller_id
-          const buyerIdForEmail = session.metadata?.buyer_id
-
-          // Get order details for email
-          const { data: orderData } = await supabase
-            .from('orders')
-            .select('total, platform_fee')
-            .eq('id', orderId)
-            .single()
-
-          const { data: orderItems } = await supabase
-            .from('order_items')
-            .select('card_name, quantity, unit_price, condition')
-            .eq('order_id', orderId)
-
-          // Get user emails via admin auth
-          const [sellerAuth, buyerAuth] = await Promise.all([
-            sellerId ? supabase.auth.admin.getUserById(sellerId) : null,
-            buyerIdForEmail ? supabase.auth.admin.getUserById(buyerIdForEmail) : null,
-          ])
-
-          const [sellerProfileData, buyerProfileData] = await Promise.all([
-            sellerId
-              ? supabase.from('profiles').select('display_name').eq('id', sellerId).single()
-              : null,
-            buyerIdForEmail
-              ? supabase.from('profiles').select('display_name').eq('id', buyerIdForEmail).single()
-              : null,
-          ])
-
-          const sellerEmail = sellerAuth?.data?.user?.email
-          const buyerEmail = buyerAuth?.data?.user?.email
-          const emailItems = (orderItems || []).map((i) => ({
-            card_name: i.card_name,
-            quantity: i.quantity,
-            unit_price: i.unit_price,
-            condition: i.condition,
-          }))
-
-          if (sellerEmail && orderData) {
-            await sendSellerNewOrderEmail({
-              sellerEmail,
-              sellerName: sellerProfileData?.data?.display_name || '',
-              orderId,
-              items: emailItems,
-              total: Number(orderData.total),
-              platformFee: Number(orderData.platform_fee),
-              buyerName: buyerProfileData?.data?.display_name || '',
-              shippingAddress,
-            })
+              .eq('id', order.seller_id)
           }
 
-          if (buyerEmail && orderData) {
-            await sendBuyerReceiptEmail({
-              buyerEmail,
-              buyerName: buyerProfileData?.data?.display_name || '',
-              orderId,
-              items: emailItems,
-              total: Number(orderData.total),
-              sellerName: sellerProfileData?.data?.display_name || '',
-            })
+          // Send email notifications
+          try {
+            const { data: orderItems } = await supabase
+              .from('order_items')
+              .select('card_name, quantity, unit_price, condition')
+              .eq('order_id', orderId)
+
+            const [sellerAuth, buyerAuth] = await Promise.all([
+              supabase.auth.admin.getUserById(order.seller_id),
+              buyerId ? supabase.auth.admin.getUserById(buyerId) : null,
+            ])
+
+            const [sellerProfileData, buyerProfileData] = await Promise.all([
+              supabase.from('profiles').select('display_name').eq('id', order.seller_id).single(),
+              buyerId
+                ? supabase.from('profiles').select('display_name').eq('id', buyerId).single()
+                : null,
+            ])
+
+            const sellerEmail = sellerAuth?.data?.user?.email
+            const buyerEmail = buyerAuth?.data?.user?.email
+            const emailItems = (orderItems || []).map((i) => ({
+              card_name: i.card_name,
+              quantity: i.quantity,
+              unit_price: i.unit_price,
+              condition: i.condition,
+            }))
+
+            if (sellerEmail) {
+              await sendSellerNewOrderEmail({
+                sellerEmail,
+                sellerName: sellerProfileData?.data?.display_name || '',
+                orderId,
+                items: emailItems,
+                total: Number(order.total),
+                platformFee: Number(order.platform_fee),
+                buyerName: buyerProfileData?.data?.display_name || '',
+                shippingAddress,
+              })
+            }
+
+            if (buyerEmail) {
+              await sendBuyerReceiptEmail({
+                buyerEmail,
+                buyerName: buyerProfileData?.data?.display_name || '',
+                orderId,
+                items: emailItems,
+                total: Number(order.total),
+                sellerName: sellerProfileData?.data?.display_name || '',
+              })
+            }
+          } catch (emailErr) {
+            console.error('Failed to send order emails:', emailErr)
           }
-        } catch (emailErr) {
-          // Log but don't fail the webhook for email errors
-          console.error('Failed to send order emails:', emailErr)
         }
       }
       break
     }
-
   }
 
   return NextResponse.json({ received: true })

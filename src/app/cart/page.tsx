@@ -44,29 +44,11 @@ export default function CartPage() {
     fetchCart()
   }
 
-  // Group items by seller for checkout (one order per seller)
-  function getSellerGroups() {
-    const map = new Map<string, { sellerId: string; subtotal: number }>()
-    for (const item of items) {
-      const seller = item.listing?.seller
-      if (!seller) continue
-      if (!map.has(seller.id)) {
-        map.set(seller.id, {
-          sellerId: seller.id,
-          subtotal: 0,
-        })
-      }
-      map.get(seller.id)!.subtotal += item.quantity * Number(item.listing!.price)
-    }
-    return Array.from(map.values())
-  }
-
-  async function handleCheckout(sellerId: string) {
+  async function handleCheckout() {
     setCheckingOut(true)
     const res = await fetch('/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seller_id: sellerId }),
     })
     const data = await res.json()
 
@@ -102,8 +84,6 @@ export default function CartPage() {
       </div>
     )
   }
-
-  const sellerGroups = getSellerGroups()
 
   return (
     <div>
@@ -235,37 +215,13 @@ export default function CartPage() {
               <p className="text-xs text-zinc-400 mt-1">Shipping calculated at checkout</p>
             </div>
 
-            {/* Checkout — one button if single seller, multiple if needed */}
-            <div className="space-y-3">
-              {sellerGroups.length === 1 ? (
-                <button
-                  onClick={() => handleCheckout(sellerGroups[0].sellerId)}
-                  disabled={checkingOut}
-                  className="w-full px-4 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer"
-                >
-                  {checkingOut ? 'Processing...' : `Checkout — $${grandTotal.toFixed(2)}`}
-                </button>
-              ) : (
-                sellerGroups.map((group, i) => (
-                  <button
-                    key={group.sellerId}
-                    onClick={() => handleCheckout(group.sellerId)}
-                    disabled={checkingOut}
-                    className="w-full px-4 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer text-sm"
-                  >
-                    {checkingOut
-                      ? 'Processing...'
-                      : `Checkout ${i + 1} of ${sellerGroups.length} — $${group.subtotal.toFixed(2)}`}
-                  </button>
-                ))
-              )}
-            </div>
-
-            {sellerGroups.length > 1 && (
-              <p className="text-xs text-zinc-400 text-center">
-                Items require separate checkouts
-              </p>
-            )}
+            <button
+              onClick={handleCheckout}
+              disabled={checkingOut}
+              className="w-full px-4 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer"
+            >
+              {checkingOut ? 'Processing...' : `Checkout — $${grandTotal.toFixed(2)}`}
+            </button>
           </div>
         </div>
       </div>
