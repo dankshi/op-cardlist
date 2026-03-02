@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { card_id, title, description, condition, price, quantity, language, is_first_edition, photo_urls } = body
+  const { card_id, title, description, condition, price, quantity, language, is_first_edition, photo_urls, grading_company, grade } = body
 
   if (!card_id || !title || !condition || !price || price <= 0) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -76,6 +76,8 @@ export async function POST(request: Request) {
       language: language || 'EN',
       is_first_edition: is_first_edition || false,
       photo_urls: photo_urls || [],
+      grading_company: grading_company || null,
+      grade: grade || null,
     })
     .select()
     .single()
