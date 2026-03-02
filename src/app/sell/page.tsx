@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { GRADING_SCALES, PHOTO_SLOTS, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap } from '@/types/database'
+import { GRADING_SCALES, type GradingCompany } from '@/types/database'
 import confetti from 'canvas-confetti'
 import Image from 'next/image'
 
@@ -33,45 +33,6 @@ function isGradeEligible(grade: string): boolean {
   return !isNaN(num) && num >= 8
 }
 
-// Front / Back slot groups for photo upload
-const FRONT_SLOTS = PHOTO_SLOTS.filter(s => s.key.startsWith('front'))
-const BACK_SLOTS = PHOTO_SLOTS.filter(s => s.key.startsWith('back'))
-
-// Client-side image compression via Canvas
-async function compressImage(file: File): Promise<Blob> {
-  const MAX_SIZE = 1600
-  const QUALITY = 0.85
-
-  return new Promise((resolve, reject) => {
-    const img = new window.Image()
-    img.onload = () => {
-      let { width, height } = img
-      if (width > MAX_SIZE || height > MAX_SIZE) {
-        const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height)
-        width = Math.round(width * ratio)
-        height = Math.round(height * ratio)
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, width, height)
-      canvas.toBlob(
-        (blob) => {
-          URL.revokeObjectURL(img.src)
-          blob ? resolve(blob) : reject(new Error('Compression failed'))
-        },
-        'image/jpeg',
-        QUALITY,
-      )
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(img.src)
-      reject(new Error('Failed to load image'))
-    }
-    img.src = URL.createObjectURL(file)
-  })
-}
 
 // ============================================
 // Bottom Step Indicator (minimal)
@@ -417,118 +378,6 @@ function StepDetails({
 }
 
 // ============================================
-// Step: Photos (raw cards only)
-// ============================================
-
-function StepPhotos({
-  photos,
-  uploading,
-  onUpload,
-  onRemove,
-}: {
-  photos: PhotoSlotMap
-  uploading: Record<string, boolean>
-  onUpload: (slot: PhotoSlotKey, file: File) => void
-  onRemove: (slot: PhotoSlotKey) => void
-}) {
-  function SlotButton({ slot }: { slot: typeof PHOTO_SLOTS[number] }) {
-    const url = photos[slot.key]
-    const isUploading = uploading[slot.key]
-    const isFull = slot.key === 'front' || slot.key === 'back'
-
-    return (
-      <label
-        className={`relative rounded-xl border-2 border-dashed transition-all cursor-pointer overflow-hidden flex items-center justify-center ${
-          url
-            ? 'border-green-300 bg-green-50'
-            : isUploading
-              ? 'border-orange-300 bg-orange-50'
-              : 'border-zinc-200 bg-zinc-50 hover:border-orange-300 hover:bg-orange-50/50'
-        } ${isFull ? 'aspect-[2.5/3.5]' : 'aspect-square'}`}
-      >
-        {url ? (
-          <>
-            <Image src={url} alt={slot.label} fill className="object-cover" sizes="200px" unoptimized />
-            <button
-              type="button"
-              onClick={(e) => { e.preventDefault(); onRemove(slot.key) }}
-              className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors z-10"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </>
-        ) : isUploading ? (
-          <div className="text-center">
-            <svg className="animate-spin h-6 w-6 text-orange-500 mx-auto mb-1" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <p className="text-xs text-orange-500">Uploading...</p>
-          </div>
-        ) : (
-          <div className="text-center p-2">
-            <svg className="w-6 h-6 text-zinc-300 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            <p className="text-[11px] text-zinc-400 leading-tight">{slot.label}</p>
-          </div>
-        )}
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) onUpload(slot.key, file)
-            e.target.value = ''
-          }}
-        />
-      </label>
-    )
-  }
-
-  const filledCount = Object.values(photos).filter(Boolean).length
-
-  return (
-    <div>
-      <h2 className="text-2xl font-bold text-zinc-900 mb-1">Upload photos</h2>
-      <p className="text-zinc-500 mb-6">
-        Buyers want to see the card&apos;s condition. Upload all 10 photos.
-        <span className="ml-2 font-medium text-zinc-700">{filledCount}/10</span>
-      </p>
-
-      {/* Front Photos */}
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-zinc-700 mb-3">Front</h3>
-        <div className="grid grid-cols-4 gap-3">
-          <div className="col-span-2 row-span-2">
-            <SlotButton slot={FRONT_SLOTS[0]} />
-          </div>
-          {FRONT_SLOTS.slice(1).map((slot) => (
-            <SlotButton key={slot.key} slot={slot} />
-          ))}
-        </div>
-      </div>
-
-      {/* Back Photos */}
-      <div>
-        <h3 className="text-sm font-semibold text-zinc-700 mb-3">Back</h3>
-        <div className="grid grid-cols-4 gap-3">
-          <div className="col-span-2 row-span-2">
-            <SlotButton slot={BACK_SLOTS[0]} />
-          </div>
-          {BACK_SLOTS.slice(1).map((slot) => (
-            <SlotButton key={slot.key} slot={slot} />
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================
 // Step: Pricing
 // ============================================
 
@@ -685,7 +534,6 @@ function StepReview({
   isGraded,
   gradingCompany,
   grade,
-  photos,
 }: {
   selectedCard: CardResult
   language: string
@@ -697,7 +545,6 @@ function StepReview({
   isGraded: boolean
   gradingCompany: GradingCompany | null
   grade: string
-  photos: PhotoSlotMap
 }) {
   const priceNum = parseFloat(price) || 0
   const qtyNum = parseInt(quantity) || 1
@@ -766,25 +613,6 @@ function StepReview({
           )}
         </div>
       </div>
-
-      {/* Photos preview (raw only) */}
-      {!isGraded && Object.values(photos).some(Boolean) && (
-        <div className="mt-4 p-4 bg-zinc-50 rounded-xl border border-zinc-200">
-          <p className="text-sm font-medium text-zinc-700 mb-3">Photos ({Object.values(photos).filter(Boolean).length}/10)</p>
-          <div className="grid grid-cols-5 gap-2">
-            {PHOTO_SLOTS.map(slot => {
-              const url = photos[slot.key]
-              return url ? (
-                <div key={slot.key} className="aspect-square relative rounded-lg overflow-hidden bg-zinc-100">
-                  <Image src={url} alt={slot.label} fill className="object-cover" sizes="80px" unoptimized />
-                </div>
-              ) : (
-                <div key={slot.key} className="aspect-square rounded-lg bg-zinc-200/50" />
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       <button
         type="button"
@@ -867,7 +695,7 @@ function SuccessScreen({ cardName, onViewDashboard, onListAnother }: {
           onClick={onViewDashboard}
           className="flex-1 px-4 py-3 rounded-xl bg-orange-500 text-white font-medium hover:bg-orange-600 transition-colors cursor-pointer"
         >
-          View Dashboard
+          View My Shop
         </button>
       </div>
     </div>
@@ -902,19 +730,14 @@ function SellPageContent() {
   const [language, setLanguage] = useState('EN')
   const [marketPrice, setMarketPrice] = useState<number | null>(null)
 
-  // Photo state (raw cards only)
-  const emptyPhotos = Object.fromEntries(PHOTO_SLOTS.map(s => [s.key, null])) as PhotoSlotMap
-  const [photos, setPhotos] = useState<PhotoSlotMap>(emptyPhotos)
-  const [photoUploading, setPhotoUploading] = useState<Record<string, boolean>>({})
-
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  // Dynamic steps: raw cards have a Photos step, graded cards skip it
-  const pricingStep = isGraded ? 3 : 4
-  const reviewStep = isGraded ? 4 : 5
-  const totalSteps = isGraded ? 4 : 5
+  // Steps: 1=Card, 2=Details, 3=Pricing, 4=Review
+  const pricingStep = 3
+  const reviewStep = 4
+  const totalSteps = 4
 
   // Check auth
   useEffect(() => {
@@ -961,7 +784,7 @@ function SellPageContent() {
             if (card.price?.marketPrice) {
               setMarketPrice(card.price.marketPrice)
             }
-            // Go to details — user needs to confirm condition & upload photos
+            // Go to details — user needs to confirm condition
             setStep(2)
           }
         })
@@ -997,44 +820,9 @@ function SellPageContent() {
       if (isGraded) return !!gradingCompany && !!grade && !!language
       return !!language
     }
-    // Photos step (raw only, step 3)
-    if (!isGraded && step === 3) {
-      const allFilled = PHOTO_SLOTS.every(s => photos[s.key])
-      const anyUploading = Object.values(photoUploading).some(Boolean)
-      return allFilled && !anyUploading
-    }
     if (step === pricingStep) return !!price && parseFloat(price) > 0 && parseInt(quantity) > 0
     if (step === reviewStep) return true
     return false
-  }
-
-  async function handlePhotoUpload(slot: PhotoSlotKey, file: File) {
-    setPhotoUploading(prev => ({ ...prev, [slot]: true }))
-    try {
-      const compressed = await compressImage(file)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-
-      const path = `${user.id}/${Date.now()}_${slot}.jpg`
-      const { error: uploadError } = await supabase.storage
-        .from('listing-photos')
-        .upload(path, compressed, { contentType: 'image/jpeg', upsert: false })
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('listing-photos')
-        .getPublicUrl(path)
-      setPhotos(prev => ({ ...prev, [slot]: publicUrl }))
-    } catch (err) {
-      console.error('Photo upload failed:', err)
-      alert('Photo upload failed. Please try again.')
-    } finally {
-      setPhotoUploading(prev => ({ ...prev, [slot]: false }))
-    }
-  }
-
-  function handlePhotoRemove(slot: PhotoSlotKey) {
-    setPhotos(prev => ({ ...prev, [slot]: null }))
   }
 
   async function handleSubmit() {
@@ -1060,7 +848,7 @@ function SellPageContent() {
           language,
           grading_company: isGraded ? gradingCompany : null,
           grade: isGraded ? grade : null,
-          photo_urls: isGraded ? [] : PHOTO_SLOTS.map(s => photos[s.key]).filter(Boolean),
+          photo_urls: [],
         }),
       })
 
@@ -1088,8 +876,6 @@ function SellPageContent() {
     setQuantity('1')
     setLanguage('EN')
     setMarketPrice(null)
-    setPhotos(emptyPhotos)
-    setPhotoUploading({})
     setError('')
     setSuccess(false)
   }
@@ -1132,15 +918,6 @@ function SellPageContent() {
           />
         )}
 
-        {!isGraded && step === 3 && selectedCard && (
-          <StepPhotos
-            photos={photos}
-            uploading={photoUploading}
-            onUpload={handlePhotoUpload}
-            onRemove={handlePhotoRemove}
-          />
-        )}
-
         {step === pricingStep && selectedCard && (
           <StepPricing
             selectedCard={selectedCard}
@@ -1164,7 +941,6 @@ function SellPageContent() {
             isGraded={isGraded}
             gradingCompany={gradingCompany}
             grade={grade}
-            photos={photos}
           />
         )}
 

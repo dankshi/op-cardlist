@@ -59,7 +59,7 @@ function OnboardingCompleteContent() {
           href="/dashboard"
           className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
         >
-          Go to Dashboard
+          Go to My Shop
         </Link>
       </div>
     )

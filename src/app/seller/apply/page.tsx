@@ -74,13 +74,13 @@ export default function SellerApplyPage() {
           </div>
           <h1 className="text-2xl font-bold text-zinc-900">You&apos;re already a seller!</h1>
           <p className="text-zinc-500 mt-2">
-            Head to your dashboard to manage listings and orders.
+            Head to your shop to manage listings and orders.
           </p>
           <Link
             href="/dashboard"
             className="inline-block mt-6 px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
           >
-            Go to Dashboard
+            Go to My Shop
           </Link>
         </div>
       </div>

@@ -223,7 +223,7 @@ export default function OrderDetailPage() {
   return (
     <div className="max-w-3xl mx-auto">
       <Link href={isSeller ? '/dashboard' : '/orders'} className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
-        &larr; {isSeller ? 'Back to Dashboard' : 'Back to Orders'}
+        &larr; {isSeller ? 'Back to My Shop' : 'Back to Orders'}
       </Link>
 
       <div className="flex items-center justify-between mb-8">

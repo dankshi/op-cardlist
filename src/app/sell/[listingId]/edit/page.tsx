@@ -222,7 +222,7 @@ export default function EditListingPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
-        &larr; Back to Dashboard
+        &larr; Back to My Shop
       </Link>
 
       <h1 className="text-3xl font-bold text-zinc-900 mb-2">Edit Listing</h1>

@@ -41,6 +41,59 @@ export async function POST(request: Request) {
   const subtotal = quantity * Number(listing.price)
   const platformFee = calculatePlatformFee(subtotal)
 
+  // Check for existing pending order for this buyer + listing
+  const { data: existingOrders } = await supabase
+    .from('orders')
+    .select('id, stripe_payment_intent_id, items:order_items(listing_id)')
+    .eq('buyer_id', user.id)
+    .eq('status', 'pending_payment')
+    .order('created_at', { ascending: false })
+
+  const existingOrder = existingOrders?.find(o =>
+    o.items?.some((item: { listing_id: string }) => item.listing_id === listing_id)
+  )
+
+  // Reuse existing pending order if it has a valid PaymentIntent
+  if (existingOrder?.stripe_payment_intent_id) {
+    try {
+      const existingPI = await getStripe().paymentIntents.retrieve(existingOrder.stripe_payment_intent_id)
+      if (existingPI.status === 'requires_payment_method' || existingPI.status === 'requires_confirmation') {
+        return NextResponse.json({
+          clientSecret: existingPI.client_secret,
+          orderId: existingOrder.id,
+          listing: {
+            title: listing.title,
+            price: Number(listing.price),
+            photo_url: listing.photo_urls?.[0] || null,
+            condition: listing.condition,
+            grading_company: listing.grading_company || null,
+            grade: listing.grade || null,
+            quantity,
+          },
+          subtotal,
+          total: subtotal,
+        })
+      }
+    } catch {
+      // PaymentIntent invalid/expired, create a new one below
+    }
+  }
+
+  // Cancel stale pending orders for this buyer + listing
+  if (existingOrders) {
+    const staleIds = existingOrders
+      .filter(o => o.items?.some((item: { listing_id: string }) => item.listing_id === listing_id))
+      .map(o => o.id)
+
+    if (staleIds.length > 0) {
+      await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .in('id', staleIds)
+    }
+  }
+
+  // Create new order
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({

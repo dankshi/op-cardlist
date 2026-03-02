@@ -61,6 +61,7 @@ export default function DashboardPage() {
         .from('orders')
         .select('*, buyer:profiles!orders_buyer_id_fkey(display_name), items:order_items(*)')
         .eq('seller_id', user.id)
+        .not('status', 'in', '("pending_payment","cancelled")')
         .order('created_at', { ascending: false })
       setOrders((o as Order[]) || [])
 
@@ -129,7 +130,7 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-zinc-900">Seller Dashboard</h1>
+        <h1 className="text-3xl font-bold text-zinc-900">My Shop</h1>
         <Link
           href="/sell"
           className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
@@ -143,10 +144,16 @@ export default function DashboardPage() {
         {[
           { label: 'Balance', value: `$${Number(profile?.balance || 0).toFixed(2)}` },
           { label: 'Active Listings', value: activeListings.length },
-          { label: 'Pending Orders', value: pendingOrders.length },
+          { label: 'Pending Orders', value: pendingOrders.length, onClick: () => setTab('orders') },
           { label: 'Total Sales', value: profile?.total_sales || 0 },
         ].map(stat => (
-          <div key={stat.label} className="bg-white border border-zinc-200 rounded-lg p-4 text-center">
+          <div
+            key={stat.label}
+            onClick={'onClick' in stat ? stat.onClick : undefined}
+            className={`bg-white border border-zinc-200 rounded-lg p-4 text-center ${
+              'onClick' in stat ? 'cursor-pointer hover:border-zinc-300 transition-colors' : ''
+            }`}
+          >
             <p className="text-2xl font-bold text-zinc-900">{stat.value}</p>
             <p className="text-xs text-zinc-500">{stat.label}</p>
           </div>
@@ -215,10 +222,10 @@ export default function DashboardPage() {
           )}
 
           <div className="space-y-3">
-          {listings.length === 0 ? (
+          {listings.filter(l => l.status !== 'sold').length === 0 ? (
             <p className="text-zinc-500 text-center py-8">No listings yet. Create your first listing!</p>
           ) : (
-            listings.map(listing => (
+            listings.filter(l => l.status !== 'sold').map(listing => (
               <Link
                 key={listing.id}
                 href={`/sell/${listing.id}/edit`}
@@ -269,39 +276,51 @@ export default function DashboardPage() {
           {orders.length === 0 ? (
             <p className="text-zinc-500 text-center py-8">No orders yet.</p>
           ) : (
-            orders.map(order => (
-              <Link
-                key={order.id}
-                href={`/orders/${order.id}`}
-                className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-zinc-900">
-                      Order #{order.id.slice(0, 8)}
-                    </p>
-                    <p className="text-sm text-zinc-500">
-                      {order.items?.length || 0} items &middot; {(order.buyer as { display_name: string })?.display_name || 'Unknown buyer'}
-                    </p>
+            orders.map(order => {
+              const firstItem = order.items?.[0]
+              return (
+                <Link
+                  key={order.id}
+                  href={`/orders/${order.id}`}
+                  className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    {firstItem?.snapshot_photo_url ? (
+                      <img
+                        src={firstItem.snapshot_photo_url}
+                        alt={firstItem.card_name}
+                        className="w-12 h-[67px] rounded object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-[67px] rounded bg-zinc-100 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-zinc-900 truncate">
+                        {firstItem?.card_name || `Order #${order.id.slice(0, 8)}`}
+                      </p>
+                      <p className="text-sm text-zinc-500">
+                        {(order.buyer as { display_name: string })?.display_name || 'Unknown buyer'}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-bold text-zinc-900">${Number(order.total).toFixed(2)}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        order.status === 'paid' ? 'bg-yellow-500/10 text-yellow-400' :
+                        order.status === 'seller_shipped' ? 'bg-blue-500/10 text-blue-400' :
+                        order.status === 'received' ? 'bg-purple-500/10 text-purple-400' :
+                        order.status === 'authenticated' ? 'bg-emerald-500/10 text-emerald-400' :
+                        order.status === 'shipped_to_buyer' ? 'bg-blue-500/10 text-blue-400' :
+                        order.status === 'shipped' ? 'bg-blue-500/10 text-blue-400' :
+                        order.status === 'delivered' ? 'bg-green-500/10 text-green-400' :
+                        'bg-zinc-200 text-zinc-500'
+                      }`}>
+                        {order.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-zinc-900">${Number(order.total).toFixed(2)}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      order.status === 'paid' ? 'bg-yellow-500/10 text-yellow-400' :
-                      order.status === 'seller_shipped' ? 'bg-blue-500/10 text-blue-400' :
-                      order.status === 'received' ? 'bg-purple-500/10 text-purple-400' :
-                      order.status === 'authenticated' ? 'bg-emerald-500/10 text-emerald-400' :
-                      order.status === 'shipped_to_buyer' ? 'bg-blue-500/10 text-blue-400' :
-                      order.status === 'shipped' ? 'bg-blue-500/10 text-blue-400' :
-                      order.status === 'delivered' ? 'bg-green-500/10 text-green-400' :
-                      'bg-zinc-200 text-zinc-500'
-                    }`}>
-                      {order.status.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))
+                </Link>
+              )
+            })
           )}
         </div>
       )}

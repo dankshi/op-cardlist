@@ -20,6 +20,20 @@ const STATUS_STYLES: Record<string, string> = {
   disputed: 'bg-red-500/10 text-red-400',
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  pending_payment: 'Pending Payment',
+  paid: 'Paid',
+  seller_shipped: 'Shipped to Platform',
+  received: 'Received',
+  authenticated: 'Authenticated',
+  shipped_to_buyer: 'Shipped to You',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded',
+  disputed: 'Disputed',
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,7 +47,10 @@ export default function OrdersPage() {
 
       const res = await fetch('/api/orders?role=buyer')
       const data = await res.json()
-      setOrders(data.orders || [])
+      const activeOrders = (data.orders || []).filter(
+        (o: Order) => o.status !== 'cancelled' && o.status !== 'pending_payment'
+      )
+      setOrders(activeOrders)
       setLoading(false)
     }
     load()
@@ -58,31 +75,49 @@ export default function OrdersPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {orders.map(order => (
-            <Link
-              key={order.id}
-              href={`/orders/${order.id}`}
-              className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-zinc-900">
-                    Order #{order.id.slice(0, 8)}
-                  </p>
-                  <p className="text-sm text-zinc-500 mt-1">
-                    {order.items?.length || 0} items &middot;{' '}
-                    {new Date(order.created_at).toLocaleDateString()}
-                  </p>
+          {orders.map(order => {
+            const firstItem = order.items?.[0]
+            return (
+              <Link
+                key={order.id}
+                href={`/orders/${order.id}`}
+                className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  {firstItem?.snapshot_photo_url ? (
+                    <img
+                      src={firstItem.snapshot_photo_url}
+                      alt={firstItem.card_name}
+                      className="w-16 h-22 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 h-22 rounded-lg bg-zinc-100 flex-shrink-0 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-zinc-900 truncate">
+                      {firstItem?.card_name || `Order #${order.id.slice(0, 8)}`}
+                    </p>
+                    {(order.items?.length || 0) > 1 && (
+                      <p className="text-xs text-zinc-400">+{(order.items?.length || 0) - 1} more</p>
+                    )}
+                    <p className="text-sm text-zinc-500 mt-1">
+                      {new Date(order.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-bold text-zinc-900">${Number(order.total).toFixed(2)}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded ${STATUS_STYLES[order.status] || ''}`}>
+                      {STATUS_LABELS[order.status] || order.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-zinc-900">${Number(order.total).toFixed(2)}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded ${STATUS_STYLES[order.status] || ''}`}>
-                    {order.status.replace('_', ' ')}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>
