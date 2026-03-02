@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 import "./globals.css";
 import AuthButton from "@/components/auth/AuthButton";
-import CartButton from "@/components/marketplace/CartButton";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, TWITTER_HANDLE, DEFAULT_OG_IMAGE, BASE_KEYWORDS, getOrganizationSchema, getWebSiteSchema } from "@/lib/seo";
 
 const inter = Inter({
@@ -109,9 +108,6 @@ export default function RootLayout({
                 <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
                   Dashboard
                 </Link>
-                <Suspense>
-                  <CartButton />
-                </Suspense>
                 <Suspense fallback={<div className="w-8 h-8 rounded-full bg-zinc-100 animate-pulse" />}>
                   <AuthButton />
                 </Suspense>

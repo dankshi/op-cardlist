@@ -1,5 +1,5 @@
 import { ConditionBadge } from './ConditionBadge'
-import { AddToCartButton } from './AddToCartButton'
+import { BuyNowButton } from './BuyNowButton'
 import type { Listing } from '@/types/database'
 
 export function ListingCard({ listing }: { listing: Listing }) {
@@ -26,7 +26,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
             <p className="text-xs text-zinc-500">{listing.quantity_available} available</p>
           )}
         </div>
-        <AddToCartButton listingId={listing.id} maxQuantity={listing.quantity_available} />
+        <BuyNowButton listingId={listing.id} price={Number(listing.price)} />
       </div>
     </div>
   )

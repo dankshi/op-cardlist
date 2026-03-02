@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { getProfileByUsername } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
-import { AddToCartButton } from '@/components/marketplace/AddToCartButton'
+import { BuyNowButton } from '@/components/marketplace/BuyNowButton'
 import type { Metadata } from 'next'
 import type { Listing } from '@/types/database'
 
@@ -93,7 +93,7 @@ export default async function SellerStorefrontPage({ params }: { params: Promise
               </div>
               <div className="flex items-center gap-4">
                 <p className="text-lg font-bold text-zinc-900">${Number(listing.price).toFixed(2)}</p>
-                <AddToCartButton listingId={listing.id} />
+                <BuyNowButton listingId={listing.id} price={Number(listing.price)} />
               </div>
             </div>
           ))}

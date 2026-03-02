@@ -16,14 +16,14 @@ export default function CheckoutCancelPage() {
       </div>
       <h1 className="text-3xl font-bold text-zinc-900 mb-3">Checkout Cancelled</h1>
       <p className="text-zinc-500 mb-8">
-        Your payment was not processed. Your cart items are still saved.
+        Your payment was not processed. No charges were made.
       </p>
       <div className="flex gap-4 justify-center">
         <Link
-          href="/cart"
-          className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
+          href="/"
+          className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors"
         >
-          Return to Cart
+          Browse Listings
         </Link>
         <Link
           href="/"

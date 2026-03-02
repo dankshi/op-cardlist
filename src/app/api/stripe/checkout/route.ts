@@ -2,23 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getStripe, calculatePlatformFee } from '@/lib/stripe'
 
-interface CartListing {
-  id: string
-  seller_id: string
-  card_id: string
-  title: string
-  price: number
-  condition: string
-  photo_urls: string[]
-  status: string
-}
-
-interface CartItemRow {
-  listing: CartListing
-  quantity: number
-}
-
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -26,102 +10,94 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Get all active cart items
-  const { data: cartItems } = await supabase
-    .from('cart_items')
-    .select('*, listing:listings(*)')
-    .eq('user_id', user.id)
+  const { listing_id, quantity = 1 } = await request.json()
 
-  const activeItems = (cartItems as CartItemRow[] | null)?.filter(
-    (item) => item.listing?.status === 'active'
-  )
-
-  if (!activeItems?.length) {
-    return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
+  if (!listing_id) {
+    return NextResponse.json({ error: 'listing_id is required' }, { status: 400 })
   }
 
-  // Group items by seller to create one order per seller
-  const sellerGroups = new Map<string, CartItemRow[]>()
-  for (const item of activeItems) {
-    const sid = item.listing.seller_id
-    if (!sellerGroups.has(sid)) sellerGroups.set(sid, [])
-    sellerGroups.get(sid)!.push(item)
+  // Fetch the listing
+  const { data: listing, error: listingError } = await supabase
+    .from('listings')
+    .select('*')
+    .eq('id', listing_id)
+    .single()
+
+  if (listingError || !listing) {
+    return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
   }
 
-  // Create orders for each seller
-  const orderIds: string[] = []
-  const allLineItems: { price_data: { currency: string; product_data: { name: string }; unit_amount: number }; quantity: number }[] = []
-
-  for (const [sellerId, sellerItems] of sellerGroups) {
-    const subtotal = sellerItems.reduce(
-      (sum, item) => sum + item.quantity * Number(item.listing.price),
-      0
-    )
-    const platformFee = calculatePlatformFee(subtotal)
-
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        buyer_id: user.id,
-        seller_id: sellerId,
-        status: 'pending_payment',
-        subtotal,
-        platform_fee: platformFee,
-        total: subtotal,
-      })
-      .select()
-      .single()
-
-    if (orderError || !order) {
-      return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
-    }
-
-    orderIds.push(order.id)
-
-    // Create order items
-    const orderItems = sellerItems.map((item) => ({
-      order_id: order.id,
-      listing_id: item.listing.id,
-      card_id: item.listing.card_id,
-      card_name: item.listing.title,
-      quantity: item.quantity,
-      unit_price: item.listing.price,
-      condition: item.listing.condition,
-      snapshot_photo_url: item.listing.photo_urls?.[0] || null,
-    }))
-
-    await supabase.from('order_items').insert(orderItems)
-
-    // Add to Stripe line items
-    for (const item of sellerItems) {
-      allLineItems.push({
-        price_data: {
-          currency: 'usd',
-          product_data: { name: item.listing.title },
-          unit_amount: Math.round(Number(item.listing.price) * 100),
-        },
-        quantity: item.quantity,
-      })
-    }
+  if (listing.status !== 'active') {
+    return NextResponse.json({ error: 'Listing is no longer available' }, { status: 400 })
   }
 
-  // Create single Stripe Checkout Session for all items
+  if (quantity > listing.quantity_available) {
+    return NextResponse.json({ error: 'Not enough stock' }, { status: 400 })
+  }
+
+  if (listing.seller_id === user.id) {
+    return NextResponse.json({ error: 'You cannot buy your own listing' }, { status: 400 })
+  }
+
+  const subtotal = quantity * Number(listing.price)
+  const platformFee = calculatePlatformFee(subtotal)
+
+  // Create the order
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .insert({
+      buyer_id: user.id,
+      seller_id: listing.seller_id,
+      status: 'pending_payment',
+      subtotal,
+      platform_fee: platformFee,
+      total: subtotal,
+    })
+    .select()
+    .single()
+
+  if (orderError || !order) {
+    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
+  }
+
+  // Create order item
+  await supabase.from('order_items').insert({
+    order_id: order.id,
+    listing_id: listing.id,
+    card_id: listing.card_id,
+    card_name: listing.title,
+    quantity,
+    unit_price: listing.price,
+    condition: listing.condition,
+    snapshot_photo_url: listing.photo_urls?.[0] || null,
+  })
+
+  // Create Stripe Checkout Session
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
   const session = await getStripe().checkout.sessions.create({
     mode: 'payment',
     customer_email: user.email || undefined,
-    line_items: allLineItems,
+    line_items: [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: { name: listing.title },
+          unit_amount: Math.round(Number(listing.price) * 100),
+        },
+        quantity,
+      },
+    ],
     shipping_address_collection: {
       allowed_countries: ['US'],
     },
     metadata: {
-      order_ids: orderIds.join(','),
+      order_ids: order.id,
       buyer_id: user.id,
     },
-    success_url: `${origin}/checkout/success?order_id=${orderIds[0]}`,
-    cancel_url: `${origin}/checkout/cancel?order_id=${orderIds[0]}`,
+    success_url: `${origin}/checkout/success?order_id=${order.id}`,
+    cancel_url: `${origin}/checkout/cancel?order_id=${order.id}`,
   })
 
-  return NextResponse.json({ url: session.url, order_ids: orderIds })
+  return NextResponse.json({ url: session.url, order_id: order.id })
 }
