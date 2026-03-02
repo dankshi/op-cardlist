@@ -16,17 +16,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'seller_id required' }, { status: 400 })
   }
 
-  // Get seller's Stripe account
-  const { data: seller } = await supabase
-    .from('profiles')
-    .select('stripe_account_id, stripe_onboarding_complete, display_name')
-    .eq('id', seller_id)
-    .single()
-
-  if (!seller?.stripe_account_id || !seller?.stripe_onboarding_complete) {
-    return NextResponse.json({ error: 'Seller not set up for payments' }, { status: 400 })
-  }
-
   // Get cart items for this seller
   const { data: cartItems } = await supabase
     .from('cart_items')
@@ -49,7 +38,7 @@ export async function POST(request: Request) {
     0
   )
   const platformFee = calculatePlatformFee(subtotal)
-  const total = subtotal // Shipping to be added later
+  const total = subtotal
 
   // Create order
   const { data: order, error: orderError } = await supabase
@@ -83,7 +72,7 @@ export async function POST(request: Request) {
 
   await supabase.from('order_items').insert(orderItems)
 
-  // Create Stripe Checkout Session
+  // Create Stripe Checkout Session — charges the platform directly
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
   const session = await getStripe().checkout.sessions.create({
@@ -101,12 +90,6 @@ export async function POST(request: Request) {
     })),
     shipping_address_collection: {
       allowed_countries: ['US'],
-    },
-    payment_intent_data: {
-      application_fee_amount: Math.round(platformFee * 100),
-      transfer_data: {
-        destination: seller.stripe_account_id,
-      },
     },
     metadata: {
       order_id: order.id,

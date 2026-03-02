@@ -87,18 +87,28 @@ export async function POST(request: Request) {
           }
         }
 
-        // Increment seller's total_sales
+        // Increment seller's total_sales and credit their balance
         if (session.metadata?.seller_id) {
+          const { data: orderForCredit } = await supabase
+            .from('orders')
+            .select('total, platform_fee')
+            .eq('id', orderId)
+            .single()
+
           const { data: sellerProfile } = await supabase
             .from('profiles')
-            .select('total_sales')
+            .select('total_sales, balance')
             .eq('id', session.metadata.seller_id)
             .single()
 
-          if (sellerProfile) {
+          if (sellerProfile && orderForCredit) {
+            const sellerCredit = Number(orderForCredit.total) - Number(orderForCredit.platform_fee)
             await supabase
               .from('profiles')
-              .update({ total_sales: (sellerProfile.total_sales || 0) + 1 })
+              .update({
+                total_sales: (sellerProfile.total_sales || 0) + 1,
+                balance: Number(sellerProfile.balance || 0) + sellerCredit,
+              })
               .eq('id', session.metadata.seller_id)
           }
         }
@@ -199,17 +209,6 @@ export async function POST(request: Request) {
       break
     }
 
-    case 'account.updated': {
-      const account = event.data.object as Stripe.Account
-      if (account.charges_enabled && account.payouts_enabled) {
-        // Mark seller as fully onboarded
-        await supabase
-          .from('profiles')
-          .update({ stripe_onboarding_complete: true })
-          .eq('stripe_account_id', account.id)
-      }
-      break
-    }
   }
 
   return NextResponse.json({ received: true })

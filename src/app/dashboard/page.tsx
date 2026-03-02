@@ -69,12 +69,6 @@ export default function DashboardPage() {
     load()
   }, [supabase, router])
 
-  async function connectStripe() {
-    const res = await fetch('/api/stripe/connect', { method: 'POST' })
-    const data = await res.json()
-    if (data.url) window.location.href = data.url
-  }
-
   async function loadMarketPrices() {
     const cardIds = [...new Set(listings.filter(l => l.status === 'active').map(l => l.card_id))]
     const prices: Record<string, number> = {}
@@ -144,25 +138,13 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stripe onboarding notice */}
-      {profile && !profile.stripe_onboarding_complete && (
-        <div className="mb-6 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-          <p className="text-yellow-300 text-sm">
-            Set up Stripe to receive payments.{' '}
-            <button onClick={connectStripe} className="text-yellow-200 underline cursor-pointer font-medium">
-              Connect Stripe Account
-            </button>
-          </p>
-        </div>
-      )}
-
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
+          { label: 'Balance', value: `$${Number(profile?.balance || 0).toFixed(2)}` },
           { label: 'Active Listings', value: activeListings.length },
           { label: 'Pending Orders', value: pendingOrders.length },
           { label: 'Total Sales', value: profile?.total_sales || 0 },
-          { label: 'Revenue', value: `$${revenue.toFixed(2)}` },
         ].map(stat => (
           <div key={stat.label} className="bg-white border border-zinc-200 rounded-lg p-4 text-center">
             <p className="text-2xl font-bold text-zinc-900">{stat.value}</p>
@@ -323,14 +305,9 @@ export default function DashboardPage() {
       {tab === 'settings' && (
         <div className="bg-white border border-zinc-200 rounded-lg p-6 space-y-4">
           <div>
-            <h3 className="font-medium text-zinc-900 mb-2">Stripe Payments</h3>
-            {profile?.stripe_onboarding_complete ? (
-              <p className="text-green-400 text-sm">Connected and ready to receive payments</p>
-            ) : (
-              <button onClick={connectStripe} className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white text-sm font-medium cursor-pointer">
-                {profile?.stripe_account_id ? 'Complete Stripe Setup' : 'Connect Stripe'}
-              </button>
-            )}
+            <h3 className="font-medium text-zinc-900 mb-2">Balance</h3>
+            <p className="text-2xl font-bold text-zinc-900">${Number(profile?.balance || 0).toFixed(2)}</p>
+            <p className="text-zinc-500 text-sm mt-1">Credits from sales (1:1 USD). Cash out coming soon.</p>
           </div>
           <div>
             <h3 className="font-medium text-zinc-900 mb-2">Platform Fee</h3>

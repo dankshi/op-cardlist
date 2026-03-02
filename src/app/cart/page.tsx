@@ -44,16 +44,15 @@ export default function CartPage() {
     fetchCart()
   }
 
-  // Group items by seller for checkout (Stripe requires separate sessions per seller)
+  // Group items by seller for checkout (one order per seller)
   function getSellerGroups() {
-    const map = new Map<string, { sellerId: string; stripeReady: boolean; subtotal: number }>()
+    const map = new Map<string, { sellerId: string; subtotal: number }>()
     for (const item of items) {
       const seller = item.listing?.seller
       if (!seller) continue
       if (!map.has(seller.id)) {
         map.set(seller.id, {
           sellerId: seller.id,
-          stripeReady: !!seller.stripe_account_id,
           subtotal: 0,
         })
       }
@@ -241,24 +240,22 @@ export default function CartPage() {
               {sellerGroups.length === 1 ? (
                 <button
                   onClick={() => handleCheckout(sellerGroups[0].sellerId)}
-                  disabled={checkingOut || !sellerGroups[0].stripeReady}
+                  disabled={checkingOut}
                   className="w-full px-4 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer"
                 >
-                  {checkingOut ? 'Processing...' : !sellerGroups[0].stripeReady ? 'Seller not ready' : `Checkout — $${grandTotal.toFixed(2)}`}
+                  {checkingOut ? 'Processing...' : `Checkout — $${grandTotal.toFixed(2)}`}
                 </button>
               ) : (
                 sellerGroups.map((group, i) => (
                   <button
                     key={group.sellerId}
                     onClick={() => handleCheckout(group.sellerId)}
-                    disabled={checkingOut || !group.stripeReady}
+                    disabled={checkingOut}
                     className="w-full px-4 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer text-sm"
                   >
                     {checkingOut
                       ? 'Processing...'
-                      : !group.stripeReady
-                        ? 'Seller not ready'
-                        : `Checkout ${i + 1} of ${sellerGroups.length} — $${group.subtotal.toFixed(2)}`}
+                      : `Checkout ${i + 1} of ${sellerGroups.length} — $${group.subtotal.toFixed(2)}`}
                   </button>
                 ))
               )}

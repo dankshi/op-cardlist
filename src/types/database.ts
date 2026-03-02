@@ -16,6 +16,7 @@ export interface Profile {
   rating_avg: number
   rating_count: number
   total_sales: number
+  balance: number
   created_at: string
   updated_at: string
 }
