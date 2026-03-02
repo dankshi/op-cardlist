@@ -100,6 +100,9 @@ export default function RootLayout({
                 <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto" />
               </Link>
               <div className="flex items-center gap-4">
+                <Link href="/marketplace" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
+                  Marketplace
+                </Link>
                 <Link href="/about" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
                   How It Works
                 </Link>

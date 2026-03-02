@@ -6,8 +6,13 @@ export async function GET(request: Request) {
   const cardId = searchParams.get('card_id')
   const sellerId = searchParams.get('seller_id')
   const condition = searchParams.get('condition')
+  const gradingCompany = searchParams.get('grading_company')
+  const grade = searchParams.get('grade')
+  const minPrice = searchParams.get('min_price')
+  const maxPrice = searchParams.get('max_price')
+  const search = searchParams.get('search')
   const sort = searchParams.get('sort') || 'price_asc'
-  const limit = Math.min(Number(searchParams.get('limit') || 50), 100)
+  const limit = Math.min(Number(searchParams.get('limit') || 50), 500)
   const offset = Number(searchParams.get('offset') || 0)
 
   const supabase = await createClient()
@@ -20,6 +25,15 @@ export async function GET(request: Request) {
   if (cardId) query = query.eq('card_id', cardId)
   if (sellerId) query = query.eq('seller_id', sellerId)
   if (condition) query = query.eq('condition', condition)
+  if (gradingCompany === 'raw') {
+    query = query.is('grading_company', null)
+  } else if (gradingCompany) {
+    query = query.eq('grading_company', gradingCompany)
+  }
+  if (grade) query = query.eq('grade', grade)
+  if (minPrice) query = query.gte('price', Number(minPrice))
+  if (maxPrice) query = query.lte('price', Number(maxPrice))
+  if (search) query = query.ilike('title', `%${search}%`)
 
   if (sort === 'price_asc') query = query.order('price', { ascending: true })
   else if (sort === 'price_desc') query = query.order('price', { ascending: false })
