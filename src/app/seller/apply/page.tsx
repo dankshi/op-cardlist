@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { SubmitButton, AuthError } from '@/components/auth/AuthForm'
+import { AuthError } from '@/components/auth/AuthForm'
 import type { Profile } from '@/types/database'
 
 export default function SellerApplyPage() {
@@ -129,11 +129,23 @@ export default function SellerApplyPage() {
 
           <AuthError message={error} />
 
-          <SubmitButton pending={pending}>
-            <span className="cursor-pointer" onClick={handleApply}>
-              I Agree — Start Selling
-            </span>
-          </SubmitButton>
+          <button
+            onClick={handleApply}
+            disabled={pending}
+            className="w-full px-4 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-orange-700 disabled:cursor-not-allowed text-white font-semibold transition-colors cursor-pointer"
+          >
+            {pending ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Loading...
+              </span>
+            ) : (
+              'I Agree — Start Selling'
+            )}
+          </button>
         </div>
       </div>
     </div>
