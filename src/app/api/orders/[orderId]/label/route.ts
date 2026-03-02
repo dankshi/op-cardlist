@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getShippingRates, createShippingLabel } from '@/lib/shippo'
+import { getShippingRates, createShippingLabel, PLATFORM_ADDRESS } from '@/lib/shippo'
 
 export async function POST(
   _request: Request,
@@ -49,15 +49,18 @@ export async function POST(
   }
 
   try {
-    // Get rates first to know the cost
-    const sellerAddress = {
-      name: profile.display_name || 'Seller',
-      street1: profile.shipping_street1 || '',
-      city: profile.shipping_city || '',
-      state: profile.shipping_state || '',
-      zip: profile.shipping_zip || '',
-      country: 'US',
-    }
+    // Use seller's address if available, otherwise fall back to platform address
+    const hasSellerAddress = profile.shipping_street1 && profile.shipping_city && profile.shipping_state && profile.shipping_zip
+    const sellerAddress = hasSellerAddress
+      ? {
+          name: profile.display_name || 'Seller',
+          street1: profile.shipping_street1,
+          city: profile.shipping_city,
+          state: profile.shipping_state,
+          zip: profile.shipping_zip,
+          country: 'US',
+        }
+      : { ...PLATFORM_ADDRESS, name: profile.display_name || 'Seller' }
 
     const rates = await getShippingRates(sellerAddress)
 
