@@ -253,8 +253,15 @@ function findMatchingProduct(card: Card, products: TCGPlayerProduct[], debug: bo
   return result || null;
 }
 
-// Fetch the most recent sale for a product from TCGPlayer
-async function fetchLastSoldPrice(productId: number): Promise<{ price: number; date: string } | null> {
+interface SaleRecord {
+  price: number;
+  date: string;
+  condition: string | null;
+  quantity: number;
+}
+
+// Fetch all recent sales for a product from TCGPlayer
+async function fetchSales(productId: number): Promise<SaleRecord[]> {
   try {
     const res = await fetch(`https://mpapi.tcgplayer.com/v2/product/${productId}/latestsales`, {
       method: 'POST',
@@ -263,22 +270,26 @@ async function fetchLastSoldPrice(productId: number): Promise<{ price: number; d
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ listingType: 'All' }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) return [];
 
     const text = await res.text();
-    if (text.startsWith('<')) return null; // HTML = rate limited
+    if (text.startsWith('<')) return []; // HTML = rate limited
 
     const data = JSON.parse(text);
     const sales = data.data || data;
-    if (Array.isArray(sales) && sales.length > 0) {
-      return { price: sales[0].purchasePrice, date: sales[0].orderDate };
-    }
-    return null;
+    if (!Array.isArray(sales)) return [];
+
+    return sales.map((s: any) => ({
+      price: s.purchasePrice,
+      date: s.orderDate,
+      condition: s.condition ?? null,
+      quantity: s.quantity ?? 1,
+    }));
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -543,51 +554,79 @@ async function main() {
     }
   }
 
-  // Fetch last sold prices for all matched products
+  // Fetch sales history for all matched products — flush to DB as we go
   if (matchedProductIds.length > 0) {
-    console.log(`\nFetching last sold prices for ${matchedProductIds.length} products...`);
+    console.log(`\nFetching sales for ${matchedProductIds.length} products...`);
     let lastSoldFound = 0;
-    const lastSoldRows: { card_id: string; last_sold_price: number; last_sold_date: string }[] = [];
+    let totalSalesStored = 0;
+    let pendingLastSold: { card_id: string; last_sold_price: number; last_sold_date: string }[] = [];
+    let pendingSales: { tcgplayer_product_id: number; sold_at: string; price: number; condition: string | null; quantity: number }[] = [];
+    const FLUSH_SIZE = 500;
     const batchSize = 5;
+
+    async function flushPending() {
+      if (pendingLastSold.length > 0) {
+        const { error } = await supabase
+          .from('card_prices')
+          .upsert(pendingLastSold, { onConflict: 'card_id' });
+        if (error) console.error(`  Supabase last sold upsert error:`, error.message);
+        pendingLastSold = [];
+      }
+      if (pendingSales.length > 0) {
+        const { error } = await supabase
+          .from('card_sales')
+          .upsert(pendingSales, { onConflict: 'tcgplayer_product_id,sold_at,price,condition', ignoreDuplicates: true });
+        if (error) {
+          console.error(`  Supabase card_sales upsert error:`, error.message);
+        } else {
+          totalSalesStored += pendingSales.length;
+        }
+        pendingSales = [];
+      }
+    }
+
     for (let i = 0; i < matchedProductIds.length; i += batchSize) {
       const batch = matchedProductIds.slice(i, i + batchSize);
       const results = await Promise.all(
-        batch.map(({ productId }) => fetchLastSoldPrice(productId))
+        batch.map(({ productId }) => fetchSales(productId))
       );
       for (let j = 0; j < batch.length; j++) {
-        const { cardId } = batch[j];
-        const sale = results[j];
-        if (sale) {
-          lastSoldRows.push({
+        const { cardId, productId } = batch[j];
+        const sales = results[j];
+        if (sales.length > 0) {
+          pendingLastSold.push({
             card_id: cardId,
-            last_sold_price: sale.price,
-            last_sold_date: sale.date,
+            last_sold_price: sales[0].price,
+            last_sold_date: sales[0].date,
           });
           lastSoldFound++;
+
+          for (const sale of sales) {
+            pendingSales.push({
+              tcgplayer_product_id: productId,
+              sold_at: sale.date,
+              price: sale.price,
+              condition: sale.condition,
+              quantity: sale.quantity,
+            });
+          }
         }
       }
+
+      // Flush to DB every FLUSH_SIZE sales
+      if (pendingSales.length >= FLUSH_SIZE) {
+        await flushPending();
+      }
+
       if (i % 50 === 0 && i > 0) {
-        process.stdout.write(`  ${i}/${matchedProductIds.length}\r`);
+        process.stdout.write(`  ${i}/${matchedProductIds.length} (${totalSalesStored} sales stored)\r`);
       }
       await sleep(100); // Rate limit between batches
     }
-    console.log(`  Found last sold price for ${lastSoldFound}/${matchedProductIds.length} products`);
 
-    // Update last sold prices in Supabase
-    if (lastSoldRows.length > 0) {
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < lastSoldRows.length; i += BATCH_SIZE) {
-        const batch = lastSoldRows.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase
-          .from('card_prices')
-          .upsert(batch, { onConflict: 'card_id' });
-
-        if (error) {
-          console.error(`  Supabase last sold upsert error:`, error.message);
-        }
-      }
-      console.log(`  Updated ${lastSoldRows.length} last sold prices in Supabase`);
-    }
+    // Flush remaining
+    await flushPending();
+    console.log(`  Found sales for ${lastSoldFound}/${matchedProductIds.length} products (${totalSalesStored} total sales stored)`);
   }
 
   const totalTime = formatTime(Date.now() - startTime);

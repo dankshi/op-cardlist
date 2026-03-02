@@ -27,9 +27,16 @@ export interface Profile {
 export type CardCondition =
   | 'near_mint'
   | 'lightly_played'
-  | 'moderately_played'
-  | 'heavily_played'
   | 'damaged'
+
+export type GradingCompany = 'PSA' | 'CGC' | 'BGS' | 'TAG'
+
+export const GRADING_SCALES: Record<GradingCompany, string[]> = {
+  PSA: ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  CGC: ['10', '9.9', '9.8', '9.6', '9.4', '9.2', '9', '8.5', '8', '7.5', '7', '6.5', '6', '5.5', '5', '4.5', '4', '3.5', '3', '2.5', '2', '1.8', '1.5', '1', '0.5'],
+  BGS: ['Black Label 10', '10', '9.5', '9', '8.5', '8', '7.5', '7', '6.5', '6', '5.5', '5', '4.5', '4', '3.5', '3', '2.5', '2', '1.5', '1'],
+  TAG: ['Pristine 10', '10', '9', '8.5', '8', '7.5', '7', '6.5', '6', '5.5', '5', '4.5', '4', '3.5', '3', '2.5', '2', '1.5', '1'],
+}
 
 export type ListingStatus = 'active' | 'sold' | 'reserved' | 'delisted'
 
@@ -56,6 +63,8 @@ export interface Listing {
   is_first_edition: boolean
   photo_urls: string[]
   status: ListingStatus
+  grading_company: GradingCompany | null
+  grade: string | null
   tcgplayer_product_id: number | null
   created_at: string
   updated_at: string
@@ -135,6 +144,27 @@ export interface Review {
   updated_at: string
   // Joined fields
   reviewer?: Profile
+}
+
+// ============================================
+// Bids Types
+// ============================================
+
+export type BidStatus = 'active' | 'filled' | 'cancelled' | 'expired'
+
+export interface Bid {
+  id: string
+  user_id: string
+  card_id: string
+  price: number
+  quantity: number
+  condition_min: CardCondition
+  status: BidStatus
+  expires_at: string
+  created_at: string
+  updated_at: string
+  // Joined fields
+  user?: Profile
 }
 
 // ============================================
@@ -220,23 +250,38 @@ export interface Message {
 export const CONDITION_LABELS: Record<CardCondition, string> = {
   near_mint: 'Near Mint',
   lightly_played: 'Lightly Played',
-  moderately_played: 'Moderately Played',
-  heavily_played: 'Heavily Played',
   damaged: 'Damaged',
 }
 
 export const CONDITION_SHORT: Record<CardCondition, string> = {
   near_mint: 'NM',
   lightly_played: 'LP',
-  moderately_played: 'MP',
-  heavily_played: 'HP',
   damaged: 'DMG',
 }
 
 export const CONDITION_COLORS: Record<CardCondition, string> = {
   near_mint: 'text-green-400 bg-green-400/10',
   lightly_played: 'text-yellow-400 bg-yellow-400/10',
-  moderately_played: 'text-orange-400 bg-orange-400/10',
-  heavily_played: 'text-red-400 bg-red-400/10',
   damaged: 'text-zinc-400 bg-zinc-400/10',
 }
+
+// ============================================
+// Photo Slot Types
+// ============================================
+
+export const PHOTO_SLOTS = [
+  { key: 'front', label: 'Front' },
+  { key: 'back', label: 'Back' },
+  { key: 'front_tl', label: 'Front Top-Left' },
+  { key: 'front_tr', label: 'Front Top-Right' },
+  { key: 'front_bl', label: 'Front Bottom-Left' },
+  { key: 'front_br', label: 'Front Bottom-Right' },
+  { key: 'back_tl', label: 'Back Top-Left' },
+  { key: 'back_tr', label: 'Back Top-Right' },
+  { key: 'back_bl', label: 'Back Bottom-Left' },
+  { key: 'back_br', label: 'Back Bottom-Right' },
+] as const
+
+export type PhotoSlotKey = typeof PHOTO_SLOTS[number]['key']
+
+export type PhotoSlotMap = Record<PhotoSlotKey, string | null>

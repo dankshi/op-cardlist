@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { supabase } from '@/lib/supabase';
 
 interface PriceSnapshot {
   date: string;
@@ -58,18 +59,41 @@ export function getPriceFromDaysAgo(cardId: string, daysAgo: number): number | n
 }
 
 /**
- * Calculate price change for a card over N days
+ * Calculate price change for a card over N days (Supabase)
  */
-export function calculatePriceChange(
+export async function calculatePriceChange(
   cardId: string,
   currentPrice: number | null,
   daysAgo: number = 7
-): PriceChange | null {
-  if (currentPrice == null) return null;
+): Promise<PriceChange | null> {
+  if (currentPrice == null || !supabase) return null;
 
-  const previousPrice = getPriceFromDaysAgo(cardId, daysAgo);
-  if (previousPrice == null) return null;
+  // Look up tcgplayer_product_id
+  const { data: mapping } = await supabase
+    .from('card_prices')
+    .select('tcgplayer_product_id')
+    .eq('card_id', cardId)
+    .single();
 
+  if (!mapping?.tcgplayer_product_id) return null;
+
+  // Get the price from ~N days ago
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() - daysAgo);
+  const dateStr = targetDate.toISOString().split('T')[0];
+
+  const { data: row } = await supabase
+    .from('card_price_history')
+    .select('market_price')
+    .eq('tcgplayer_product_id', mapping.tcgplayer_product_id)
+    .lte('recorded_date', dateStr)
+    .order('recorded_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!row?.market_price) return null;
+
+  const previousPrice = Number(row.market_price);
   const change = currentPrice - previousPrice;
   const changePercent = previousPrice > 0 ? ((change / previousPrice) * 100) : 0;
 
@@ -162,25 +186,85 @@ export function calculateBatchPriceChanges(
 }
 
 /**
- * Get price history for a specific card (last N days)
+ * Get price history for a specific card (last N days) from Supabase
  */
-export function getCardPriceHistory(
+export async function getCardPriceHistory(
   cardId: string,
   days: number = 30
-): { date: string; price: number }[] {
-  const files = getPriceHistoryFiles();
-  const history: { date: string; price: number }[] = [];
+): Promise<{ date: string; price: number }[]> {
+  if (!supabase) return [];
 
-  for (let i = 0; i < Math.min(days, files.length); i++) {
-    const snapshot = loadPriceSnapshot(files[i]);
-    if (snapshot && snapshot.prices[cardId] != null) {
-      history.push({
-        date: snapshot.date,
-        price: snapshot.prices[cardId],
-      });
-    }
-  }
+  // Look up tcgplayer_product_id
+  const { data: mapping } = await supabase
+    .from('card_prices')
+    .select('tcgplayer_product_id')
+    .eq('card_id', cardId)
+    .single();
 
-  // Reverse to show oldest first (for charts)
-  return history.reverse();
+  if (!mapping?.tcgplayer_product_id) return [];
+
+  // Query price history for the last N days
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const dateStr = startDate.toISOString().split('T')[0];
+
+  const { data: rows } = await supabase
+    .from('card_price_history')
+    .select('recorded_date, market_price')
+    .eq('tcgplayer_product_id', mapping.tcgplayer_product_id)
+    .gte('recorded_date', dateStr)
+    .order('recorded_date', { ascending: true });
+
+  if (!rows) return [];
+
+  return rows
+    .filter(r => r.market_price != null)
+    .map(r => ({
+      date: r.recorded_date,
+      price: Number(r.market_price),
+    }));
+}
+
+export interface SalePoint {
+  date: string;
+  price: number;
+  condition: string | null;
+  quantity: number;
+}
+
+/**
+ * Get individual sales for a card from Supabase card_sales table
+ */
+export async function getCardSales(
+  cardId: string,
+  days: number = 30
+): Promise<SalePoint[]> {
+  if (!supabase) return [];
+
+  const { data: mapping } = await supabase
+    .from('card_prices')
+    .select('tcgplayer_product_id')
+    .eq('card_id', cardId)
+    .single();
+
+  if (!mapping?.tcgplayer_product_id) return [];
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  const { data: rows } = await supabase
+    .from('card_sales')
+    .select('sold_at, price, condition, quantity')
+    .eq('tcgplayer_product_id', mapping.tcgplayer_product_id)
+    .gte('sold_at', startDate.toISOString())
+    .order('sold_at', { ascending: true });
+
+  if (!rows) return [];
+
+  return rows.map(r => ({
+    date: r.sold_at,
+    price: Number(r.price),
+    condition: r.condition,
+    quantity: r.quantity ?? 1,
+  }));
 }
