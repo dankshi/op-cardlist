@@ -108,9 +108,18 @@ export async function getSetBySlug(slug: string): Promise<CardSet | undefined> {
   return setWithMergedPrices(set, prices);
 }
 
+/** Rarities excluded from browsing surfaces (too low value for marketplace). */
+export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R']);
+
 export async function getAllCards(): Promise<Card[]> {
   const prices = await fetchPrices();
   return database.sets.flatMap(set => set.cards).map(card => mergePrice(card, prices));
+}
+
+/** All cards excluding C/UC/R — used for browsing, search, and carousels. */
+export async function getBrowsableCards(): Promise<Card[]> {
+  const all = await getAllCards();
+  return all.filter(card => !HIDDEN_RARITIES.has(card.rarity));
 }
 
 export async function getCardById(cardId: string): Promise<Card | undefined> {
@@ -166,7 +175,22 @@ function tokenMatchesCard(token: string, card: Card): boolean {
   );
 }
 
-export async function searchCards(query: string): Promise<Card[]> {
+// Name-only matching: card name, ID, and set — no effect/trait text
+function tokenMatchesCardName(token: string, card: Card): boolean {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escaped, 'i');
+  const wordRegex = new RegExp(`\\b${escaped}\\b`, 'i');
+
+  return (
+    wordRegex.test(card.name) ||
+    regex.test(card.id) ||
+    regex.test(card.setId) ||
+    (setNameLookup[card.setId] ? regex.test(setNameLookup[card.setId]) : false) ||
+    (card.price?.tcgplayerProductName ? regex.test(card.price.tcgplayerProductName) : false)
+  );
+}
+
+export async function searchCards(query: string, nameOnly = false): Promise<Card[]> {
   // Tokenize: split on whitespace, filter out empty/noise tokens
   const noiseWords = new Set(['one', 'piece', 'card', 'tcg', 'the', 'a', 'of', 'and', 'in', 'from']);
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
@@ -176,9 +200,12 @@ export async function searchCards(query: string): Promise<Card[]> {
 
   if (searchTokens.length === 0) return [];
 
+  const matcher = nameOnly ? tokenMatchesCardName : tokenMatchesCard;
+
   const allCards = await getAllCards();
   return allCards
-    .filter(card => searchTokens.every(token => tokenMatchesCard(token, card)))
+    .filter(card => !HIDDEN_RARITIES.has(card.rarity))
+    .filter(card => searchTokens.every(token => matcher(token, card)))
     .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0));
 }
 
@@ -261,7 +288,7 @@ export function getSetIndex(): SetIndexEntry[] {
 }
 
 export async function getSearchIndex(): Promise<SearchIndexEntry[]> {
-  return (await getAllCards()).map(card => ({
+  return (await getBrowsableCards()).map(card => ({
     id: card.id,
     name: card.name,
     tcgName: card.price?.tcgplayerProductName ?? null,

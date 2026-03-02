@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getAllSets, getAllCards, getAllSetImages } from "@/lib/cards";
+import { getAllSets, getBrowsableCards, getAllSetImages } from "@/lib/cards";
 import { getTopPriceMovers, getPriceHistoryFiles } from "@/lib/price-history";
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, BASE_KEYWORDS } from "@/lib/seo";
@@ -27,7 +27,7 @@ function getSetShortName(fullName: string): string {
 
 export default async function Home() {
   const sets = getAllSets();
-  const allCards = await getAllCards();
+  const allCards = await getBrowsableCards();
   const totalCards = sets.reduce((sum, set) => sum + set.cardCount, 0);
   const setImages = getAllSetImages();
   const cardMap = new Map(allCards.map((c) => [c.id, c]));
@@ -76,12 +76,12 @@ export default async function Home() {
     const supabase = await createClient();
     const { data: recentListings } = await supabase
       .from("listings")
-      .select("*, seller:profiles(display_name, username)")
+      .select("*")
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .limit(12);
 
-    enrichedListings = (recentListings || [])
+    const mapped = (recentListings || [])
       .map((listing: any) => {
         const card = cardMap.get(listing.card_id);
         if (!card) return null;
@@ -92,11 +92,12 @@ export default async function Home() {
           cardImageUrl: card.imageUrl,
           price: listing.price,
           condition: listing.condition,
-          sellerName: listing.seller?.display_name || "Seller",
+          grading_company: listing.grading_company || null,
+          grade: listing.grade || null,
           createdAt: listing.created_at,
-        };
-      })
-      .filter((l: EnrichedListing | null): l is EnrichedListing => l !== null);
+        } as EnrichedListing;
+      });
+    enrichedListings = mapped.filter((l): l is EnrichedListing => l !== null);
   } catch {
     // Supabase unavailable — skip listings section
   }

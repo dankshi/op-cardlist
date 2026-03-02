@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCardById } from '@/lib/cards'
 
 export async function GET() {
   const supabase = await createClient()
@@ -25,7 +26,22 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ items: data })
+  // Enrich items with card image URLs
+  const items = await Promise.all(
+    (data || []).map(async (item: { listing?: { card_id?: string; photo_urls?: string[] } }) => {
+      const cardId = item.listing?.card_id
+      if (cardId) {
+        const card = await getCardById(cardId)
+        return {
+          ...item,
+          card_image_url: item.listing?.photo_urls?.[0] || card?.imageUrl || null,
+        }
+      }
+      return { ...item, card_image_url: null }
+    })
+  )
+
+  return NextResponse.json({ items })
 }
 
 export async function POST(request: Request) {

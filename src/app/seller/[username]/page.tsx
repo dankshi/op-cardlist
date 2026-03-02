@@ -85,7 +85,7 @@ export default async function SellerStorefrontPage({ params }: { params: Promise
               <div>
                 <p className="font-medium text-zinc-900">{listing.title}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <ConditionBadge condition={listing.condition} />
+                  <ConditionBadge condition={listing.condition} gradingCompany={listing.grading_company} grade={listing.grade} />
                   {listing.quantity_available > 1 && (
                     <span className="text-xs text-zinc-500">{listing.quantity_available} available</span>
                   )}

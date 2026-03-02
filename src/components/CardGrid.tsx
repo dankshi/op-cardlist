@@ -15,7 +15,7 @@ interface CardGridProps {
 
 const COLORS: CardColor[] = ["Red", "Green", "Blue", "Purple", "Black", "Yellow"];
 const TYPES: CardType[] = ["LEADER", "CHARACTER", "EVENT", "STAGE"];
-const RARITIES: Rarity[] = ["L", "SEC", "SP", "SR", "R", "UC", "C"];
+const RARITIES: Rarity[] = ["L", "SEC", "SP", "SR"];
 
 // Selected state colors for card color filters
 const colorClassesSelected: Record<CardColor, string> = {

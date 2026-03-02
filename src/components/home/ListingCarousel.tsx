@@ -12,7 +12,8 @@ export interface EnrichedListing {
   cardImageUrl: string;
   price: number;
   condition: CardCondition;
-  sellerName: string;
+  grading_company?: string | null;
+  grade?: string | null;
   createdAt: string;
 }
 
@@ -148,16 +149,11 @@ export function ListingCarousel({
                   <span className="text-sm font-bold text-zinc-900">
                     ${Number(listing.price).toFixed(2)}
                   </span>
-                  <ConditionBadge condition={listing.condition} />
+                  <ConditionBadge condition={listing.condition} gradingCompany={listing.grading_company} grade={listing.grade} />
                 </div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs text-zinc-400 truncate">
-                    {listing.sellerName}
-                  </span>
-                  <span className="text-xs text-zinc-400 flex-shrink-0">
-                    {timeAgo(listing.createdAt)}
-                  </span>
-                </div>
+                <p className="text-xs text-zinc-400 mt-1">
+                  {timeAgo(listing.createdAt)}
+                </p>
               </div>
             </Link>
           ))}

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { searchCards, searchSets, getAllCards } from "@/lib/cards";
+import { searchCards, searchSets, getBrowsableCards } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
 
 interface PageProps {
@@ -30,7 +30,7 @@ export async function generateMetadata({
 
 export default async function SearchPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
-  const allCards = await getAllCards();
+  const allCards = await getBrowsableCards();
   const matchedSets = q ? searchSets(q) : [];
 
   return (

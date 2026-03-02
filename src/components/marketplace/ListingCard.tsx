@@ -1,17 +1,14 @@
-import Link from 'next/link'
 import { ConditionBadge } from './ConditionBadge'
 import { AddToCartButton } from './AddToCartButton'
 import type { Listing } from '@/types/database'
 
 export function ListingCard({ listing }: { listing: Listing }) {
-  const seller = listing.seller
-
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors">
       <div className="flex items-center gap-4 min-w-0">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <ConditionBadge condition={listing.condition} />
+          <div className="flex items-center gap-2">
+            <ConditionBadge condition={listing.condition} gradingCompany={listing.grading_company} grade={listing.grade} />
             {listing.language !== 'EN' && (
               <span className="px-1.5 py-0.5 rounded text-xs bg-zinc-200 text-zinc-600">{listing.language}</span>
             )}
@@ -19,22 +16,6 @@ export function ListingCard({ listing }: { listing: Listing }) {
               <span className="px-1.5 py-0.5 rounded text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20">1st Ed</span>
             )}
           </div>
-          {seller && (
-            <Link
-              href={seller.username ? `/seller/${seller.username}` : '#'}
-              className="text-sm text-zinc-500 hover:text-orange-400 transition-colors"
-            >
-              {seller.display_name || 'Unknown Seller'}
-              {seller.rating_count > 0 && (
-                <span className="ml-1 text-yellow-400">
-                  {'★'.repeat(Math.round(seller.rating_avg))} ({seller.rating_count})
-                </span>
-              )}
-            </Link>
-          )}
-          {listing.description && (
-            <p className="text-xs text-zinc-500 mt-1 line-clamp-1">{listing.description}</p>
-          )}
         </div>
       </div>
 

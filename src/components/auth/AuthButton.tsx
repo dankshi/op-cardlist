@@ -102,36 +102,7 @@ export default function AuthButton() {
           >
             My Orders
           </Link>
-          <Link
-            href="/collection"
-            onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-          >
-            My Collection
-          </Link>
-          <Link
-            href="/wants"
-            onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-          >
-            Want List
-          </Link>
-          <Link
-            href="/decks"
-            onClick={() => setMenuOpen(false)}
-            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-          >
-            My Decks
-          </Link>
-
           <div className="border-t border-zinc-200 mt-1 pt-1">
-            <Link
-              href="/dashboard"
-              onClick={() => setMenuOpen(false)}
-              className="block px-4 py-2 text-sm text-orange-400 hover:bg-zinc-50"
-            >
-              Seller Dashboard
-            </Link>
             <Link
               href="/sell"
               onClick={() => setMenuOpen(false)}

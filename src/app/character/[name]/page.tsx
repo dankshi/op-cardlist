@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getAllCards } from '@/lib/cards';
+import { getBrowsableCards } from '@/lib/cards';
 import { getAllCharacterSlugs, buildCharacterIndex } from '@/lib/characters';
 import { SITE_URL, SITE_NAME, getBreadcrumbSchema } from '@/lib/seo';
 
@@ -17,7 +17,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { name: slug } = await params;
-  const allCards = await getAllCards();
+  const allCards = await getBrowsableCards();
   const index = buildCharacterIndex(allCards);
   const character = index.find((c) => c.slug === slug);
 
@@ -79,7 +79,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CharacterPage({ params }: PageProps) {
   const { name: slug } = await params;
-  const allCards = await getAllCards();
+  const allCards = await getBrowsableCards();
   const index = buildCharacterIndex(allCards);
   const character = index.find((c) => c.slug === slug);
 

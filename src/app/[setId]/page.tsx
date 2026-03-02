@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSetBySlug, getAllSets } from "@/lib/cards";
+import { getSetBySlug, getAllSets, HIDDEN_RARITIES } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
 import SetStats from "@/components/SetStats";
 import BoxEVCalculator from "@/components/BoxEVCalculator";
@@ -185,7 +185,7 @@ export default async function SetPage({ params }: PageProps) {
 
       {/* Card Grid with Filters */}
       <h2 className="text-xl font-bold mb-4">All {set.id.toUpperCase()} Cards</h2>
-      <CardGrid cards={set.cards} setId={set.id} priceChanges={priceChanges} />
+      <CardGrid cards={set.cards.filter(c => !HIDDEN_RARITIES.has(c.rarity))} setId={set.id} priceChanges={priceChanges} />
 
       {/* BreadcrumbList Schema */}
       <script

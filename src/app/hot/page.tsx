@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getAllCards } from "@/lib/cards";
+import { getBrowsableCards } from "@/lib/cards";
 import { getTopPriceMovers, getPriceHistoryFiles } from "@/lib/price-history";
 import { CardThumbnail } from "@/components/card/CardThumbnail";
 import { PriceChangeBadge } from "@/components/PriceChangeBadge";
@@ -33,7 +33,7 @@ function getTopValueCards(cards: Card[], limit: number = 20): Card[] {
 }
 
 export default async function HotCardsPage() {
-  const allCards = await getAllCards();
+  const allCards = await getBrowsableCards();
   const historyFiles = getPriceHistoryFiles();
   const hasHistory = historyFiles.length > 1;
 

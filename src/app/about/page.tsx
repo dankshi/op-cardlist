@@ -5,7 +5,7 @@ import { SITE_URL, SITE_NAME, BASE_KEYWORDS, getBreadcrumbSchema } from "@/lib/s
 export const metadata: Metadata = {
   title: "How It Works",
   description:
-    "Learn how nomi market authenticates every trading card before it ships. Every order verified in-hand at our Los Angeles facility.",
+    "Learn how nomi market authenticates every trading card before it ships. Every order verified in-hand at our facility.",
   keywords: [
     ...BASE_KEYWORDS,
     "how it works",
@@ -43,7 +43,7 @@ const steps = [
     number: "03",
     title: "We authenticate",
     description:
-      "The seller ships to our facility in Los Angeles. Our team inspects every card for condition, authenticity, and accuracy.",
+      "The seller ships to our facility. Our team inspects every card for condition, authenticity, and accuracy.",
   },
   {
     number: "04",
@@ -133,9 +133,9 @@ export default function AboutPage() {
       <section className="mb-20">
         <div className="grid sm:grid-cols-3 gap-10 max-w-3xl mx-auto text-center">
           <div>
-            <div className="text-2xl font-bold text-zinc-900">LA-Based</div>
+            <div className="text-2xl font-bold text-zinc-900">US-Based</div>
             <p className="text-sm text-zinc-500 mt-2">
-              Authentication facility in Los Angeles, CA
+              Domestic authentication facility
             </p>
           </div>
           <div>
