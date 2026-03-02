@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { card_id, price, quantity, condition_min } = body
+  const { card_id, price, quantity } = body
 
   if (!card_id || !price || price <= 0) {
     return NextResponse.json({ error: 'card_id and a positive price are required' }, { status: 400 })
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       card_id,
       price,
       quantity: quantity || 1,
-      condition_min: condition_min || 'near_mint',
+      condition_min: 'near_mint',
     })
     .select()
     .single()

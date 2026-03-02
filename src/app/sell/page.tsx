@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { CONDITION_LABELS, GRADING_SCALES, PHOTO_SLOTS, type CardCondition, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap } from '@/types/database'
+import { GRADING_SCALES, PHOTO_SLOTS, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap } from '@/types/database'
 import confetti from 'canvas-confetti'
 import Image from 'next/image'
 
@@ -230,8 +230,6 @@ function StepSelectCard({
 
 function StepDetails({
   selectedCard,
-  condition,
-  setCondition,
   language,
   setLanguage,
   isGraded,
@@ -242,8 +240,6 @@ function StepDetails({
   setGrade,
 }: {
   selectedCard: CardResult
-  condition: CardCondition
-  setCondition: (c: CardCondition) => void
   language: string
   setLanguage: (l: string) => void
   isGraded: boolean
@@ -258,44 +254,18 @@ function StepDetails({
     ? showAllGrades ? GRADING_SCALES[gradingCompany] : GRADING_SCALES[gradingCompany].filter(isGradeEligible)
     : []
 
-  // Fetch buyer offers for this card
+  // Fetch highest buyer offer for this card
   const [highestOffer, setHighestOffer] = useState<number | null>(null)
-  const [offersByCondition, setOffersByCondition] = useState<Record<CardCondition, number | null>>({
-    near_mint: null, lightly_played: null, damaged: null,
-  })
-
-  // condition_min hierarchy: NM(0) > LP(1) > DMG(2)
-  // A bid with condition_min X accepts cards where card quality rank <= X rank
-  const conditionRank: Record<CardCondition, number> = { near_mint: 0, lightly_played: 1, damaged: 2 }
 
   useEffect(() => {
     if (!selectedCard) return
-    fetch(`/api/bids?card_id=${encodeURIComponent(selectedCard.id)}&limit=50`)
+    fetch(`/api/bids?card_id=${encodeURIComponent(selectedCard.id)}&limit=1`)
       .then(res => res.json())
       .then(data => {
         const bids = data.bids || []
-        if (bids.length > 0) {
-          setHighestOffer(bids[0].price)
-        } else {
-          setHighestOffer(null)
-        }
-
-        // Compute highest offer per seller condition
-        const perCondition: Record<CardCondition, number | null> = { near_mint: null, lightly_played: null, damaged: null }
-        for (const cond of ['near_mint', 'lightly_played', 'damaged'] as CardCondition[]) {
-          const matching = bids.filter((b: { condition_min: CardCondition; price: number }) =>
-            conditionRank[cond] <= conditionRank[b.condition_min]
-          )
-          if (matching.length > 0) {
-            perCondition[cond] = Math.max(...matching.map((b: { price: number }) => b.price))
-          }
-        }
-        setOffersByCondition(perCondition)
+        setHighestOffer(bids.length > 0 ? bids[0].price : null)
       })
-      .catch(() => {
-        setHighestOffer(null)
-        setOffersByCondition({ near_mint: null, lightly_played: null, damaged: null })
-      })
+      .catch(() => setHighestOffer(null))
   }, [selectedCard])
 
   return (
@@ -353,41 +323,11 @@ function StepDetails({
           </div>
         </div>
 
-        {/* Condition (raw cards only) */}
+        {/* Raw cards are always Near Mint */}
         {!isGraded && (
-          <div>
-            <label className="block text-sm font-semibold text-zinc-700 mb-2">Condition</label>
-            <div className="grid grid-cols-3 gap-3">
-              {(Object.entries(CONDITION_LABELS) as [CardCondition, string][]).map(([value, label]) => {
-                const offer = offersByCondition[value]
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setCondition(value)}
-                    className={`px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
-                      condition === value
-                        ? 'bg-orange-500 text-white ring-2 ring-orange-500 ring-offset-2'
-                        : 'bg-zinc-100 text-zinc-700 border border-zinc-200 hover:border-orange-300'
-                    }`}
-                  >
-                    <span>{label}</span>
-                    {offer != null && (
-                      <span className={`text-[10px] font-normal ${
-                        condition === value ? 'text-orange-100' : 'text-green-600'
-                      }`}>
-                        ${offer.toFixed(2)} offer
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <p className="text-xs text-zinc-400 mt-2">
-              {condition === 'near_mint' && 'Card is in perfect or near-perfect condition with minimal wear.'}
-              {condition === 'lightly_played' && 'Card shows slight wear such as minor edge whitening or small scratches.'}
-              {condition === 'damaged' && 'Card has noticeable damage such as creases, bends, or heavy wear.'}
-            </p>
+          <div className="px-4 py-3 rounded-xl bg-green-50 border border-green-200">
+            <span className="text-sm font-medium text-green-700">Condition: Near Mint (NM)</span>
+            <p className="text-xs text-green-600/70 mt-0.5">All raw cards are listed as Near Mint.</p>
           </div>
         )}
 
@@ -736,7 +676,6 @@ function StepPricing({
 
 function StepReview({
   selectedCard,
-  condition,
   language,
   price,
   quantity,
@@ -749,7 +688,6 @@ function StepReview({
   photos,
 }: {
   selectedCard: CardResult
-  condition: CardCondition
   language: string
   price: string
   quantity: string
@@ -807,7 +745,7 @@ function StepReview({
           <div className="flex items-center justify-between px-5 py-3.5">
             <span className="text-sm text-zinc-500">Condition</span>
             <span className="text-sm font-medium text-zinc-900">
-              {isGraded && gradingCompany ? `${gradingCompany} ${grade}` : CONDITION_LABELS[condition]}
+              {isGraded && gradingCompany ? `${gradingCompany} ${grade}` : 'Near Mint (NM)'}
             </span>
           </div>
           <div className="flex items-center justify-between px-5 py-3.5">
@@ -956,7 +894,6 @@ function SellPageContent() {
 
   // Form state
   const [selectedCard, setSelectedCard] = useState<CardResult | null>(null)
-  const [condition, setCondition] = useState<CardCondition>('near_mint')
   const [isGraded, setIsGraded] = useState(false)
   const [gradingCompany, setGradingCompany] = useState<GradingCompany | null>(null)
   const [grade, setGrade] = useState('')
@@ -1004,12 +941,8 @@ function SellPageContent() {
   useEffect(() => {
     const cardParam = searchParams.get('card')
     const priceParam = searchParams.get('price')
-    const conditionParam = searchParams.get('condition')
 
     if (priceParam) setPrice(priceParam)
-    if (conditionParam && conditionParam in CONDITION_LABELS) {
-      setCondition(conditionParam as CardCondition)
-    }
     if (cardParam) {
       fetch(`/api/cards?id=${encodeURIComponent(cardParam)}`)
         .then(res => res.json())
@@ -1062,7 +995,7 @@ function SellPageContent() {
     if (step === 1) return !!selectedCard
     if (step === 2) {
       if (isGraded) return !!gradingCompany && !!grade && !!language
-      return !!condition && !!language
+      return !!language
     }
     // Photos step (raw only, step 3)
     if (!isGraded && step === 3) {
@@ -1111,7 +1044,7 @@ function SellPageContent() {
 
     const conditionLabel = isGraded && gradingCompany
       ? `${gradingCompany} ${grade}`
-      : CONDITION_LABELS[condition]
+      : 'NM'
     const title = `${selectedCard.name} (${selectedCard.id}) - ${conditionLabel}`
 
     try {
@@ -1121,7 +1054,7 @@ function SellPageContent() {
         body: JSON.stringify({
           card_id: selectedCard.id,
           title,
-          condition: isGraded ? 'near_mint' : condition,
+          condition: 'near_mint',
           price: parseFloat(price),
           quantity: parseInt(quantity),
           language,
@@ -1148,7 +1081,6 @@ function SellPageContent() {
   function handleListAnother() {
     setStep(1)
     setSelectedCard(null)
-    setCondition('near_mint')
     setIsGraded(false)
     setGradingCompany(null)
     setGrade('')
@@ -1189,8 +1121,6 @@ function SellPageContent() {
         {step === 2 && selectedCard && (
           <StepDetails
             selectedCard={selectedCard}
-            condition={condition}
-            setCondition={setCondition}
             language={language}
             setLanguage={setLanguage}
             isGraded={isGraded}
@@ -1225,7 +1155,6 @@ function SellPageContent() {
         {step === reviewStep && selectedCard && (
           <StepReview
             selectedCard={selectedCard}
-            condition={condition}
             language={language}
             price={price}
             quantity={quantity}

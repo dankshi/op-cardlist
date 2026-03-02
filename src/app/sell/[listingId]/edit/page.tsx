@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { CONDITION_LABELS, GRADING_SCALES, PHOTO_SLOTS, type CardCondition, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap, type Listing } from '@/types/database'
+import { GRADING_SCALES, PHOTO_SLOTS, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap, type Listing } from '@/types/database'
 
 // Only allow grades 8 or higher for listings
 function isGradeEligible(grade: string): boolean {
@@ -54,7 +54,6 @@ export default function EditListingPage() {
   const [listing, setListing] = useState<Listing | null>(null)
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
-  const [condition, setCondition] = useState<CardCondition>('near_mint')
   const [isGraded, setIsGraded] = useState(false)
   const [gradingCompany, setGradingCompany] = useState<GradingCompany | null>(null)
   const [grade, setGrade] = useState('')
@@ -92,7 +91,6 @@ export default function EditListingPage() {
       setListing(l)
       setPrice(String(l.price))
       setQuantity(String(l.quantity_available))
-      setCondition(l.condition)
       if (l.grading_company) {
         setIsGraded(true)
         setGradingCompany(l.grading_company)
@@ -172,7 +170,7 @@ export default function EditListingPage() {
         price: priceNum,
         quantity_available: qtyNum,
         quantity: Math.max(listing.quantity, qtyNum),
-        condition: isGraded ? 'near_mint' : condition,
+        condition: 'near_mint',
         grading_company: isGraded ? gradingCompany : null,
         grade: isGraded ? grade : null,
         language,
@@ -290,20 +288,10 @@ export default function EditListingPage() {
           </div>
         </div>
 
-        {/* Condition (raw only) */}
+        {/* Raw cards are always Near Mint */}
         {!isGraded && (
-          <div>
-            <label className="block text-sm font-medium text-zinc-600 mb-1.5">Condition</label>
-            <select
-              value={condition}
-              onChange={e => setCondition(e.target.value as CardCondition)}
-              disabled={listing.status === 'sold'}
-              className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 disabled:opacity-50"
-            >
-              {Object.entries(CONDITION_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+          <div className="px-4 py-3 rounded-lg bg-green-50 border border-green-200">
+            <span className="text-sm font-medium text-green-700">Condition: Near Mint (NM)</span>
           </div>
         )}
 

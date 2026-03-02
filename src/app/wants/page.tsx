@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { CONDITION_SHORT, type CardCondition } from '@/types/database'
 import type { WantListItem } from '@/types/database'
 
 export default function WantsPage() {
@@ -65,7 +64,7 @@ export default function WantsPage() {
                 </Link>
                 <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
                   {item.max_price && <span>Max: ${Number(item.max_price).toFixed(2)}</span>}
-                  <span>Min: {CONDITION_SHORT[item.min_condition as CardCondition] || item.min_condition}</span>
+                  <span>Condition: NM</span>
                   {item.priority > 0 && (
                     <span className={item.priority === 2 ? 'text-red-400' : 'text-yellow-400'}>
                       {PRIORITY_LABELS[item.priority]}

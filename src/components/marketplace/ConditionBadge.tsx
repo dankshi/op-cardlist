@@ -1,11 +1,8 @@
-import { CONDITION_SHORT, CONDITION_COLORS, type CardCondition } from '@/types/database'
-
 export function ConditionBadge({
-  condition,
   gradingCompany,
   grade,
 }: {
-  condition: CardCondition
+  condition?: string
   gradingCompany?: string | null
   grade?: string | null
 }) {
@@ -18,8 +15,8 @@ export function ConditionBadge({
   }
 
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${CONDITION_COLORS[condition]}`}>
-      {CONDITION_SHORT[condition]}
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold text-green-400 bg-green-400/10">
+      NM
     </span>
   )
 }

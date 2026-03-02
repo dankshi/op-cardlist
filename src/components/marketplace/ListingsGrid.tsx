@@ -4,16 +4,9 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ListingCard } from './ListingCard'
 import { BidAskSpread } from './BidAskSpread'
-import type { Listing, CardCondition, GradingCompany } from '@/types/database'
+import type { Listing, GradingCompany } from '@/types/database'
 
 type TypeFilter = 'all' | 'raw' | 'graded'
-
-const RAW_CONDITIONS: { value: CardCondition | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'near_mint', label: 'NM' },
-  { value: 'lightly_played', label: 'LP' },
-  { value: 'damaged', label: 'DMG' },
-]
 
 const GRADING_COMPANIES: { value: GradingCompany | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -27,7 +20,6 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
-  const [conditionFilter, setConditionFilter] = useState<CardCondition | 'all'>('all')
   const [companyFilter, setCompanyFilter] = useState<GradingCompany | 'all'>('all')
 
   useEffect(() => {
@@ -43,9 +35,6 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
 
       if (typeFilter === 'raw') {
         query = query.is('grading_company', null)
-        if (conditionFilter !== 'all') {
-          query = query.eq('condition', conditionFilter)
-        }
       } else if (typeFilter === 'graded') {
         query = query.not('grading_company', 'is', null)
         if (companyFilter !== 'all') {
@@ -58,7 +47,7 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
       setLoading(false)
     }
     fetchListings()
-  }, [cardId, typeFilter, conditionFilter, companyFilter])
+  }, [cardId, typeFilter, companyFilter])
 
   return (
     <div>
@@ -69,7 +58,6 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
             key={t}
             onClick={() => {
               setTypeFilter(t)
-              setConditionFilter('all')
               setCompanyFilter('all')
             }}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
@@ -83,25 +71,7 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
         ))}
       </div>
 
-      {/* Sub-filters */}
-      {typeFilter === 'raw' && (
-        <div className="flex items-center gap-1.5 mb-3">
-          {RAW_CONDITIONS.map(c => (
-            <button
-              key={c.value}
-              onClick={() => setConditionFilter(c.value)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                conditionFilter === c.value
-                  ? 'bg-zinc-700 text-white'
-                  : 'bg-zinc-50 text-zinc-400 hover:text-zinc-600 border border-zinc-200'
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      )}
-
+      {/* Sub-filters for graded */}
       {typeFilter === 'graded' && (
         <div className="flex items-center gap-1.5 mb-3">
           {GRADING_COMPANIES.map(c => (

@@ -56,9 +56,9 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { card_id, title, description, condition, price, quantity, language, is_first_edition, photo_urls, grading_company, grade } = body
+  const { card_id, title, description, price, quantity, language, is_first_edition, photo_urls, grading_company, grade } = body
 
-  if (!card_id || !title || !condition || !price || price <= 0) {
+  if (!card_id || !title || !price || price <= 0) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       card_id,
       title,
       description: description || null,
-      condition,
+      condition: 'near_mint',
       price,
       quantity: quantity || 1,
       quantity_available: quantity || 1,
