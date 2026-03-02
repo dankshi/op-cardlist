@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
-import type { Order, Review, CardCondition } from '@/types/database'
+import type { Order, Review, CardCondition, ShippingAddress } from '@/types/database'
 
 const STATUS_STYLES: Record<string, string> = {
   pending_payment: 'bg-zinc-200 text-zinc-600',
@@ -211,6 +211,24 @@ export default function OrderDetailPage() {
         </div>
       )}
 
+      {/* Seller: Shipping address */}
+      {isSeller && order.shipping_address && (
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+          <h2 className="font-medium text-zinc-900 mb-2">Shipping Address</h2>
+          {(() => {
+            const addr = order.shipping_address as ShippingAddress
+            return (
+              <div className="text-sm text-zinc-600">
+                <p>{addr.name}</p>
+                <p>{addr.line1}</p>
+                {addr.line2 && <p>{addr.line2}</p>}
+                <p>{addr.city}, {addr.state} {addr.zip}</p>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
       {/* Seller: Mark as shipped */}
       {isSeller && order.status === 'paid' && (
         <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
@@ -221,23 +239,24 @@ export default function OrderDetailPage() {
             const trackingNumber = (form.elements.namedItem('tracking') as HTMLInputElement).value
             const carrier = (form.elements.namedItem('carrier') as HTMLInputElement).value
 
-            await supabase
-              .from('orders')
-              .update({
-                status: 'shipped',
+            const res = await fetch(`/api/orders/${order.id}/ship`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
                 tracking_number: trackingNumber || null,
                 tracking_carrier: carrier || null,
-                shipped_at: new Date().toISOString(),
-              })
-              .eq('id', order.id)
+              }),
+            })
 
-            setOrder({ ...order, status: 'shipped', tracking_number: trackingNumber, tracking_carrier: carrier, shipped_at: new Date().toISOString() })
+            if (res.ok) {
+              setOrder({ ...order, status: 'shipped', tracking_number: trackingNumber, tracking_carrier: carrier, shipped_at: new Date().toISOString() })
+            }
           }} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <input name="carrier" placeholder="Carrier (e.g., USPS)" className="px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm" />
               <input name="tracking" placeholder="Tracking number" className="px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm" />
             </div>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold text-sm transition-colors cursor-pointer">
+            <button type="submit" className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors cursor-pointer">
               Mark as Shipped
             </button>
           </form>

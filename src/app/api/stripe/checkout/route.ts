@@ -99,6 +99,9 @@ export async function POST(request: Request) {
       },
       quantity: item.quantity,
     })),
+    shipping_address_collection: {
+      allowed_countries: ['US'],
+    },
     payment_intent_data: {
       application_fee_amount: Math.round(platformFee * 100),
       transfer_data: {
