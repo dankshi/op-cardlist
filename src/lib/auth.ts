@@ -43,6 +43,15 @@ export async function requireSeller() {
   return { user, profile }
 }
 
+export async function requireAdmin() {
+  const user = await requireUser()
+  const profile = await getProfile(user.id)
+  if (!profile?.is_admin) {
+    redirect('/')
+  }
+  return { user, profile }
+}
+
 export async function getCurrentProfile(): Promise<Profile | null> {
   const user = await getUser()
   if (!user) return null

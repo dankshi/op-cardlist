@@ -19,7 +19,7 @@ export default async function CheckoutSuccessPage({ searchParams }: { searchPara
       </div>
       <h1 className="text-3xl font-bold text-zinc-900 mb-3">Order Confirmed!</h1>
       <p className="text-zinc-500 mb-8">
-        Your payment was successful. The seller has been notified and will ship your order soon.
+        Your payment was successful. The seller will ship your card to our authentication center. Once verified, we&rsquo;ll ship it to you.
       </p>
       {orderId && (
         <p className="text-sm text-zinc-500 mb-6">Order ID: {orderId.slice(0, 8)}...</p>

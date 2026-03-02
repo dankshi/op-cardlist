@@ -8,6 +8,7 @@ import type { User } from '@supabase/supabase-js'
 
 export default function AuthButton() {
   const [user, setUser] = useState<User | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -19,6 +20,14 @@ export default function AuthButton() {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
+        setIsAdmin(profile?.is_admin || false)
+      }
       setLoading(false)
     }
     getUser()
@@ -110,6 +119,15 @@ export default function AuthButton() {
             >
               Sell a Card
             </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setMenuOpen(false)}
+                className="block px-4 py-2 text-sm text-purple-500 hover:bg-zinc-50"
+              >
+                Admin Panel
+              </Link>
+            )}
           </div>
 
           <div className="border-t border-zinc-200 mt-1 pt-1">

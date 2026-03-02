@@ -13,6 +13,7 @@ export interface Profile {
   seller_applied_at: string | null
   stripe_account_id: string | null
   stripe_onboarding_complete: boolean
+  is_admin: boolean
   rating_avg: number
   rating_count: number
   total_sales: number
@@ -25,10 +26,7 @@ export interface Profile {
 // Marketplace Types
 // ============================================
 
-export type CardCondition =
-  | 'near_mint'
-  | 'lightly_played'
-  | 'damaged'
+export type CardCondition = 'near_mint'
 
 export type GradingCompany = 'PSA' | 'CGC' | 'BGS' | 'TAG'
 
@@ -44,7 +42,11 @@ export type ListingStatus = 'active' | 'sold' | 'reserved' | 'delisted'
 export type OrderStatus =
   | 'pending_payment'
   | 'paid'
-  | 'shipped'
+  | 'seller_shipped'
+  | 'received'
+  | 'authenticated'
+  | 'shipped_to_buyer'
+  | 'shipped'        // legacy — kept for old orders
   | 'delivered'
   | 'cancelled'
   | 'refunded'
@@ -73,16 +75,6 @@ export interface Listing {
   seller?: Profile
 }
 
-export interface CartItem {
-  id: string
-  user_id: string
-  listing_id: string
-  quantity: number
-  created_at: string
-  updated_at: string
-  // Joined fields
-  listing?: Listing
-}
 
 export interface Order {
   id: string
@@ -98,10 +90,18 @@ export interface Order {
   shipping_address: ShippingAddress | null
   tracking_number: string | null
   tracking_carrier: string | null
+  seller_tracking_number: string | null
+  seller_tracking_carrier: string | null
+  seller_label_url: string | null
+  seller_label_cost: number | null
+  admin_notes: string | null
   buyer_notes: string | null
   seller_notes: string | null
   paid_at: string | null
   shipped_at: string | null
+  received_at: string | null
+  authenticated_at: string | null
+  shipped_to_buyer_at: string | null
   delivered_at: string | null
   created_at: string
   updated_at: string
@@ -248,23 +248,9 @@ export interface Message {
 // Condition Display Helpers
 // ============================================
 
-export const CONDITION_LABELS: Record<CardCondition, string> = {
-  near_mint: 'Near Mint',
-  lightly_played: 'Lightly Played',
-  damaged: 'Damaged',
-}
-
-export const CONDITION_SHORT: Record<CardCondition, string> = {
-  near_mint: 'NM',
-  lightly_played: 'LP',
-  damaged: 'DMG',
-}
-
-export const CONDITION_COLORS: Record<CardCondition, string> = {
-  near_mint: 'text-green-400 bg-green-400/10',
-  lightly_played: 'text-yellow-400 bg-yellow-400/10',
-  damaged: 'text-zinc-400 bg-zinc-400/10',
-}
+export const CONDITION_LABEL = 'Near Mint'
+export const CONDITION_SHORT_LABEL = 'NM'
+export const CONDITION_COLOR = 'text-green-400 bg-green-400/10'
 
 // ============================================
 // Photo Slot Types

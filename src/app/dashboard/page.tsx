@@ -121,9 +121,9 @@ export default function DashboardPage() {
   }
 
   const activeListings = listings.filter(l => l.status === 'active')
-  const pendingOrders = orders.filter(o => o.status === 'paid')
+  const pendingOrders = orders.filter(o => ['paid', 'seller_shipped', 'received', 'authenticated'].includes(o.status))
   const revenue = orders
-    .filter(o => ['paid', 'shipped', 'delivered'].includes(o.status))
+    .filter(o => ['paid', 'seller_shipped', 'received', 'authenticated', 'shipped_to_buyer', 'shipped', 'delivered'].includes(o.status))
     .reduce((sum, o) => sum + Number(o.subtotal) - Number(o.platform_fee), 0)
 
   return (
@@ -288,11 +288,15 @@ export default function DashboardPage() {
                     <p className="font-bold text-zinc-900">${Number(order.total).toFixed(2)}</p>
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       order.status === 'paid' ? 'bg-yellow-500/10 text-yellow-400' :
+                      order.status === 'seller_shipped' ? 'bg-blue-500/10 text-blue-400' :
+                      order.status === 'received' ? 'bg-purple-500/10 text-purple-400' :
+                      order.status === 'authenticated' ? 'bg-emerald-500/10 text-emerald-400' :
+                      order.status === 'shipped_to_buyer' ? 'bg-blue-500/10 text-blue-400' :
                       order.status === 'shipped' ? 'bg-blue-500/10 text-blue-400' :
                       order.status === 'delivered' ? 'bg-green-500/10 text-green-400' :
                       'bg-zinc-200 text-zinc-500'
                     }`}>
-                      {order.status}
+                      {order.status.replace(/_/g, ' ')}
                     </span>
                   </div>
                 </div>

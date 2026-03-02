@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { sendBuyerShippedEmail } from '@/lib/email'
+import { sendAdminSellerShippedEmail } from '@/lib/email'
 
 export async function POST(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ orderId: string }> }
 ) {
   const { orderId } = await params
@@ -15,12 +15,10 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { tracking_number, tracking_carrier } = await request.json()
-
   // Get the order and verify seller owns it
   const { data: order } = await supabase
     .from('orders')
-    .select('id, buyer_id, seller_id, status')
+    .select('id, buyer_id, seller_id, status, seller_label_url, seller_tracking_number, seller_tracking_carrier')
     .eq('id', orderId)
     .single()
 
@@ -36,13 +34,15 @@ export async function POST(
     return NextResponse.json({ error: 'Order is not in paid status' }, { status: 400 })
   }
 
-  // Update order to shipped
+  if (!order.seller_label_url) {
+    return NextResponse.json({ error: 'You must generate a shipping label first' }, { status: 400 })
+  }
+
+  // Update order to seller_shipped
   const { error: updateError } = await supabase
     .from('orders')
     .update({
-      status: 'shipped',
-      tracking_number: tracking_number || null,
-      tracking_carrier: tracking_carrier || null,
+      status: 'seller_shipped',
       shipped_at: new Date().toISOString(),
     })
     .eq('id', orderId)
@@ -51,29 +51,27 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }
 
-  // Send buyer notification email
+  // Notify admin that seller has shipped
   try {
     const admin = getSupabaseAdmin()
-    const { data: buyerAuth } = await admin.auth.admin.getUserById(order.buyer_id)
-    const buyerEmail = buyerAuth?.user?.email
+    const { data: sellerProfile } = await admin
+      .from('profiles')
+      .select('display_name')
+      .eq('id', order.seller_id)
+      .single()
 
-    const [buyerProfile, sellerProfile] = await Promise.all([
-      admin.from('profiles').select('display_name').eq('id', order.buyer_id).single(),
-      admin.from('profiles').select('display_name').eq('id', order.seller_id).single(),
-    ])
-
-    if (buyerEmail) {
-      await sendBuyerShippedEmail({
-        buyerEmail,
-        buyerName: buyerProfile.data?.display_name || '',
+    const adminEmail = process.env.ADMIN_EMAIL
+    if (adminEmail) {
+      await sendAdminSellerShippedEmail({
+        adminEmail,
+        sellerName: sellerProfile?.display_name || '',
         orderId,
-        sellerName: sellerProfile.data?.display_name || '',
-        trackingNumber: tracking_number,
-        trackingCarrier: tracking_carrier,
+        trackingNumber: order.seller_tracking_number,
+        trackingCarrier: order.seller_tracking_carrier,
       })
     }
   } catch (emailErr) {
-    console.error('Failed to send shipped email:', emailErr)
+    console.error('Failed to send admin notification:', emailErr)
   }
 
   return NextResponse.json({ success: true })

@@ -5,11 +5,15 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
-import type { Order, Review, CardCondition, ShippingAddress } from '@/types/database'
+import type { Order, Review, CardCondition } from '@/types/database'
 
 const STATUS_STYLES: Record<string, string> = {
   pending_payment: 'bg-zinc-200 text-zinc-600',
   paid: 'bg-yellow-500/10 text-yellow-400',
+  seller_shipped: 'bg-blue-500/10 text-blue-400',
+  received: 'bg-purple-500/10 text-purple-400',
+  authenticated: 'bg-emerald-500/10 text-emerald-400',
+  shipped_to_buyer: 'bg-blue-500/10 text-blue-400',
   shipped: 'bg-blue-500/10 text-blue-400',
   delivered: 'bg-green-500/10 text-green-400',
   cancelled: 'bg-red-500/10 text-red-400',
@@ -19,12 +23,63 @@ const STATUS_STYLES: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Pending Payment',
-  paid: 'Paid',
+  paid: 'Paid — Awaiting Shipment',
+  seller_shipped: 'Shipped to Platform',
+  received: 'Received by Platform',
+  authenticated: 'Authenticated',
+  shipped_to_buyer: 'Shipped to You',
   shipped: 'Shipped',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
   refunded: 'Refunded',
   disputed: 'Disputed',
+}
+
+const PIPELINE_STEPS = [
+  { key: 'paid', label: 'Paid' },
+  { key: 'seller_shipped', label: 'Shipped' },
+  { key: 'received', label: 'Received' },
+  { key: 'authenticated', label: 'Authenticated' },
+  { key: 'shipped_to_buyer', label: 'On the Way' },
+  { key: 'delivered', label: 'Delivered' },
+]
+
+function PipelineStepper({ currentStatus }: { currentStatus: string }) {
+  const currentIndex = PIPELINE_STEPS.findIndex(s => s.key === currentStatus)
+  return (
+    <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+      <h2 className="font-medium text-zinc-900 mb-4">Order Progress</h2>
+      <div className="flex items-center justify-between">
+        {PIPELINE_STEPS.map((step, i) => {
+          const isComplete = i <= currentIndex
+          const isCurrent = i === currentIndex
+          return (
+            <div key={step.key} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                  isComplete
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-zinc-100 text-zinc-400'
+                } ${isCurrent ? 'ring-2 ring-orange-500 ring-offset-2' : ''}`}>
+                  {isComplete && i < currentIndex ? (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  ) : (
+                    i + 1
+                  )}
+                </div>
+                <span className={`text-xs mt-1 ${isComplete ? 'text-zinc-900 font-medium' : 'text-zinc-400'}`}>
+                  {step.label}
+                </span>
+              </div>
+              {i < PIPELINE_STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mx-2 mt-[-16px] ${i < currentIndex ? 'bg-orange-500' : 'bg-zinc-200'}`} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function OrderDetailPage() {
@@ -35,6 +90,10 @@ export default function OrderDetailPage() {
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewComment, setReviewComment] = useState('')
   const [submittingReview, setSubmittingReview] = useState(false)
+  const [labelLoading, setLabelLoading] = useState(false)
+  const [estimateLoading, setEstimateLoading] = useState(false)
+  const [estimate, setEstimate] = useState<{ estimated_cost: number; carrier: string; estimated_days: number } | null>(null)
+  const [shipLoading, setShipLoading] = useState(false)
   const router = useRouter()
   const params = useParams()
   const orderId = params.orderId as string
@@ -57,7 +116,6 @@ export default function OrderDetailPage() {
         return
       }
 
-      // Get order items
       const { data: items } = await supabase
         .from('order_items')
         .select('*')
@@ -66,7 +124,6 @@ export default function OrderDetailPage() {
       const fullOrder = { ...orderData, items: items || [] } as Order
       setOrder(fullOrder)
 
-      // Check for existing review
       const { data: reviewData } = await supabase
         .from('reviews')
         .select('*')
@@ -79,10 +136,57 @@ export default function OrderDetailPage() {
     load()
   }, [supabase, router, orderId])
 
+  async function getEstimate() {
+    setEstimateLoading(true)
+    const res = await fetch(`/api/orders/${orderId}/label/estimate`)
+    const data = await res.json()
+    if (res.ok) {
+      setEstimate(data)
+    } else {
+      alert(data.error || 'Failed to get estimate')
+    }
+    setEstimateLoading(false)
+  }
+
+  async function generateLabel() {
+    if (!order) return
+    setLabelLoading(true)
+    const res = await fetch(`/api/orders/${orderId}/label`, { method: 'POST' })
+    const data = await res.json()
+    if (res.ok) {
+      setOrder({
+        ...order,
+        seller_label_url: data.label_url,
+        seller_label_cost: data.cost,
+        seller_tracking_number: data.tracking_number,
+        seller_tracking_carrier: data.carrier,
+      })
+    } else {
+      alert(data.error || 'Label generation failed')
+    }
+    setLabelLoading(false)
+  }
+
+  async function markAsShipped() {
+    if (!order) return
+    setShipLoading(true)
+    const res = await fetch(`/api/orders/${order.id}/ship`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    if (res.ok) {
+      setOrder({ ...order, status: 'seller_shipped' as Order['status'], shipped_at: new Date().toISOString() })
+    } else {
+      const data = await res.json()
+      alert(data.error || 'Failed to mark as shipped')
+    }
+    setShipLoading(false)
+  }
+
   async function submitReview() {
     if (!order || !userId) return
     setSubmittingReview(true)
-
     const { data, error } = await supabase
       .from('reviews')
       .insert({
@@ -114,11 +218,12 @@ export default function OrderDetailPage() {
   const isBuyer = userId === order.buyer_id
   const isSeller = userId === order.seller_id
   const canReview = isBuyer && order.status === 'delivered' && !review
+  const platformAddress = process.env.NEXT_PUBLIC_PLATFORM_ADDRESS || ''
 
   return (
     <div className="max-w-3xl mx-auto">
-      <Link href="/orders" className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
-        &larr; Back to Orders
+      <Link href={isSeller ? '/dashboard' : '/orders'} className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
+        &larr; {isSeller ? 'Back to Dashboard' : 'Back to Orders'}
       </Link>
 
       <div className="flex items-center justify-between mb-8">
@@ -132,6 +237,11 @@ export default function OrderDetailPage() {
           {STATUS_LABELS[order.status] || order.status}
         </span>
       </div>
+
+      {/* Pipeline Stepper */}
+      {['paid', 'seller_shipped', 'received', 'authenticated', 'shipped_to_buyer', 'delivered'].includes(order.status) && (
+        <PipelineStepper currentStatus={order.status} />
+      )}
 
       {/* Order Items */}
       <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden mb-6">
@@ -195,13 +305,13 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Tracking Info */}
-      {order.tracking_number && (
+      {/* Tracking: Seller to Platform */}
+      {order.seller_tracking_number && (
         <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
-          <h2 className="font-medium text-zinc-900 mb-2">Tracking</h2>
+          <h2 className="font-medium text-zinc-900 mb-2">Tracking — {isBuyer ? 'To Authentication' : 'To Platform'}</h2>
           <p className="text-zinc-600">
-            {order.tracking_carrier && <span className="text-zinc-500">{order.tracking_carrier}: </span>}
-            {order.tracking_number}
+            {order.seller_tracking_carrier && <span className="text-zinc-500">{order.seller_tracking_carrier}: </span>}
+            {order.seller_tracking_number}
           </p>
           {order.shipped_at && (
             <p className="text-xs text-zinc-500 mt-1">
@@ -211,60 +321,118 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Seller: Shipping address */}
-      {isSeller && order.shipping_address && (
+      {/* Tracking: Platform to Buyer */}
+      {order.tracking_number && (
         <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
-          <h2 className="font-medium text-zinc-900 mb-2">Shipping Address</h2>
-          {(() => {
-            const addr = order.shipping_address as ShippingAddress
-            return (
-              <div className="text-sm text-zinc-600">
-                <p>{addr.name}</p>
-                <p>{addr.line1}</p>
-                {addr.line2 && <p>{addr.line2}</p>}
-                <p>{addr.city}, {addr.state} {addr.zip}</p>
-              </div>
-            )
-          })()}
+          <h2 className="font-medium text-zinc-900 mb-2">Tracking — To {isBuyer ? 'You' : 'Buyer'}</h2>
+          <p className="text-zinc-600">
+            {order.tracking_carrier && <span className="text-zinc-500">{order.tracking_carrier}: </span>}
+            {order.tracking_number}
+          </p>
+          {order.shipped_to_buyer_at && (
+            <p className="text-xs text-zinc-500 mt-1">
+              Shipped {new Date(order.shipped_to_buyer_at).toLocaleDateString()}
+            </p>
+          )}
         </div>
       )}
 
-      {/* Seller: Mark as shipped */}
-      {isSeller && order.status === 'paid' && (
+      {/* Seller: Generate label & ship (status = paid, no label yet) */}
+      {isSeller && order.status === 'paid' && !order.seller_label_url && (
         <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
-          <h2 className="font-medium text-zinc-900 mb-3">Ship This Order</h2>
-          <form onSubmit={async (e) => {
-            e.preventDefault()
-            const form = e.target as HTMLFormElement
-            const trackingNumber = (form.elements.namedItem('tracking') as HTMLInputElement).value
-            const carrier = (form.elements.namedItem('carrier') as HTMLInputElement).value
+          <h2 className="font-medium text-zinc-900 mb-3">Ship Your Card to Us</h2>
 
-            const res = await fetch(`/api/orders/${order.id}/ship`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                tracking_number: trackingNumber || null,
-                tracking_carrier: carrier || null,
-              }),
-            })
-
-            if (res.ok) {
-              setOrder({ ...order, status: 'shipped', tracking_number: trackingNumber, tracking_carrier: carrier, shipped_at: new Date().toISOString() })
-            }
-          }} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <input name="carrier" placeholder="Carrier (e.g., USPS)" className="px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm" />
-              <input name="tracking" placeholder="Tracking number" className="px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm" />
+          {platformAddress && (
+            <div className="bg-zinc-50 rounded-lg p-4 mb-4">
+              <p className="text-sm font-medium text-zinc-900 mb-1">Ship to:</p>
+              <p className="text-sm text-zinc-600">{platformAddress}</p>
             </div>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors cursor-pointer">
-              Mark as Shipped
+          )}
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-amber-800 font-medium">Packing Instructions</p>
+            <ul className="text-sm text-amber-700 mt-1 space-y-1 list-disc list-inside">
+              <li>Place card in a top loader or card saver</li>
+              <li>Wrap in bubble wrap or padding</li>
+              <li>Use a rigid mailer or small box</li>
+            </ul>
+          </div>
+
+          {!estimate ? (
+            <button
+              onClick={getEstimate}
+              disabled={estimateLoading}
+              className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {estimateLoading ? 'Getting estimate...' : 'Get Shipping Estimate'}
             </button>
-          </form>
+          ) : (
+            <div>
+              <div className="bg-zinc-50 rounded-lg p-3 mb-3">
+                <p className="text-sm text-zinc-900">
+                  <span className="font-medium">Estimated cost:</span> ${estimate.estimated_cost.toFixed(2)} via {estimate.carrier}
+                </p>
+                <p className="text-xs text-zinc-500">Est. {estimate.estimated_days} days &middot; Deducted from your balance</p>
+              </div>
+              <button
+                onClick={generateLabel}
+                disabled={labelLoading}
+                className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {labelLoading ? 'Generating label...' : `Generate Label — $${estimate.estimated_cost.toFixed(2)}`}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Seller: Label generated, ready to ship */}
+      {isSeller && order.status === 'paid' && order.seller_label_url && (
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+          <h2 className="font-medium text-zinc-900 mb-3">Your Shipping Label</h2>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-green-800">Label generated! Cost: ${Number(order.seller_label_cost || 0).toFixed(2)}</p>
+          </div>
+          <div className="flex gap-3 mb-4">
+            <a
+              href={order.seller_label_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-sm font-medium transition-colors"
+            >
+              Download Label (PDF)
+            </a>
+          </div>
+          <button
+            onClick={markAsShipped}
+            disabled={shipLoading}
+            className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {shipLoading ? 'Updating...' : 'I\'ve Shipped It — Mark as Shipped'}
+          </button>
+        </div>
+      )}
+
+      {/* Seller: Waiting for platform */}
+      {isSeller && ['seller_shipped', 'received', 'authenticated', 'shipped_to_buyer'].includes(order.status) && (
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
+          <h2 className="font-medium text-zinc-900 mb-2">
+            {order.status === 'seller_shipped' && 'Card in Transit to Platform'}
+            {order.status === 'received' && 'Card Being Reviewed'}
+            {order.status === 'authenticated' && 'Card Authenticated — Shipping to Buyer'}
+            {order.status === 'shipped_to_buyer' && 'Shipped to Buyer'}
+          </h2>
+          <p className="text-sm text-zinc-500">
+            {order.status === 'seller_shipped' && 'We\'ll update you once we receive your card.'}
+            {order.status === 'received' && 'We\'ve received your card and are verifying it.'}
+            {order.status === 'authenticated' && 'Your card passed authentication! Your payout has been credited. We\'re shipping it to the buyer now.'}
+            {order.status === 'shipped_to_buyer' && 'The card is on its way to the buyer. You\'ll be notified when it\'s delivered.'}
+          </p>
         </div>
       )}
 
       {/* Buyer: Confirm delivery */}
-      {isBuyer && order.status === 'shipped' && (
+      {isBuyer && order.status === 'shipped_to_buyer' && (
         <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
           <p className="text-zinc-600 mb-3">Have you received this order?</p>
           <button
@@ -273,7 +441,7 @@ export default function OrderDetailPage() {
                 .from('orders')
                 .update({ status: 'delivered', delivered_at: new Date().toISOString() })
                 .eq('id', order.id)
-              setOrder({ ...order, status: 'delivered', delivered_at: new Date().toISOString() })
+              setOrder({ ...order, status: 'delivered' as Order['status'], delivered_at: new Date().toISOString() })
             }}
             className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold text-sm transition-colors cursor-pointer"
           >
@@ -325,7 +493,7 @@ export default function OrderDetailPage() {
           <button
             onClick={submitReview}
             disabled={submittingReview}
-            className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
           >
             {submittingReview ? 'Submitting...' : 'Submit Review'}
           </button>

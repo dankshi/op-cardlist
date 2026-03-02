@@ -9,6 +9,10 @@ import type { Order } from '@/types/database'
 const STATUS_STYLES: Record<string, string> = {
   pending_payment: 'bg-zinc-200 text-zinc-600',
   paid: 'bg-yellow-500/10 text-yellow-400',
+  seller_shipped: 'bg-blue-500/10 text-blue-400',
+  received: 'bg-purple-500/10 text-purple-400',
+  authenticated: 'bg-emerald-500/10 text-emerald-400',
+  shipped_to_buyer: 'bg-blue-500/10 text-blue-400',
   shipped: 'bg-blue-500/10 text-blue-400',
   delivered: 'bg-green-500/10 text-green-400',
   cancelled: 'bg-red-500/10 text-red-400',
