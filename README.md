@@ -228,6 +228,66 @@ op-cardlist/
 └── public/
 ```
 
+## Local Stripe Setup (Webhooks)
+
+Stripe webhooks are required for processing payments. For local development, use the Stripe CLI to forward webhook events to your dev server.
+
+### 1. Install Stripe CLI
+
+**Windows (scoop):**
+```bash
+scoop install stripe
+```
+
+**Or download manually** from https://docs.stripe.com/stripe-cli#install
+
+### 2. Login
+
+```bash
+stripe login
+```
+
+This opens your browser to authorize the CLI with your Stripe account.
+
+### 3. Forward webhooks to localhost
+
+In a separate terminal, run:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhooks
+```
+
+It will output a webhook signing secret:
+```
+> Ready! Your webhook signing secret is whsec_abc123...
+```
+
+Add this to your `.env.local`:
+```
+STRIPE_WEBHOOK_SECRET=whsec_abc123...
+```
+
+### 4. Test a payment
+
+With both `npm run dev` and `stripe listen` running, place a test order using Stripe's test card:
+
+| Field | Value |
+|-------|-------|
+| Card number | `4242 4242 4242 4242` |
+| Expiry | Any future date |
+| CVC | Any 3 digits |
+| ZIP | Any 5 digits |
+
+You should see the webhook event forwarded in the `stripe listen` terminal.
+
+### Production Webhooks
+
+For production, create a webhook endpoint in the Stripe Dashboard:
+1. Go to **Developers > Webhooks**
+2. Add endpoint: `https://yourdomain.com/api/stripe/webhooks`
+3. Select event: `checkout.session.completed`
+4. Copy the signing secret to your production environment variables
+
 ## Deployment
 
 Deploy to Vercel:
