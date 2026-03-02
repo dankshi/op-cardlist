@@ -3,9 +3,45 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { GRADING_SCALES, type GradingCompany } from '@/types/database'
+import { GRADING_SCALES, PHOTO_SLOTS, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap } from '@/types/database'
 import confetti from 'canvas-confetti'
 import Image from 'next/image'
+
+// Client-side image compression via Canvas
+async function compressImage(file: File): Promise<Blob> {
+  const MAX_SIZE = 1600
+  const QUALITY = 0.85
+
+  return new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.onload = () => {
+      let { width, height } = img
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(img.src)
+          blob ? resolve(blob) : reject(new Error('Compression failed'))
+        },
+        'image/jpeg',
+        QUALITY,
+      )
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src)
+      reject(new Error('Failed to load image'))
+    }
+    img.src = URL.createObjectURL(file)
+  })
+}
 
 // ============================================
 // Types
@@ -729,6 +765,9 @@ function SellPageContent() {
   const [quantity, setQuantity] = useState('1')
   const [language, setLanguage] = useState('EN')
   const [marketPrice, setMarketPrice] = useState<number | null>(null)
+  const emptyPhotos = Object.fromEntries(PHOTO_SLOTS.map(s => [s.key, null])) as PhotoSlotMap
+  const [photos, setPhotos] = useState<PhotoSlotMap>(emptyPhotos)
+  const [photoUploading, setPhotoUploading] = useState<Record<string, boolean>>({})
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -804,6 +843,35 @@ function SellPageContent() {
       .catch(() => {})
   }, [])
 
+  async function handlePhotoUpload(slot: PhotoSlotKey, file: File) {
+    setPhotoUploading(prev => ({ ...prev, [slot]: true }))
+    try {
+      const compressed = await compressImage(file)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      const path = `${user.id}/${Date.now()}_${slot}.jpg`
+      const { error: uploadError } = await supabase.storage
+        .from('listing-photos')
+        .upload(path, compressed, { contentType: 'image/jpeg', upsert: false })
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('listing-photos')
+        .getPublicUrl(path)
+      setPhotos(prev => ({ ...prev, [slot]: publicUrl }))
+    } catch (err) {
+      console.error('Photo upload failed:', err)
+      alert('Photo upload failed. Please try again.')
+    } finally {
+      setPhotoUploading(prev => ({ ...prev, [slot]: false }))
+    }
+  }
+
+  function handlePhotoRemove(slot: PhotoSlotKey) {
+    setPhotos(prev => ({ ...prev, [slot]: null }))
+  }
+
   function handleSelectCard(card: CardResult) {
     setSelectedCard(card)
     if (card.price?.marketPrice) {
@@ -848,7 +916,7 @@ function SellPageContent() {
           language,
           grading_company: isGraded ? gradingCompany : null,
           grade: isGraded ? grade : null,
-          photo_urls: [],
+          photo_urls: isGraded ? [] : PHOTO_SLOTS.map(s => photos[s.key]).filter(Boolean),
         }),
       })
 
@@ -876,6 +944,7 @@ function SellPageContent() {
     setQuantity('1')
     setLanguage('EN')
     setMarketPrice(null)
+    setPhotos(emptyPhotos)
     setError('')
     setSuccess(false)
   }
@@ -905,17 +974,86 @@ function SellPageContent() {
         )}
 
         {step === 2 && selectedCard && (
-          <StepDetails
-            selectedCard={selectedCard}
-            language={language}
-            setLanguage={setLanguage}
-            isGraded={isGraded}
-            setIsGraded={setIsGraded}
-            gradingCompany={gradingCompany}
-            setGradingCompany={setGradingCompany}
-            grade={grade}
-            setGrade={setGrade}
-          />
+          <>
+            <StepDetails
+              selectedCard={selectedCard}
+              language={language}
+              setLanguage={setLanguage}
+              isGraded={isGraded}
+              setIsGraded={setIsGraded}
+              gradingCompany={gradingCompany}
+              setGradingCompany={setGradingCompany}
+              grade={grade}
+              setGrade={setGrade}
+            />
+
+            {/* Optional photos for raw cards */}
+            {!isGraded && (
+              <div className="mt-8">
+                <label className="block text-sm font-semibold text-zinc-700 mb-2">
+                  Photos
+                  <span className="ml-2 text-xs text-zinc-400 font-normal">(Optional) {Object.values(photos).filter(Boolean).length}/10</span>
+                </label>
+                <p className="text-xs text-zinc-400 mb-3">Add photos of your card to help buyers. You can also add them later.</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {PHOTO_SLOTS.map(slot => {
+                    const url = photos[slot.key]
+                    const isUp = photoUploading[slot.key]
+
+                    return (
+                      <label
+                        key={slot.key}
+                        className={`relative aspect-square rounded-lg border-2 border-dashed transition-all cursor-pointer overflow-hidden flex items-center justify-center ${
+                          url
+                            ? 'border-green-300 bg-green-50'
+                            : isUp
+                              ? 'border-orange-300 bg-orange-50'
+                              : 'border-zinc-200 bg-zinc-50 hover:border-orange-300'
+                        }`}
+                      >
+                        {url ? (
+                          <>
+                            <Image src={url} alt={slot.label} fill className="object-cover" sizes="100px" unoptimized />
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); handlePhotoRemove(slot.key) }}
+                              className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white z-10"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </>
+                        ) : isUp ? (
+                          <svg className="animate-spin h-4 w-4 text-orange-500" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : (
+                          <div className="text-center">
+                            <svg className="w-4 h-4 text-zinc-300 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            <p className="text-[9px] text-zinc-400 mt-0.5 leading-tight">{slot.label}</p>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handlePhotoUpload(slot.key, file)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {step === pricingStep && selectedCard && (
