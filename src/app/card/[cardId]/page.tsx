@@ -1,21 +1,20 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCardById, getAllCards } from "@/lib/cards";
-import CardModalClient from "./CardModalClient";
+import Link from "next/link";
+import { getCardById, getParallelCards } from "@/lib/cards";
+import { getCardSales, calculatePriceChange } from "@/lib/price-history";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
+import { CardThumbnail } from "@/components/card/CardThumbnail";
+import { PriceHistoryChart } from "@/components/card/PriceHistoryChart";
+import { PriceChangeBadge } from "@/components/PriceChangeBadge";
 import { ShareButtons } from "@/components/ShareButtons";
 import { ListingsGrid } from "@/components/marketplace/ListingsGrid";
 
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   params: Promise<{ cardId: string }>;
-}
-
-export async function generateStaticParams() {
-  const cards = await getAllCards();
-  return cards.map((card) => ({
-    cardId: card.id.toLowerCase(),
-  }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -31,7 +30,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const setUpper = card.setId.toUpperCase();
   const pageUrl = `${SITE_URL}/card/${card.id.toLowerCase()}`;
 
-  // Build comprehensive description with price for virality
   const price = card.price?.marketPrice;
   const priceText = price != null
     ? price >= 1000
@@ -50,7 +48,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const effectSnippet = card.effect ? card.effect.slice(0, 150) : '';
   const description = `${pricePrefix}${card.name} (${card.id}) - One Piece TCG ${setUpper} ${card.type} card. ${stats}. ${effectSnippet}`;
 
-  // Dynamic OG image with price overlay
   const ogImageUrl = `${SITE_URL}/api/og/${card.id.toLowerCase()}`;
 
   return {
@@ -101,151 +98,154 @@ export default async function CardPage({ params }: PageProps) {
     notFound();
   }
 
+  const sales = await getCardSales(card.id, 30);
+  const priceChange = await calculatePriceChange(card.id, card.price?.marketPrice ?? null, 7);
+  const parallelCards = await getParallelCards(card.baseId ?? card.id);
+  const relatedCards = parallelCards.filter(c => c.id !== card.id);
+
   return (
-    <CardModalClient>
-      <div className="flex flex-col md:flex-row max-h-[90vh]">
-            {/* Card Image - Left Side with 3D Preview */}
-            <div className="flex-shrink-0 bg-zinc-100 p-4 md:p-6 flex items-center justify-center md:w-[340px] lg:w-[400px]">
-              <Card3DPreview
-                card={card}
-                className="w-[200px] h-[280px] md:w-[280px] md:h-[392px] lg:w-[320px] lg:h-[448px]"
-                priority
-              />
+    <div>
+      {/* Breadcrumbs */}
+      <nav className="text-sm text-zinc-500 mb-6">
+        <Link href="/" className="hover:text-zinc-900 transition-colors">Home</Link>
+        <span className="mx-2">/</span>
+        <Link href={`/${card.setId}`} className="hover:text-zinc-900 transition-colors">
+          {card.setId.toUpperCase()}
+        </Link>
+        <span className="mx-2">/</span>
+        <span className="text-zinc-900">{card.name}</span>
+      </nav>
+
+      {/* Two-Column Layout: Image + Details */}
+      <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-8 mb-10">
+        {/* Left: Card Image */}
+        <div className="flex justify-center md:sticky md:top-24 md:self-start">
+          <Card3DPreview
+            card={card}
+            className="w-[280px] h-[392px] md:w-[320px] md:h-[448px]"
+            priority
+          />
+        </div>
+
+        {/* Right: Details + Market */}
+        <div>
+          {/* Card Identity */}
+          <div className="flex items-center gap-2 mb-1 text-xs text-zinc-500">
+            <span className="font-mono">{card.id}</span>
+            <span className="px-1.5 py-0.5 bg-zinc-100 rounded">{card.rarity}</span>
+            <span className="px-1.5 py-0.5 bg-zinc-100 rounded">{card.type}</span>
+            {card.isParallel && (
+              <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-200 rounded font-medium">
+                {card.artStyle === 'wanted' ? 'WANTED' : card.artStyle === 'manga' ? 'MANGA' : 'ALT'}
+              </span>
+            )}
+            <span className="text-zinc-300">|</span>
+            <Link href={`/${card.setId}`} className="hover:text-orange-500 transition-colors">
+              {card.setId.toUpperCase()}
+            </Link>
+          </div>
+          <h1 className="text-2xl font-bold text-zinc-900 mb-3">{card.name}</h1>
+
+          {/* Price */}
+          {card.price?.marketPrice != null && (
+            <div className="flex items-baseline gap-3 mb-4">
+              <span className="text-3xl font-bold text-zinc-900">
+                ${card.price.marketPrice.toFixed(2)}
+              </span>
+              {priceChange && (
+                <PriceChangeBadge changePercent={priceChange.changePercent} size="sm" />
+              )}
+              <span className="text-xs text-zinc-400">TCGPlayer Market</span>
             </div>
+          )}
 
-            {/* Card Details - Right Side */}
-            <div className="flex-1 p-5 md:p-6 overflow-y-auto">
-              {/* Header Row */}
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-zinc-600 font-mono">{card.id}</span>
-                    <span className="px-2 py-0.5 bg-zinc-200 rounded text-xs font-medium">{card.rarity}</span>
-                    <span className="px-2 py-0.5 bg-zinc-200 rounded text-xs">{card.type}</span>
-                    {card.isParallel && (
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-xs font-medium">
-                        {card.artStyle === 'wanted' ? 'WANTED' : card.artStyle === 'manga' ? 'MANGA' : 'ALT'}
-                      </span>
-                    )}
-                  </div>
-                  <h1 className="text-2xl md:text-3xl font-bold">{card.name}</h1>
-                </div>
-              </div>
-
-              {/* Colors */}
-              <div className="flex items-center gap-2 mb-4">
-                {card.colors.map((color) => (
-                  <div key={color} className="flex items-center gap-1.5">
-                    <span className={`w-4 h-4 rounded-full ${colorClasses[color]}`} />
-                    <span className="text-sm text-zinc-600">{color}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-4 gap-3 mb-5">
-                <div className="bg-zinc-100 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">{card.type === "LEADER" ? "Life" : "Cost"}</p>
-                  <p className="text-xl font-bold">{card.type === "LEADER" ? (card.life ?? "-") : (card.cost ?? "-")}</p>
-                </div>
-                <div className="bg-zinc-100 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Power</p>
-                  <p className="text-xl font-bold">{card.power?.toLocaleString() ?? "-"}</p>
-                </div>
-                <div className="bg-zinc-100 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Counter</p>
-                  <p className="text-xl font-bold">{card.counter ? `+${card.counter.toLocaleString()}` : "-"}</p>
-                </div>
-                <div className="bg-zinc-100 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Attribute</p>
-                  <p className="text-lg font-bold truncate">{card.attribute ?? "-"}</p>
-                </div>
-              </div>
-
-              {/* Traits */}
-              {card.traits.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {card.traits.map((trait) => (
-                    <span key={trait} className="px-2.5 py-1 bg-zinc-200 rounded-full text-xs text-zinc-700">
-                      {trait}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Effect */}
-              <div className="mb-4">
-                <h3 className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Effect</h3>
-                <p className="text-sm text-zinc-700 leading-relaxed">
-                  {card.effect || "No effect."}
-                </p>
-              </div>
-
-              {/* Trigger */}
-              {card.trigger && (
-                <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                  <h3 className="text-xs text-amber-400 uppercase tracking-wide mb-1">Trigger</h3>
-                  <p className="text-sm text-zinc-700">{card.trigger}</p>
-                </div>
-              )}
-
-              {/* Price */}
-              {card.price?.marketPrice != null && (
-                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <h3 className="text-xs text-green-400 uppercase tracking-wide mb-1">TCGPlayer Price</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-green-400">${card.price.marketPrice.toFixed(2)}</span>
-                    {card.price.tcgplayerUrl && (
-                      <a
-                        href={card.price.tcgplayerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-green-400 hover:text-green-300 underline"
-                      >
-                        View on TCGPlayer
-                      </a>
-                    )}
-                  </div>
-                  {(card.price.lowestPrice != null || card.price.medianPrice != null) && (
-                    <p className="text-xs text-zinc-500 mt-1">
-                      {card.price.lowestPrice != null && `Low: $${card.price.lowestPrice.toFixed(2)}`}
-                      {card.price.lowestPrice != null && card.price.medianPrice != null && ' • '}
-                      {card.price.medianPrice != null && `Median: $${card.price.medianPrice.toFixed(2)}`}
-                    </p>
-                  )}
-                  {card.price.lastSoldPrice != null && (
-                    <p className="text-xs text-zinc-500 mt-1">
-                      Last sold: ${card.price.lastSoldPrice.toFixed(2)}
-                      {card.price.lastSoldDate && ` (${new Date(card.price.lastSoldDate).toLocaleDateString()})`}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Share Buttons */}
-              <div className="mb-4">
-                <ShareButtons card={card} />
-              </div>
-
-              {/* Marketplace Listings */}
-              <div className="mb-4 p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg">
-                <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide mb-3">Buy on NOMI Market</h3>
-                <ListingsGrid cardId={card.id} />
-              </div>
-
-              {/* Set Info */}
-              <div className="mt-4 pt-4 border-t border-zinc-200">
-                <p className="text-xs text-zinc-500">
-                  Set: <span className="text-zinc-700 font-medium">{card.setId.toUpperCase()}</span>
-                </p>
-                {card.price?.tcgplayerProductId != null && (
-                  <p className="text-xs text-zinc-500 mt-1">
-                    TCGPlayer ID: <span className="text-zinc-700 font-mono">{card.price.tcgplayerProductId}</span>
-                  </p>
-                )}
-              </div>
+          {/* Marketplace section */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 mb-5">
+            <ListingsGrid cardId={card.id} />
+            <div className="mt-4 pt-3 border-t border-zinc-100">
+              <Link
+                href={`/sell?card=${encodeURIComponent(card.id)}`}
+                className="block text-center py-2.5 rounded-lg border border-zinc-200 hover:border-orange-300 hover:bg-orange-50 text-sm font-medium text-zinc-700 transition-colors"
+              >
+                Sell This Card
+              </Link>
             </div>
           </div>
+
+          {/* Card details */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-4">
+            <h3 className="text-xs font-semibold text-zinc-700 uppercase tracking-wide mb-3">Card Details</h3>
+            <div className="text-xs text-zinc-500 space-y-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+              {card.colors.map((color) => (
+                <span key={color} className="inline-flex items-center gap-1">
+                  <span className={`w-2 h-2 rounded-full ${colorClasses[color]}`} />
+                  {color}
+                </span>
+              ))}
+              <span>{card.type === "LEADER" ? "Life" : "Cost"} {card.type === "LEADER" ? (card.life ?? "-") : (card.cost ?? "-")}</span>
+              <span>Power {card.power?.toLocaleString() ?? "-"}</span>
+              {card.counter != null && <span>Counter +{card.counter.toLocaleString()}</span>}
+              {card.attribute && <span>{card.attribute}</span>}
+            </div>
+            {card.traits.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {card.traits.map((trait) => (
+                  <span key={trait} className="px-1.5 py-0.5 bg-zinc-100 rounded text-[11px]">{trait}</span>
+                ))}
+              </div>
+            )}
+            <p className="text-zinc-500 leading-relaxed">{card.effect || "No effect."}</p>
+            {card.trigger && (
+              <p><span className="text-amber-600 font-medium">Trigger:</span> {card.trigger}</p>
+            )}
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+                {card.price?.lowestPrice != null && <span>Low ${card.price.lowestPrice.toFixed(2)}</span>}
+                {card.price?.medianPrice != null && <span>Med ${card.price.medianPrice.toFixed(2)}</span>}
+                {card.price?.tcgplayerUrl && (
+                  <a href={card.price.tcgplayerUrl} target="_blank" rel="noopener noreferrer" className="hover:text-orange-500 transition-colors">TCGPlayer</a>
+                )}
+              </div>
+              <ShareButtons card={card} />
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sales Chart */}
+      {sales.length > 1 && (
+        <section className="mb-8">
+          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-3">Recent Sales</h2>
+          <div className="bg-white border border-zinc-100 rounded-xl p-4">
+            <PriceHistoryChart data={sales} />
+          </div>
+        </section>
+      )}
+
+      {/* Other Versions */}
+      {relatedCards.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-lg font-bold text-zinc-900 mb-3">Other Versions</h2>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+            {relatedCards.map(alt => (
+              <Link key={alt.id} href={`/card/${alt.id.toLowerCase()}`} className="block group">
+                <CardThumbnail card={alt} />
+                <div className="mt-1.5">
+                  <p className="text-xs font-medium truncate group-hover:text-orange-500 transition-colors">{alt.name}</p>
+                  <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+                    <span>{alt.id}</span>
+                    {alt.price?.marketPrice != null && (
+                      <span className="text-zinc-600 font-medium">${alt.price.marketPrice.toFixed(2)}</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* BreadcrumbList Schema */}
       <script
@@ -320,6 +320,6 @@ export default async function CardPage({ params }: PageProps) {
           }),
         }}
       />
-    </CardModalClient>
+    </div>
   );
 }

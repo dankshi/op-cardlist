@@ -74,10 +74,8 @@ icons: {
 
 export default function RootLayout({
   children,
-  modal,
 }: Readonly<{
   children: React.ReactNode;
-  modal: React.ReactNode;
 }>) {
   return (
     <html lang="en">
@@ -108,6 +106,9 @@ export default function RootLayout({
                 <Link href="/sell" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
                   Sell
                 </Link>
+                <Link href="/dashboard" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
+                  Dashboard
+                </Link>
                 <Suspense>
                   <CartButton />
                 </Suspense>
@@ -120,13 +121,12 @@ export default function RootLayout({
           <main className="max-w-7xl mx-auto px-4 py-8">
             {children}
           </main>
-          {modal}
           <footer className="border-t border-zinc-200 mt-16">
             <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-3">
               <div className="flex items-center justify-center">
                 <Image src="/nomi-slab.png" alt="nomi" width={60} height={20} className="h-5 w-auto" />
               </div>
-              <p>Authenticated cards. Market prices. Los Angeles, CA.</p>
+
               <div className="flex items-center justify-center gap-4 text-xs text-zinc-400">
                 <Link href="/about" className="hover:text-zinc-900 transition-colors">How It Works</Link>
                 <span className="text-zinc-300">|</span>
