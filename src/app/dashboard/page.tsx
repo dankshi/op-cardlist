@@ -10,6 +10,26 @@ import type { Profile, Listing, Order } from '@/types/database'
 
 type Tab = 'listings' | 'orders' | 'settings'
 
+const STATUS_STYLES: Record<string, string> = {
+  paid: 'bg-yellow-500/10 text-yellow-600',
+  seller_shipped: 'bg-blue-500/10 text-blue-600',
+  received: 'bg-purple-500/10 text-purple-600',
+  authenticated: 'bg-emerald-500/10 text-emerald-600',
+  shipped_to_buyer: 'bg-blue-500/10 text-blue-600',
+  shipped: 'bg-blue-500/10 text-blue-600',
+  delivered: 'bg-green-500/10 text-green-600',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  paid: 'Action Required',
+  seller_shipped: 'Shipped to Platform',
+  received: 'Received by Platform',
+  authenticated: 'Authenticated',
+  shipped_to_buyer: 'Shipped to Buyer',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+}
+
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
@@ -41,8 +61,18 @@ export default function DashboardPage() {
       const fetchedListings = (l as Listing[]) || []
       setListings(fetchedListings)
 
-      // Fetch card images for listings
-      const uniqueCardIds = [...new Set(fetchedListings.map(li => li.card_id))]
+      const { data: o } = await supabase
+        .from('orders')
+        .select('*, buyer:profiles!orders_buyer_id_fkey(display_name), items:order_items(*)')
+        .eq('seller_id', user.id)
+        .not('status', 'in', '("pending_payment","cancelled")')
+        .order('created_at', { ascending: false })
+      const fetchedOrders = (o as Order[]) || []
+      setOrders(fetchedOrders)
+
+      // Fetch card images for listings + order items
+      const orderCardIds = fetchedOrders.flatMap(order => order.items?.map(i => i.card_id) || [])
+      const uniqueCardIds = [...new Set([...fetchedListings.map(li => li.card_id), ...orderCardIds])]
       const images: Record<string, string> = {}
       await Promise.all(
         uniqueCardIds.map(async (cardId) => {
@@ -56,14 +86,6 @@ export default function DashboardPage() {
         })
       )
       setCardImages(images)
-
-      const { data: o } = await supabase
-        .from('orders')
-        .select('*, buyer:profiles!orders_buyer_id_fkey(display_name), items:order_items(*)')
-        .eq('seller_id', user.id)
-        .not('status', 'in', '("pending_payment","cancelled")')
-        .order('created_at', { ascending: false })
-      setOrders((o as Order[]) || [])
 
       setLoading(false)
     }
@@ -285,37 +307,30 @@ export default function DashboardPage() {
                   className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    {firstItem?.snapshot_photo_url ? (
+                    {(firstItem?.snapshot_photo_url || (firstItem?.card_id && cardImages[firstItem.card_id])) ? (
                       <img
-                        src={firstItem.snapshot_photo_url}
-                        alt={firstItem.card_name}
-                        className="w-12 h-[67px] rounded object-cover flex-shrink-0"
+                        src={firstItem?.snapshot_photo_url || (firstItem?.card_id ? cardImages[firstItem.card_id] : '')}
+                        alt={firstItem?.card_name}
+                        className="w-16 h-[89px] rounded object-cover flex-shrink-0"
                       />
                     ) : (
-                      <div className="w-12 h-[67px] rounded bg-zinc-100 flex-shrink-0" />
+                      <div className="w-16 h-[89px] rounded bg-zinc-100 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-zinc-900 truncate">
                         {firstItem?.card_name || `Order #${order.id.slice(0, 8)}`}
                       </p>
                       <p className="text-sm text-zinc-500">
-                        {(order.buyer as { display_name: string })?.display_name || 'Unknown buyer'}
+                        Buyer: {(order.buyer as { display_name: string })?.display_name || 'Unknown'}
                       </p>
+                      <span className={`inline-block text-xs px-2 py-0.5 rounded mt-1 font-medium ${
+                        STATUS_STYLES[order.status] || 'bg-zinc-200 text-zinc-500'
+                      }`}>
+                        {STATUS_LABELS[order.status] || order.status.replace(/_/g, ' ')}
+                      </span>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="font-bold text-zinc-900">${Number(order.total).toFixed(2)}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        order.status === 'paid' ? 'bg-yellow-500/10 text-yellow-400' :
-                        order.status === 'seller_shipped' ? 'bg-blue-500/10 text-blue-400' :
-                        order.status === 'received' ? 'bg-purple-500/10 text-purple-400' :
-                        order.status === 'authenticated' ? 'bg-emerald-500/10 text-emerald-400' :
-                        order.status === 'shipped_to_buyer' ? 'bg-blue-500/10 text-blue-400' :
-                        order.status === 'shipped' ? 'bg-blue-500/10 text-blue-400' :
-                        order.status === 'delivered' ? 'bg-green-500/10 text-green-400' :
-                        'bg-zinc-200 text-zinc-500'
-                      }`}>
-                        {order.status.replace(/_/g, ' ')}
-                      </span>
+                      <p className="font-bold text-lg text-zinc-900">${Number(order.total).toFixed(2)}</p>
                     </div>
                   </div>
                 </Link>

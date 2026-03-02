@@ -94,6 +94,7 @@ export default function OrderDetailPage() {
   const [estimateLoading, setEstimateLoading] = useState(false)
   const [estimate, setEstimate] = useState<{ estimated_cost: number; carrier: string; estimated_days: number } | null>(null)
   const [shipLoading, setShipLoading] = useState(false)
+  const [cardImages, setCardImages] = useState<Record<string, string>>({})
   const router = useRouter()
   const params = useParams()
   const orderId = params.orderId as string
@@ -123,6 +124,20 @@ export default function OrderDetailPage() {
 
       const fullOrder = { ...orderData, items: items || [] } as Order
       setOrder(fullOrder)
+
+      // Fetch card images for items without snapshots
+      const cardIds = [...new Set((items || []).filter(i => !i.snapshot_photo_url).map(i => i.card_id))]
+      const imgs: Record<string, string> = {}
+      await Promise.all(
+        cardIds.map(async (cardId: string) => {
+          try {
+            const r = await fetch(`/api/cards?id=${encodeURIComponent(cardId)}`)
+            const d = await r.json()
+            if (d.card?.imageUrl) imgs[cardId] = d.card.imageUrl
+          } catch { /* skip */ }
+        })
+      )
+      setCardImages(imgs)
 
       const { data: reviewData } = await supabase
         .from('reviews')
@@ -252,8 +267,8 @@ export default function OrderDetailPage() {
           {order.items?.map(item => (
             <div key={item.id} className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
-                {item.snapshot_photo_url && (
-                  <img src={item.snapshot_photo_url} alt="" className="w-10 h-14 object-contain rounded" />
+                {(item.snapshot_photo_url || cardImages[item.card_id]) && (
+                  <img src={item.snapshot_photo_url || cardImages[item.card_id]} alt="" className="w-16 h-[89px] object-cover rounded" />
                 )}
                 <div>
                   <Link href={`/card/${item.card_id.toLowerCase()}`} className="font-medium text-zinc-900 hover:text-orange-400 transition-colors">
@@ -273,16 +288,16 @@ export default function OrderDetailPage() {
 
       {/* Order Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white border border-zinc-200 rounded-lg p-4">
-          <h2 className="font-medium text-zinc-900 mb-3">{isBuyer ? 'Seller' : 'Buyer'}</h2>
-          {isBuyer && order.seller ? (
-            <Link href={`/seller/${(order.seller as { username: string }).username}`} className="text-orange-400 hover:text-orange-600">
-              {(order.seller as { display_name: string }).display_name}
-            </Link>
-          ) : order.buyer ? (
-            <p className="text-zinc-600">{(order.buyer as { display_name: string }).display_name}</p>
-          ) : null}
-        </div>
+        {isBuyer && (
+          <div className="bg-white border border-zinc-200 rounded-lg p-4">
+            <h2 className="font-medium text-zinc-900 mb-3">Seller</h2>
+            {order.seller ? (
+              <Link href={`/seller/${(order.seller as { username: string }).username}`} className="text-orange-400 hover:text-orange-600">
+                {(order.seller as { display_name: string }).display_name}
+              </Link>
+            ) : null}
+          </div>
+        )}
 
         <div className="bg-white border border-zinc-200 rounded-lg p-4">
           <h2 className="font-medium text-zinc-900 mb-3">Summary</h2>

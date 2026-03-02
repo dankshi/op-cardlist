@@ -36,6 +36,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
+  const [cardImages, setCardImages] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
@@ -51,6 +52,22 @@ export default function OrdersPage() {
         (o: Order) => o.status !== 'cancelled' && o.status !== 'pending_payment'
       )
       setOrders(activeOrders)
+
+      // Fetch card images for order items without snapshots
+      const cardIds = [...new Set<string>(activeOrders.flatMap((o: Order) =>
+        (o.items || []).filter(i => !i.snapshot_photo_url).map(i => i.card_id)
+      ))]
+      const images: Record<string, string> = {}
+      await Promise.all(
+        cardIds.map(async (cardId: string) => {
+          try {
+            const r = await fetch(`/api/cards?id=${encodeURIComponent(cardId)}`)
+            const d = await r.json()
+            if (d.card?.imageUrl) images[cardId] = d.card.imageUrl
+          } catch { /* skip */ }
+        })
+      )
+      setCardImages(images)
       setLoading(false)
     }
     load()
@@ -84,35 +101,28 @@ export default function OrdersPage() {
                 className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
               >
                 <div className="flex items-center gap-4">
-                  {firstItem?.snapshot_photo_url ? (
+                  {(firstItem?.snapshot_photo_url || firstItem?.card_id ? cardImages[firstItem.card_id] : undefined) ? (
                     <img
-                      src={firstItem.snapshot_photo_url}
-                      alt={firstItem.card_name}
-                      className="w-16 h-22 rounded-lg object-cover flex-shrink-0"
+                      src={firstItem?.snapshot_photo_url || firstItem?.card_id ? cardImages[firstItem.card_id] : undefined}
+                      alt={firstItem?.card_name}
+                      className="w-16 h-[89px] rounded-lg object-cover flex-shrink-0"
                     />
                   ) : (
-                    <div className="w-16 h-22 rounded-lg bg-zinc-100 flex-shrink-0 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
+                    <div className="w-16 h-[89px] rounded-lg bg-zinc-100 flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-zinc-900 truncate">
                       {firstItem?.card_name || `Order #${order.id.slice(0, 8)}`}
                     </p>
-                    {(order.items?.length || 0) > 1 && (
-                      <p className="text-xs text-zinc-400">+{(order.items?.length || 0) - 1} more</p>
-                    )}
-                    <p className="text-sm text-zinc-500 mt-1">
+                    <p className="text-sm text-zinc-500 mt-0.5">
                       {new Date(order.created_at).toLocaleDateString()}
                     </p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-bold text-zinc-900">${Number(order.total).toFixed(2)}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded ${STATUS_STYLES[order.status] || ''}`}>
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded mt-1 font-medium ${STATUS_STYLES[order.status] || ''}`}>
                       {STATUS_LABELS[order.status] || order.status.replace(/_/g, ' ')}
                     </span>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-bold text-lg text-zinc-900">${Number(order.total).toFixed(2)}</p>
                   </div>
                 </div>
               </Link>
