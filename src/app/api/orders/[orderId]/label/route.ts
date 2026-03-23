@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getShippingRates, createShippingLabel, PLATFORM_ADDRESS } from '@/lib/shippo'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { createShippingLabel } from '@/lib/shippo'
+import { sendAdminSellerShippedEmail } from '@/lib/email'
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ orderId: string }> }
 ) {
   const { orderId } = await params
@@ -49,32 +51,15 @@ export async function POST(
   }
 
   try {
-    // Use seller's address if available, otherwise fall back to platform address
-    const hasSellerAddress = profile.shipping_street1 && profile.shipping_city && profile.shipping_state && profile.shipping_zip
-    const sellerAddress = hasSellerAddress
-      ? {
-          name: profile.display_name || 'Seller',
-          street1: profile.shipping_street1,
-          city: profile.shipping_city,
-          state: profile.shipping_state,
-          zip: profile.shipping_zip,
-          country: 'US',
-        }
-      : { ...PLATFORM_ADDRESS, name: profile.display_name || 'Seller' }
-
-    const rates = await getShippingRates(sellerAddress)
-
-    // Check seller has sufficient balance
-    if (Number(profile.balance) < rates.estimatedCost) {
-      return NextResponse.json({
-        error: `Insufficient balance. Label costs $${rates.estimatedCost.toFixed(2)} but your balance is $${Number(profile.balance).toFixed(2)}`,
-      }, { status: 400 })
+    const { rateId } = await request.json()
+    if (!rateId) {
+      return NextResponse.json({ error: 'rateId is required' }, { status: 400 })
     }
 
     // Create the label
-    const label = await createShippingLabel(rates.rateId)
+    const label = await createShippingLabel(rateId)
 
-    // Update the order with label info
+    // Update the order with label info and mark as shipped
     await supabase
       .from('orders')
       .update({
@@ -82,16 +67,42 @@ export async function POST(
         seller_label_cost: label.cost,
         seller_tracking_number: label.trackingNumber,
         seller_tracking_carrier: label.carrier,
+        status: 'seller_shipped',
+        shipped_at: new Date().toISOString(),
       })
       .eq('id', orderId)
 
-    // Deduct label cost from seller balance
+    // Deduct flat $5 shipping fee from seller balance (nomi covers the rest)
+    const SELLER_SHIPPING_FEE = 5
     await supabase
       .from('profiles')
       .update({
-        balance: Number(profile.balance) - label.cost,
+        balance: Number(profile.balance) - SELLER_SHIPPING_FEE,
       })
       .eq('id', user.id)
+
+    // Notify admin that seller has shipped
+    try {
+      const adminEmail = process.env.ADMIN_EMAIL
+      if (adminEmail) {
+        const admin = getSupabaseAdmin()
+        const { data: sellerProfile } = await admin
+          .from('profiles')
+          .select('display_name')
+          .eq('id', user.id)
+          .single()
+
+        await sendAdminSellerShippedEmail({
+          adminEmail,
+          sellerName: sellerProfile?.display_name || '',
+          orderId,
+          trackingNumber: label.trackingNumber,
+          trackingCarrier: label.carrier,
+        })
+      }
+    } catch (emailErr) {
+      console.error('Failed to send admin notification:', emailErr)
+    }
 
     return NextResponse.json({
       label_url: label.labelUrl,

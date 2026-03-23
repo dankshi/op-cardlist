@@ -539,17 +539,32 @@ function StepPricing({
           </div>
         </div>
 
-        {/* Total estimate */}
-        {priceNum > 0 && parseInt(quantity) > 0 && (
-          <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-zinc-500">Total listing value</p>
-              <p className="text-lg font-bold text-zinc-900">
-                ${(priceNum * parseInt(quantity)).toFixed(2)}
-              </p>
+        {/* Payout estimate */}
+        {priceNum > 0 && parseInt(quantity) > 0 && (() => {
+          const total = priceNum * parseInt(quantity)
+          const fee = total * 0.095
+          const payout = total - 5 - fee
+          return (
+            <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">Sale price</span>
+                <span className="text-zinc-900">${total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">Shipping</span>
+                <span className="text-zinc-900">-$5.00</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">Platform fee (9.5%)</span>
+                <span className="text-zinc-900">-${fee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold pt-1 border-t border-zinc-200">
+                <span className="text-zinc-900">Your payout</span>
+                <span className="text-green-600">${payout.toFixed(2)}</span>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
     </div>
   )
@@ -647,6 +662,26 @@ function StepReview({
               <span className="text-sm font-bold text-zinc-900">${(priceNum * qtyNum).toFixed(2)}</span>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Payout breakdown */}
+      <div className="mt-4 p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+        <div className="flex justify-between text-sm">
+          <span className="text-zinc-500">Sale price</span>
+          <span className="text-zinc-900">${(priceNum * qtyNum).toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-zinc-500">Shipping</span>
+          <span className="text-zinc-900">-$5.00</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-zinc-500">Platform fee (9.5%)</span>
+          <span className="text-zinc-900">-${(priceNum * qtyNum * 0.095).toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-sm font-bold pt-1 border-t border-zinc-200">
+          <span className="text-zinc-900">Your payout</span>
+          <span className="text-green-600">${(priceNum * qtyNum - 5 - priceNum * qtyNum * 0.095).toFixed(2)}</span>
         </div>
       </div>
 

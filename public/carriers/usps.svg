@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40">
+  <rect width="120" height="40" rx="4" fill="#004B87"/>
+  <!-- Eagle silhouette -->
+  <g transform="translate(8, 6)" fill="white">
+    <path d="M0 14 C2 8, 8 2, 16 0 C14 4, 12 8, 14 10 C16 6, 20 3, 26 4 C22 6, 20 10, 22 12 C18 10, 14 12, 12 16 C10 14, 6 14, 0 14Z" opacity="0.9"/>
+  </g>
+  <!-- USPS text -->
+  <text x="42" y="26" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" fill="white" letter-spacing="1">USPS</text>
+  <!-- Red underline accent -->
+  <rect x="42" y="29" width="70" height="2.5" rx="1" fill="#DA291C"/>
+</svg>

@@ -23,6 +23,11 @@ const nextConfig: NextConfig = {
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      {
+        protocol: "https",
+        hostname: "pub-7ca7df93bad849619d03ad7adf4515e8.r2.dev",
+        pathname: "/cards/**",
+      },
     ],
   },
   turbopack: {

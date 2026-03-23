@@ -18,6 +18,12 @@ export interface Profile {
   rating_count: number
   total_sales: number
   balance: number
+  shipping_street1: string | null
+  shipping_city: string | null
+  shipping_state: string | null
+  shipping_zip: string | null
+  shipping_email: string | null
+  shipping_phone: string | null
   created_at: string
   updated_at: string
 }
@@ -121,6 +127,28 @@ export interface ShippingAddress {
   country: string
 }
 
+export type IntakeStatus = 'pending' | 'verified' | 'flagged' | 'resolved' | 'rejected'
+
+export type IntakeIssueType =
+  | 'wrong_card'
+  | 'wrong_condition'
+  | 'missing_item'
+  | 'counterfeit'
+  | 'damaged_in_transit'
+  | 'wrong_quantity'
+  | 'other'
+
+export type IntakeResolutionStatus = 'open' | 'in_progress' | 'resolved' | 'escalated'
+
+export type IntakeResolutionType =
+  | 'replacement_requested'
+  | 'partial_refund'
+  | 'full_refund'
+  | 'order_cancelled'
+  | 'item_accepted'
+  | 'new_item_created'
+  | 'seller_contacted'
+
 export interface OrderItem {
   id: string
   order_id: string
@@ -131,7 +159,93 @@ export interface OrderItem {
   unit_price: number
   condition: CardCondition
   snapshot_photo_url: string | null
+  intake_status: IntakeStatus
+  intake_verified_at: string | null
+  intake_verified_by: string | null
+  intake_notes: string | null
   created_at: string
+}
+
+export interface IntakeIssue {
+  id: string
+  order_id: string
+  order_item_id: string | null
+  issue_type: IntakeIssueType
+  description: string
+  expected_card_name: string | null
+  received_card_name: string | null
+  expected_condition: string | null
+  received_condition: string | null
+  photo_urls: string[]
+  resolution_status: IntakeResolutionStatus
+  resolution_type: IntakeResolutionType | null
+  resolution_notes: string | null
+  resolved_at: string | null
+  resolved_by: string | null
+  seller_notified_at: string | null
+  buyer_notified_at: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  // Joined fields
+  order?: Order
+  order_item?: OrderItem
+  creator?: Profile
+  resolver?: Profile
+}
+
+// ============================================
+// Triage Types (Intake V2)
+// ============================================
+
+export type TriageType = 'no_order' | 'user_id'
+export type TriageCardType = 'raw' | 'slab'
+export type TriageResolvedAs = 'matched_order' | 'house_account'
+export type ReceivedVia = 'tracking_scan' | 'pon_scan' | 'triage_resolution' | 'manual'
+
+export interface TriagePackage {
+  id: string
+  triage_type: TriageType
+  tracking_number: string | null
+  seller_id: string | null
+  card_type: TriageCardType | null
+  cert_number: string | null
+  nomi_input: string | null
+  resolved_order_id: string | null
+  resolved_as: TriageResolvedAs | null
+  status: 'pending' | 'resolved'
+  created_by: string
+  resolved_by: string | null
+  resolved_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  seller?: Profile
+  resolved_order?: Order
+}
+
+export type TrackingMatchType = 'exact' | 'multiple' | 'reused' | 'none'
+
+export interface TrackingLookupResult {
+  match: TrackingMatchType
+  orders: Order[]
+  seller_id?: string
+}
+
+export const HOUSE_ACCOUNT_ID = '00000000-0000-0000-0000-000000000001'
+
+export interface IntakeActivityLog {
+  id: string
+  order_id: string
+  order_item_id: string | null
+  intake_issue_id: string | null
+  action: string
+  details: Record<string, unknown>
+  performed_by: string
+  created_at: string
+  // Joined fields
+  performer?: Profile
 }
 
 export interface Review {

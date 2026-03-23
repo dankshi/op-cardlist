@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getShippingRates, PLATFORM_ADDRESS } from '@/lib/shippo'
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ orderId: string }> }
 ) {
   const { orderId } = await params
@@ -54,15 +54,33 @@ export async function GET(
           state: profile.shipping_state,
           zip: profile.shipping_zip,
           country: 'US',
+          email: profile.shipping_email || user.email || PLATFORM_ADDRESS.email,
+          phone: profile.shipping_phone || PLATFORM_ADDRESS.phone,
         }
       : { ...PLATFORM_ADDRESS, name: profile.display_name || 'Seller' }
 
-    const rates = await getShippingRates(sellerAddress)
+    // Auto-add insurance for high-value orders (nomi covers the cost)
+    const HIGH_VALUE_THRESHOLD = 500
+    const orderTotal = Number(order.total)
+    const insuranceOptions = orderTotal >= HIGH_VALUE_THRESHOLD
+      ? { insuranceAmount: orderTotal }
+      : undefined
+
+    const rates = await getShippingRates(sellerAddress, insuranceOptions)
 
     return NextResponse.json({
-      estimated_cost: rates.estimatedCost,
-      carrier: rates.carrier,
-      estimated_days: rates.estimatedDays,
+      from_address: {
+        city: sellerAddress.city,
+        state: sellerAddress.state,
+        zip: sellerAddress.zip,
+      },
+      rates: rates.map(r => ({
+        rate_id: r.rateId,
+        carrier: r.carrier,
+        service: r.service,
+        estimated_cost: r.estimatedCost,
+        estimated_days: r.estimatedDays,
+      })),
     })
   } catch (err) {
     console.error('Rate estimation failed:', err)

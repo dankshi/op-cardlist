@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { SubmitButton, AuthError } from '@/components/auth/AuthForm'
 
@@ -168,7 +169,7 @@ export default function NewDeckPage() {
           <h3 className="text-sm font-medium text-zinc-600 mb-2">Leader</h3>
           {leader ? (
             <div className="flex items-center gap-3">
-              <img src={leader.imageUrl} alt="" className="w-12 h-16 object-contain rounded" />
+              <Image src={leader.imageUrl} alt="" width={48} height={64} className="w-12 h-16 object-contain rounded" unoptimized />
               <div>
                 <p className="text-zinc-900 font-medium">{leader.name}</p>
                 <p className="text-xs text-zinc-500">{leader.id}</p>
@@ -204,7 +205,7 @@ export default function NewDeckPage() {
                     onClick={() => addCard(card)}
                     className="w-full flex items-center gap-3 px-4 py-2 hover:bg-zinc-100 text-left cursor-pointer"
                   >
-                    <img src={card.imageUrl} alt="" className="w-8 h-11 object-contain rounded" />
+                    <Image src={card.imageUrl} alt="" width={32} height={44} className="w-8 h-11 object-contain rounded" unoptimized />
                     <div>
                       <p className="text-sm text-zinc-900">{card.name}</p>
                       <p className="text-xs text-zinc-500">{card.id} &middot; {card.type} &middot; {card.rarity}</p>

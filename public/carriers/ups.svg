@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40">
+  <!-- Shield shape -->
+  <path d="M50 2 C30 2, 15 4, 15 4 L15 18 C15 30, 30 37, 50 38 C70 37, 85 30, 85 18 L85 4 C85 4, 70 2, 50 2Z" fill="#351C15"/>
+  <path d="M50 5 C33 5, 19 7, 19 7 L19 18 C19 28, 32 34, 50 35 C68 34, 81 28, 81 18 L81 7 C81 7, 67 5, 50 5Z" fill="#FFB500"/>
+  <path d="M50 8 C35 8, 23 9.5, 23 9.5 L23 18 C23 26.5, 34 31.5, 50 32.5 C66 31.5, 77 26.5, 77 18 L77 9.5 C77 9.5, 65 8, 50 8Z" fill="#351C15"/>
+  <!-- UPS text -->
+  <text x="50" y="25" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#FFB500" text-anchor="middle" letter-spacing="1">UPS</text>
+</svg>

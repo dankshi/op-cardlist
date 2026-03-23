@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import type { SearchIndexEntry, SetIndexEntry } from "@/lib/cards";
 
 type DropdownItem =
@@ -280,10 +281,13 @@ export function SearchHero() {
                       onMouseEnter={() => setSelectedIndex(i)}
                     >
                       {set.imageUrl ? (
-                        <img
+                        <Image
                           src={set.imageUrl}
                           alt=""
+                          width={40}
+                          height={56}
                           className="w-10 h-14 object-contain rounded flex-shrink-0 bg-white"
+                          unoptimized
                         />
                       ) : (
                         <div className="w-10 h-14 rounded flex-shrink-0 bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
@@ -321,10 +325,13 @@ export function SearchHero() {
                     onClick={() => setIsOpen(false)}
                     onMouseEnter={() => setSelectedIndex(i)}
                   >
-                    <img
+                    <Image
                       src={card.imageUrl}
                       alt=""
+                      width={40}
+                      height={56}
                       className="w-10 h-14 object-cover rounded flex-shrink-0"
+                      unoptimized
                     />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate text-sm">

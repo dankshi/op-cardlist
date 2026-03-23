@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { Order } from '@/types/database'
+import type { Order, OrderItem } from '@/types/database'
 
 const STATUS_STYLES: Record<string, string> = {
   pending_payment: 'bg-zinc-200 text-zinc-600',
@@ -142,7 +142,15 @@ export default function AdminPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Admin Panel</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold text-zinc-900">Admin Panel</h1>
+        <Link
+          href="/admin/intake"
+          className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors"
+        >
+          Intake Scanner
+        </Link>
+      </div>
 
       {/* Status counts */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-8">
@@ -203,14 +211,40 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Items */}
+                {/* Items with intake status */}
                 <div className="text-sm text-zinc-600 mb-3">
                   {order.items?.map(item => (
-                    <span key={item.id} className="mr-3">
+                    <span key={item.id} className="mr-3 inline-flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full inline-block ${
+                        (item as OrderItem).intake_status === 'verified' ? 'bg-green-500' :
+                        (item as OrderItem).intake_status === 'flagged' ? 'bg-red-500' :
+                        (item as OrderItem).intake_status === 'resolved' ? 'bg-blue-500' :
+                        'bg-zinc-300'
+                      }`} />
                       {item.card_name} x{item.quantity}
                     </span>
                   ))}
                 </div>
+                {/* Intake progress */}
+                {(order.status === 'received' || order.status === 'seller_shipped') && order.items && order.items.length > 0 && (() => {
+                  const verified = order.items.filter(i => (i as OrderItem).intake_status === 'verified' || (i as OrderItem).intake_status === 'resolved').length
+                  const flagged = order.items.filter(i => (i as OrderItem).intake_status === 'flagged').length
+                  const total = order.items.length
+                  return (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
+                        <span>Intake: {verified}/{total} verified</span>
+                        {flagged > 0 && <span className="text-red-500 font-medium">{flagged} flagged</span>}
+                      </div>
+                      <div className="w-full bg-zinc-100 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full ${verified === total ? 'bg-green-500' : 'bg-orange-500'}`}
+                          style={{ width: `${(verified / total) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Tracking info */}
                 {order.seller_tracking_number && (
@@ -232,26 +266,42 @@ export default function AdminPage() {
                 )}
 
                 {/* Action area */}
-                {action && (
-                  <div className="flex items-end gap-3 pt-3 border-t border-zinc-100">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        placeholder="Add notes (optional)"
-                        value={notesMap[order.id] || ''}
-                        onChange={e => setNotesMap(prev => ({ ...prev, [order.id]: e.target.value }))}
-                        className="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm"
-                      />
+                {action && (() => {
+                  // Block authentication if items aren't all verified
+                  const isAuthGated = action.nextStatus === 'authenticated' && order.items && order.items.some(
+                    i => (i as OrderItem).intake_status !== 'verified' && (i as OrderItem).intake_status !== 'resolved'
+                  )
+
+                  return (
+                    <div className="flex items-end gap-3 pt-3 border-t border-zinc-100">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder="Add notes (optional)"
+                          value={notesMap[order.id] || ''}
+                          onChange={e => setNotesMap(prev => ({ ...prev, [order.id]: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm"
+                        />
+                      </div>
+                      {isAuthGated ? (
+                        <Link
+                          href={`/admin/intake?orderId=${order.id}`}
+                          className="px-4 py-2 rounded-lg bg-yellow-500 text-white font-semibold text-sm hover:bg-yellow-600 transition-colors"
+                        >
+                          Verify Items First
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => handleStatusChange(order.id, action.nextStatus)}
+                          disabled={actionLoading === order.id}
+                          className={`px-4 py-2 rounded-lg text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 ${action.buttonClass}`}
+                        >
+                          {actionLoading === order.id ? 'Processing...' : action.label}
+                        </button>
+                      )}
                     </div>
-                    <button
-                      onClick={() => handleStatusChange(order.id, action.nextStatus)}
-                      disabled={actionLoading === order.id}
-                      className={`px-4 py-2 rounded-lg text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 ${action.buttonClass}`}
-                    >
-                      {actionLoading === order.id ? 'Processing...' : action.label}
-                    </button>
-                  </div>
-                )}
+                  )
+                })()}
               </div>
             )
           })}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import type { Order } from '@/types/database'
 
@@ -102,10 +103,13 @@ export default function OrdersPage() {
               >
                 <div className="flex items-center gap-4">
                   {(firstItem?.snapshot_photo_url || firstItem?.card_id ? cardImages[firstItem.card_id] : undefined) ? (
-                    <img
-                      src={firstItem?.snapshot_photo_url || firstItem?.card_id ? cardImages[firstItem.card_id] : undefined}
-                      alt={firstItem?.card_name}
+                    <Image
+                      src={firstItem?.snapshot_photo_url || (firstItem?.card_id ? cardImages[firstItem.card_id] : '') || ''}
+                      alt={firstItem?.card_name || ''}
+                      width={64}
+                      height={89}
                       className="w-16 h-[89px] rounded-lg object-cover flex-shrink-0"
+                      unoptimized
                     />
                   ) : (
                     <div className="w-16 h-[89px] rounded-lg bg-zinc-100 flex-shrink-0" />

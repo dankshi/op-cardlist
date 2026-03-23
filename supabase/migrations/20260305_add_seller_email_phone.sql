@@ -1,0 +1,2 @@
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS shipping_email TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS shipping_phone TEXT;

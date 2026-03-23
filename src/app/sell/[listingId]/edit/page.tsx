@@ -461,6 +461,15 @@ export default function EditListingPage() {
           </div>
         </div>
 
+        {parseFloat(price) > 0 && (
+          <div className="text-xs text-zinc-500">
+            Your payout: <span className="font-medium text-green-600">
+              ${(parseFloat(price) * parseInt(quantity || '1') - 5 - parseFloat(price) * parseInt(quantity || '1') * 0.095).toFixed(2)}
+            </span>
+            <span className="text-zinc-400 ml-1">(after $5 shipping + 9.5% fee)</span>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-zinc-600 mb-1.5">Language</label>
           <select

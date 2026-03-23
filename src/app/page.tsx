@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import { getAllSets, getBrowsableCards, getAllSetImages } from "@/lib/cards";
 import { getTopPriceMovers, getPriceHistoryFiles } from "@/lib/price-history";
@@ -326,10 +327,12 @@ export default async function Home() {
               >
                 {setImage?.boosterBoxImageUrl && (
                   <div className="relative w-full aspect-square bg-white">
-                    <img
+                    <Image
                       src={setImage.boosterBoxImageUrl}
                       alt={`${set.name} Booster Box`}
-                      className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                      fill
+                      className="object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                      unoptimized
                     />
                   </div>
                 )}

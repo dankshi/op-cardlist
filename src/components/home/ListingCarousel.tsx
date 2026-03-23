@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ConditionBadge } from "../marketplace/ConditionBadge";
 import type { CardCondition } from "@/types/database";
 
@@ -134,11 +135,12 @@ export function ListingCarousel({
               style={{ scrollSnapAlign: "start" }}
             >
               <div className="relative aspect-[2.5/3.5] rounded-lg overflow-hidden bg-zinc-100 border border-zinc-200">
-                <img
+                <Image
                   src={listing.cardImageUrl}
                   alt={listing.cardName}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
+                  fill
+                  className="object-cover"
+                  unoptimized
                 />
               </div>
               <div className="mt-2">

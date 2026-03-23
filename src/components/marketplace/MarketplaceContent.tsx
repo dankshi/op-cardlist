@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ConditionBadge } from './ConditionBadge'
 import { BuyNowButton } from './BuyNowButton'
 import { GRADING_SCALES } from '@/types/database'
@@ -379,11 +380,12 @@ export function MarketplaceContent({ initialListings, cardMap }: MarketplaceCont
                 <Link href={`/card/${group.card_id.toLowerCase()}`}>
                   <div className="aspect-[5/7] bg-zinc-50 relative">
                     {group.cardImageUrl ? (
-                      <img
+                      <Image
                         src={group.cardImageUrl}
                         alt={group.cardName}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        loading="lazy"
+                        fill
+                        className="object-cover"
+                        unoptimized
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">

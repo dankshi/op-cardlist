@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
 import type { Product, ProductCategory, ProductTag } from "@/types/card";
 
 interface ProductGridProps {
@@ -285,11 +286,12 @@ export default function ProductGrid({ products }: ProductGridProps) {
             className="block bg-white rounded-lg border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 transition-all group overflow-hidden"
           >
             <div className="relative w-full aspect-square bg-white">
-              <img
+              <Image
                 src={product.detailImages?.[0] || product.thumbnailUrl}
                 alt={product.name}
-                className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
-                loading="lazy"
+                fill
+                className="object-contain p-3 group-hover:scale-105 transition-transform duration-300"
+                unoptimized
               />
             </div>
             <div className="p-3">

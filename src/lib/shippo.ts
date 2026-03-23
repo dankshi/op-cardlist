@@ -20,6 +20,8 @@ export const PLATFORM_ADDRESS: AddressCreateRequest = {
   state: process.env.PLATFORM_SHIP_STATE || '',
   zip: process.env.PLATFORM_SHIP_ZIP || '',
   country: process.env.PLATFORM_SHIP_COUNTRY || 'US',
+  email: process.env.PLATFORM_SHIP_EMAIL || '',
+  phone: process.env.PLATFORM_SHIP_PHONE || '',
 }
 
 const DEFAULT_PARCEL = {
@@ -31,30 +33,53 @@ const DEFAULT_PARCEL = {
   massUnit: 'oz' as const,
 }
 
-export async function getShippingRates(fromAddress: AddressCreateRequest) {
+export interface ShippingRate {
+  rateId: string
+  carrier: string
+  service: string
+  estimatedCost: number
+  estimatedDays: number
+}
+
+export async function getShippingRates(
+  fromAddress: AddressCreateRequest,
+  options?: { insuranceAmount?: number }
+): Promise<ShippingRate[]> {
   const shippo = getShippo()
 
   const shipment = await shippo.shipments.create({
     addressFrom: fromAddress,
     addressTo: PLATFORM_ADDRESS,
     parcels: [DEFAULT_PARCEL],
+    extra: options?.insuranceAmount
+      ? {
+          insurance: {
+            amount: options.insuranceAmount.toFixed(2),
+            content: 'Trading card',
+            currency: 'USD',
+          },
+        }
+      : undefined,
   })
 
-  const rates = shipment.rates || []
-  const cheapest = rates
-    .filter(r => r.amount !== undefined)
-    .sort((a, b) => Number(a.amount) - Number(b.amount))[0]
+  const ALLOWED_SERVICES = ['usps_ground_advantage', 'ups_ground_saver']
 
-  if (!cheapest) {
+  const rates = (shipment.rates || [])
+    .filter(r => r.amount !== undefined && r.objectId)
+    .filter(r => r.servicelevel?.token && ALLOWED_SERVICES.includes(r.servicelevel.token))
+    .sort((a, b) => Number(a.amount) - Number(b.amount))
+
+  if (rates.length === 0) {
     throw new Error('No shipping rates available')
   }
 
-  return {
-    estimatedCost: Number(cheapest.amount),
-    carrier: cheapest.provider || 'USPS',
-    estimatedDays: cheapest.estimatedDays || 3,
-    rateId: cheapest.objectId,
-  }
+  return rates.map(r => ({
+    rateId: r.objectId!,
+    carrier: r.provider || 'Unknown',
+    service: r.servicelevel?.name || r.servicelevel?.token || 'Standard',
+    estimatedCost: Number(r.amount),
+    estimatedDays: r.estimatedDays || 3,
+  }))
 }
 
 export async function createShippingLabel(rateId: string) {

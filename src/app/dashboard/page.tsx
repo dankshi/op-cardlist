@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
 import type { Profile, Listing, Order } from '@/types/database'
+import { US_STATES } from '@/lib/us-states'
 
 type Tab = 'listings' | 'orders' | 'settings'
 
@@ -41,6 +42,14 @@ export default function DashboardPage() {
   const [bulkUpdating, setBulkUpdating] = useState(false)
   const [marketPrices, setMarketPrices] = useState<Record<string, number>>({})
   const [cardImages, setCardImages] = useState<Record<string, string>>({})
+  const [addrStreet, setAddrStreet] = useState('')
+  const [addrCity, setAddrCity] = useState('')
+  const [addrState, setAddrState] = useState('')
+  const [addrZip, setAddrZip] = useState('')
+  const [addrPhone, setAddrPhone] = useState('')
+  const [userEmail, setUserEmail] = useState('')
+  const [addrSaving, setAddrSaving] = useState(false)
+  const [addrMessage, setAddrMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -48,10 +57,16 @@ export default function DashboardPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/sign-in'); return }
+      setUserEmail(user.email || '')
 
       const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       if (!p?.is_seller) { router.push('/seller/apply'); return }
       setProfile(p as Profile)
+      if (p.shipping_street1) setAddrStreet(p.shipping_street1)
+      if (p.shipping_city) setAddrCity(p.shipping_city)
+      if (p.shipping_state) setAddrState(p.shipping_state)
+      if (p.shipping_zip) setAddrZip(p.shipping_zip)
+      if (p.shipping_phone) setAddrPhone(p.shipping_phone)
 
       const { data: l } = await supabase
         .from('listings')
@@ -164,8 +179,8 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Balance', value: `$${Number(profile?.balance || 0).toFixed(2)}` },
-          { label: 'Active Listings', value: activeListings.length },
+          { label: 'Balance', value: `$${Number(profile?.balance || 0).toFixed(2)}`, onClick: () => setTab('settings') },
+          { label: 'Active Listings', value: activeListings.length, onClick: () => setTab('listings') },
           { label: 'Pending Orders', value: pendingOrders.length, onClick: () => setTab('orders') },
           { label: 'Total Sales', value: profile?.total_sales || 0 },
         ].map(stat => (
@@ -308,10 +323,13 @@ export default function DashboardPage() {
                 >
                   <div className="flex items-center gap-4">
                     {(firstItem?.snapshot_photo_url || (firstItem?.card_id && cardImages[firstItem.card_id])) ? (
-                      <img
+                      <Image
                         src={firstItem?.snapshot_photo_url || (firstItem?.card_id ? cardImages[firstItem.card_id] : '')}
-                        alt={firstItem?.card_name}
+                        alt={firstItem?.card_name || ''}
+                        width={64}
+                        height={89}
                         className="w-16 h-[89px] rounded object-cover flex-shrink-0"
+                        unoptimized
                       />
                     ) : (
                       <div className="w-16 h-[89px] rounded bg-zinc-100 flex-shrink-0" />
@@ -341,15 +359,119 @@ export default function DashboardPage() {
       )}
 
       {tab === 'settings' && (
-        <div className="bg-white border border-zinc-200 rounded-lg p-6 space-y-4">
-          <div>
-            <h3 className="font-medium text-zinc-900 mb-2">Balance</h3>
-            <p className="text-2xl font-bold text-zinc-900">${Number(profile?.balance || 0).toFixed(2)}</p>
-            <p className="text-zinc-500 text-sm mt-1">Credits from sales (1:1 USD). Cash out coming soon.</p>
+        <div className="space-y-6">
+          <div className="bg-white border border-zinc-200 rounded-lg p-6 space-y-4">
+            <div>
+              <h3 className="font-medium text-zinc-900 mb-2">Balance</h3>
+              <p className="text-2xl font-bold text-zinc-900">${Number(profile?.balance || 0).toFixed(2)}</p>
+              <p className="text-zinc-500 text-sm mt-1">Credits from sales (1:1 USD). Cash out coming soon.</p>
+            </div>
+            <div>
+              <h3 className="font-medium text-zinc-900 mb-2">Platform Fee</h3>
+              <p className="text-zinc-500 text-sm">9.5% on each sale</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-medium text-zinc-900 mb-2">Platform Fee</h3>
-            <p className="text-zinc-500 text-sm">9% on each sale</p>
+
+          <div className="bg-white border border-zinc-200 rounded-lg p-6">
+            <h3 className="font-medium text-zinc-900 mb-1">Shipping Address</h3>
+            <p className="text-sm text-zinc-500 mb-4">Used as the return address when generating shipping labels.</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-zinc-700 mb-1">Street Address</label>
+                <input
+                  type="text"
+                  value={addrStreet}
+                  onChange={e => setAddrStreet(e.target.value)}
+                  placeholder="123 Main St"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+              <div className="grid grid-cols-6 gap-3">
+                <div className="col-span-3">
+                  <label className="block text-sm text-zinc-700 mb-1">City</label>
+                  <input
+                    type="text"
+                    value={addrCity}
+                    onChange={e => setAddrCity(e.target.value)}
+                    placeholder="City"
+                    className="w-full px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm text-zinc-700 mb-1">State</label>
+                  <select
+                    value={addrState}
+                    onChange={e => setAddrState(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  >
+                    <option value="">Select</option>
+                    {US_STATES.map(s => (
+                      <option key={s.value} value={s.value}>{s.value}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-sm text-zinc-700 mb-1">ZIP</label>
+                  <input
+                    type="text"
+                    value={addrZip}
+                    onChange={e => setAddrZip(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                    placeholder="00000"
+                    className="w-full px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-700 mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  value={addrPhone}
+                  onChange={e => setAddrPhone(e.target.value)}
+                  placeholder="(555) 555-5555"
+                  className="w-full px-3 py-2 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {addrMessage && (
+              <p className={`text-sm mt-3 ${addrMessage.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                {addrMessage.text}
+              </p>
+            )}
+
+            <button
+              onClick={async () => {
+                if (!addrStreet || !addrCity || !addrState || !addrZip || !addrPhone) {
+                  setAddrMessage({ type: 'error', text: 'Please fill in all fields.' })
+                  return
+                }
+                setAddrSaving(true)
+                setAddrMessage(null)
+                const { error } = await supabase
+                  .from('profiles')
+                  .update({
+                    shipping_street1: addrStreet,
+                    shipping_city: addrCity,
+                    shipping_state: addrState,
+                    shipping_zip: addrZip,
+                    shipping_email: userEmail,
+                    shipping_phone: addrPhone,
+                  })
+                  .eq('id', profile!.id)
+                if (error) {
+                  setAddrMessage({ type: 'error', text: 'Failed to save address.' })
+                } else {
+                  setAddrMessage({ type: 'success', text: 'Address saved!' })
+                  setProfile({ ...profile!, shipping_street1: addrStreet, shipping_city: addrCity, shipping_state: addrState, shipping_zip: addrZip, shipping_email: userEmail, shipping_phone: addrPhone })
+                }
+                setAddrSaving(false)
+              }}
+              disabled={addrSaving}
+              className="mt-4 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {addrSaving ? 'Saving...' : 'Save Address'}
+            </button>
           </div>
         </div>
       )}

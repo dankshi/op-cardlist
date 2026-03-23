@@ -96,7 +96,7 @@ export default function SellerApplyPage() {
           <h2 className="text-xl font-semibold text-zinc-900 mb-4">Why sell on NOMI Market?</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { title: 'Low 9% Fee', desc: 'Lower than TCGPlayer\'s 10-13% seller fee' },
+              { title: 'Low 9.5% Fee', desc: 'Lower than TCGPlayer\'s 10-13% seller fee' },
               { title: 'Instant Approval', desc: 'Start selling immediately after signup' },
               { title: 'Direct Payouts', desc: 'Get paid directly via Stripe to your bank' },
               { title: 'Growing Community', desc: 'Join the fastest growing OP TCG marketplace' },
@@ -123,7 +123,7 @@ export default function SellerApplyPage() {
               <li>Ship orders within 3 business days of payment</li>
               <li>Respond to buyer inquiries within 48 hours</li>
               <li>Accept returns for items not matching the listed condition</li>
-              <li>Pay a 9% platform fee on each sale</li>
+              <li>Pay a 9.5% platform fee on each sale</li>
             </ul>
           </div>
 

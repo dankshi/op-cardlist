@@ -66,6 +66,23 @@ export async function POST(
   if (status === 'received') {
     update.received_at = now
   } else if (status === 'authenticated') {
+    // Check that all items have been verified or resolved before authenticating
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('id, intake_status, card_name')
+      .eq('order_id', orderId)
+
+    const unverifiedItems = (items || []).filter(
+      i => i.intake_status !== 'verified' && i.intake_status !== 'resolved'
+    )
+
+    if (unverifiedItems.length > 0) {
+      const names = unverifiedItems.map(i => i.card_name).join(', ')
+      return NextResponse.json({
+        error: `Cannot authenticate: ${unverifiedItems.length} item(s) not yet verified — ${names}`,
+      }, { status: 400 })
+    }
+
     update.authenticated_at = now
 
     // Credit seller balance now that card is authenticated
