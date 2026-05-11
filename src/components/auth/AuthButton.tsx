@@ -28,7 +28,7 @@ export default function AuthButton() {
             .select('is_admin')
             .eq('id', user.id)
             .single()
-          if (profileError) console.error('[AuthButton] profile fetch failed', profileError)
+          if (profileError) console.error('[AuthButton] profile fetch failed', JSON.stringify(profileError))
           setIsAdmin(profile?.is_admin || false)
         }
       } catch (err) {
@@ -48,7 +48,7 @@ export default function AuthButton() {
             .select('is_admin')
             .eq('id', session.user.id)
             .single()
-          if (profileError) console.error('[AuthButton] auth-change profile fetch failed', profileError)
+          if (profileError) console.error('[AuthButton] auth-change profile fetch failed', JSON.stringify(profileError))
           setIsAdmin(profile?.is_admin || false)
         } else {
           setIsAdmin(false)

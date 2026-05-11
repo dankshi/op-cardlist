@@ -55,54 +55,62 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/auth/sign-in'); return }
-      setUserEmail(user.email || '')
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError) console.error('[dashboard] getUser failed', userError)
+        if (!user) { router.push('/auth/sign-in'); return }
+        setUserEmail(user.email || '')
 
-      const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      if (!p?.is_seller) { router.push('/seller/apply'); return }
-      setProfile(p as Profile)
-      if (p.shipping_street1) setAddrStreet(p.shipping_street1)
-      if (p.shipping_city) setAddrCity(p.shipping_city)
-      if (p.shipping_state) setAddrState(p.shipping_state)
-      if (p.shipping_zip) setAddrZip(p.shipping_zip)
-      if (p.shipping_phone) setAddrPhone(p.shipping_phone)
+        const { data: p, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        if (profileError) console.error('[dashboard] profile fetch failed', profileError)
+        if (!p?.is_seller) { router.push('/seller/apply'); return }
+        setProfile(p as Profile)
+        if (p.shipping_street1) setAddrStreet(p.shipping_street1)
+        if (p.shipping_city) setAddrCity(p.shipping_city)
+        if (p.shipping_state) setAddrState(p.shipping_state)
+        if (p.shipping_zip) setAddrZip(p.shipping_zip)
+        if (p.shipping_phone) setAddrPhone(p.shipping_phone)
 
-      const { data: l } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('seller_id', user.id)
-        .order('created_at', { ascending: false })
-      const fetchedListings = (l as Listing[]) || []
-      setListings(fetchedListings)
+        const { data: l, error: listingsError } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('seller_id', user.id)
+          .order('created_at', { ascending: false })
+        if (listingsError) console.error('[dashboard] listings fetch failed', listingsError)
+        const fetchedListings = (l as Listing[]) || []
+        setListings(fetchedListings)
 
-      const { data: o } = await supabase
-        .from('orders')
-        .select('*, buyer:profiles!orders_buyer_id_fkey(display_name), items:order_items(*)')
-        .eq('seller_id', user.id)
-        .not('status', 'in', '("pending_payment","cancelled")')
-        .order('created_at', { ascending: false })
-      const fetchedOrders = (o as Order[]) || []
-      setOrders(fetchedOrders)
+        const { data: o, error: ordersError } = await supabase
+          .from('orders')
+          .select('*, buyer:profiles!orders_buyer_id_fkey(display_name), items:order_items(*)')
+          .eq('seller_id', user.id)
+          .not('status', 'in', '("pending_payment","cancelled")')
+          .order('created_at', { ascending: false })
+        if (ordersError) console.error('[dashboard] orders fetch failed', ordersError)
+        const fetchedOrders = (o as Order[]) || []
+        setOrders(fetchedOrders)
 
-      // Fetch card images for listings + order items
-      const orderCardIds = fetchedOrders.flatMap(order => order.items?.map(i => i.card_id) || [])
-      const uniqueCardIds = [...new Set([...fetchedListings.map(li => li.card_id), ...orderCardIds])]
-      const images: Record<string, string> = {}
-      await Promise.all(
-        uniqueCardIds.map(async (cardId) => {
-          try {
-            const res = await fetch(`/api/cards?id=${encodeURIComponent(cardId)}`)
-            const data = await res.json()
-            if (data.card?.imageUrl) {
-              images[cardId] = data.card.imageUrl
-            }
-          } catch { /* skip */ }
-        })
-      )
-      setCardImages(images)
-
-      setLoading(false)
+        // Fetch card images for listings + order items
+        const orderCardIds = fetchedOrders.flatMap(order => order.items?.map(i => i.card_id) || [])
+        const uniqueCardIds = [...new Set([...fetchedListings.map(li => li.card_id), ...orderCardIds])]
+        const images: Record<string, string> = {}
+        await Promise.all(
+          uniqueCardIds.map(async (cardId) => {
+            try {
+              const res = await fetch(`/api/cards?id=${encodeURIComponent(cardId)}`)
+              const data = await res.json()
+              if (data.card?.imageUrl) {
+                images[cardId] = data.card.imageUrl
+              }
+            } catch { /* skip */ }
+          })
+        )
+        setCardImages(images)
+      } catch (err) {
+        console.error('[dashboard] init threw', err)
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [supabase, router])
