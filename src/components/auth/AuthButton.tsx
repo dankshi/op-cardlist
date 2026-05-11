@@ -133,6 +133,13 @@ export default function AuthButton() {
           >
             My Orders
           </Link>
+          <Link
+            href="/wallet"
+            onClick={() => setMenuOpen(false)}
+            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+          >
+            Wallet
+          </Link>
           <div className="border-t border-zinc-200 mt-1 pt-1">
             <Link
               href="/sell"

@@ -93,7 +93,12 @@ export async function POST(
       .single()
 
     if (sellerProfile) {
-      const sellerCredit = Number(order.total) - Number(order.platform_fee)
+      // Net seller payout = subtotal − platform_fee − $5 shipping label fee.
+      // The $5 is deducted here (not at label generation) so the seller's
+      // wallet never goes negative between ship and authentication.
+      const SELLER_SHIPPING_FEE = 5
+      const sellerCredit =
+        Number(order.total) - Number(order.platform_fee) - SELLER_SHIPPING_FEE
       await supabase
         .from('profiles')
         .update({
@@ -107,7 +112,7 @@ export async function POST(
         amount: sellerCredit,
         type: 'sale_earned',
         order_id: orderId,
-        description: `Sale credited on authentication`,
+        description: 'Sale credited on authentication (net of shipping + platform fee)',
       })
     }
   } else if (status === 'shipped_to_buyer') {

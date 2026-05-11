@@ -39,17 +39,6 @@ export async function POST(
     return NextResponse.json({ error: 'Label already generated' }, { status: 400 })
   }
 
-  // Get seller's profile for address info
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-  }
-
   try {
     const { rateId } = await request.json()
     if (!rateId) {
@@ -72,22 +61,10 @@ export async function POST(
       })
       .eq('id', orderId)
 
-    // Deduct flat $5 shipping fee from seller balance (nomi covers the rest)
-    const SELLER_SHIPPING_FEE = 5
-    await supabase
-      .from('profiles')
-      .update({
-        balance: Number(profile.balance) - SELLER_SHIPPING_FEE,
-      })
-      .eq('id', user.id)
-
-    await getSupabaseAdmin().from('credit_transactions').insert({
-      user_id: user.id,
-      amount: -SELLER_SHIPPING_FEE,
-      type: 'admin_adjust',
-      order_id: orderId,
-      description: 'Shipping label fee',
-    })
+    // Shipping fee is netted out of the seller's sale credit at
+    // authentication — see /api/admin/orders/[orderId]/status.
+    // Deferring the charge means the seller's wallet never dips
+    // negative between ship time and authentication.
 
     // Notify admin that seller has shipped
     try {
