@@ -285,7 +285,9 @@ async function fetchSalesOnce(productId: number): Promise<FetchResult> {
       body: JSON.stringify({ listingType: 'All' }),
     });
 
-    if (res.status === 429) return { kind: 'rate_limited' };
+    // 429 = rate-limit. 403 = TCGPlayer's anti-bot fingerprint block — also
+    // worth retrying since it sometimes lifts within the same run.
+    if (res.status === 429 || res.status === 403) return { kind: 'rate_limited' };
     if (!res.ok) return { kind: 'error', message: `HTTP ${res.status}` };
 
     const text = await res.text();
