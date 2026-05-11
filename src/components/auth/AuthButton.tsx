@@ -18,31 +18,43 @@ export default function AuthButton() {
     const supabase = createClient()
 
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single()
-        setIsAdmin(profile?.is_admin || false)
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError) console.error('[AuthButton] getUser failed', userError)
+        setUser(user)
+        if (user) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single()
+          if (profileError) console.error('[AuthButton] profile fetch failed', profileError)
+          setIsAdmin(profile?.is_admin || false)
+        }
+      } catch (err) {
+        console.error('[AuthButton] init threw', err)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     getUser()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', session.user.id)
-          .single()
-        setIsAdmin(profile?.is_admin || false)
-      } else {
-        setIsAdmin(false)
+      try {
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', session.user.id)
+            .single()
+          if (profileError) console.error('[AuthButton] auth-change profile fetch failed', profileError)
+          setIsAdmin(profile?.is_admin || false)
+        } else {
+          setIsAdmin(false)
+        }
+      } catch (err) {
+        console.error('[AuthButton] auth-change threw', err)
       }
     })
 
