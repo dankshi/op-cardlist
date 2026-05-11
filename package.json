@@ -51,6 +51,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "puppeteer": "^24.40.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"

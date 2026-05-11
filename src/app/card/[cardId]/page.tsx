@@ -2,11 +2,11 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCardById, getParallelCards } from "@/lib/cards";
-import { getCardSales, calculatePriceChange } from "@/lib/price-history";
+import { getCardSales, getCardGradedSales, calculatePriceChange } from "@/lib/price-history";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
 import { CardThumbnail } from "@/components/card/CardThumbnail";
-import { PriceHistoryChart } from "@/components/card/PriceHistoryChart";
+import { RecentSales } from "@/components/card/RecentSales";
 import { PriceChangeBadge } from "@/components/PriceChangeBadge";
 import { ShareButtons } from "@/components/ShareButtons";
 import { ListingsGrid } from "@/components/marketplace/ListingsGrid";
@@ -98,8 +98,11 @@ export default async function CardPage({ params }: PageProps) {
     notFound();
   }
 
-  const sales = await getCardSales(card.id, 30);
-  const priceChange = await calculatePriceChange(card.id, card.price?.marketPrice ?? null, 7);
+  const [sales, gradedSales, priceChange] = await Promise.all([
+    getCardSales(card.id, 90),
+    getCardGradedSales(card.id, 90),
+    calculatePriceChange(card.id, card.price?.marketPrice ?? null, 7),
+  ]);
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
   const relatedCards = parallelCards.filter(c => c.id !== card.id);
 
@@ -214,12 +217,12 @@ export default async function CardPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Sales Chart */}
-      {sales.length > 1 && (
+      {/* Recent Sales — stats + filters + chart + list */}
+      {(sales.length > 0 || gradedSales.length > 0) && (
         <section className="mb-8">
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-3">Recent Sales</h2>
           <div className="bg-white border border-zinc-100 rounded-xl p-4">
-            <PriceHistoryChart data={sales} />
+            <RecentSales sales={sales} gradedSales={gradedSales} />
           </div>
         </section>
       )}

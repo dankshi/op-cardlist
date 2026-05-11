@@ -232,6 +232,17 @@ export interface SalePoint {
   quantity: number;
 }
 
+export type GradingCompany = 'PSA' | 'CGC' | 'BGS' | 'TAG';
+
+export interface GradedSalePoint {
+  date: string;
+  price: number;
+  grading_company: GradingCompany;
+  grade: string;
+  title: string;
+  listing_url: string | null;
+}
+
 /**
  * Get individual sales for a card from Supabase card_sales table
  */
@@ -266,5 +277,36 @@ export async function getCardSales(
     price: Number(r.price),
     condition: r.condition,
     quantity: r.quantity ?? 1,
+  }));
+}
+
+/**
+ * Get graded (slabbed) card sales from eBay scraper data.
+ */
+export async function getCardGradedSales(
+  cardId: string,
+  days: number = 90,
+): Promise<GradedSalePoint[]> {
+  if (!supabase) return [];
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  const { data: rows } = await supabase
+    .from('card_graded_sales')
+    .select('sold_at, price, grading_company, grade, title, listing_url')
+    .eq('card_id', cardId)
+    .gte('sold_at', startDate.toISOString())
+    .order('sold_at', { ascending: true });
+
+  if (!rows) return [];
+
+  return rows.map(r => ({
+    date: r.sold_at,
+    price: Number(r.price),
+    grading_company: r.grading_company as GradingCompany,
+    grade: r.grade,
+    title: r.title,
+    listing_url: r.listing_url,
   }));
 }
