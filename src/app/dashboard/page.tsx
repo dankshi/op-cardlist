@@ -362,9 +362,14 @@ export default function DashboardPage() {
         <div className="space-y-6">
           <div className="bg-white border border-zinc-200 rounded-lg p-6 space-y-4">
             <div>
-              <h3 className="font-medium text-zinc-900 mb-2">Balance</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium text-zinc-900">Balance</h3>
+                <Link href="/wallet" className="text-sm text-orange-500 hover:text-orange-600 font-medium">
+                  View wallet &rarr;
+                </Link>
+              </div>
               <p className="text-2xl font-bold text-zinc-900">${Number(profile?.balance || 0).toFixed(2)}</p>
-              <p className="text-zinc-500 text-sm mt-1">Credits from sales (1:1 USD). Cash out coming soon.</p>
+              <p className="text-zinc-500 text-sm mt-1">Credits from sales (1:1 USD).</p>
             </div>
             <div>
               <h3 className="font-medium text-zinc-900 mb-2">Platform Fee</h3>

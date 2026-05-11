@@ -355,9 +355,15 @@ export default function OrderDetailPage() {
                     <span>${Number(order.shipping_cost).toFixed(2)}</span>
                   </div>
                 )}
+                {Number(order.credits_applied) > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Wallet credits</span>
+                    <span>-${Number(order.credits_applied).toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-zinc-900 font-bold pt-1 border-t border-zinc-200">
-                  <span>Total</span>
-                  <span>${Number(order.total).toFixed(2)}</span>
+                  <span>Paid on card</span>
+                  <span>${(Number(order.total) - Number(order.credits_applied || 0)).toFixed(2)}</span>
                 </div>
               </>
             )}

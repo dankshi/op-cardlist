@@ -23,10 +23,23 @@ interface PaymentIntentData {
   orderId: string
   listing: ListingInfo
   subtotal: number
+  creditsApplied: number
+  cardAmount: number
+  availableBalance: number
   total: number
 }
 
 const stripePromise = getStripeClient()
+
+async function createPaymentIntent(listingId: string, creditsApplied: number) {
+  const res = await fetch('/api/stripe/payment-intent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ listing_id: listingId, quantity: 1, credits_applied: creditsApplied }),
+  })
+  const json = await res.json()
+  return { ok: res.ok, json }
+}
 
 export default function CheckoutForm({ listingId }: { listingId: string }) {
   const router = useRouter()
@@ -34,6 +47,7 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
   const [data, setData] = useState<PaymentIntentData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [creditsLoading, setCreditsLoading] = useState(false)
 
   useEffect(() => {
     async function init() {
@@ -43,14 +57,8 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
         return
       }
 
-      const res = await fetch('/api/stripe/payment-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listing_id: listingId, quantity: 1 }),
-      })
-      const json = await res.json()
-
-      if (!res.ok) {
+      const { ok, json } = await createPaymentIntent(listingId, 0)
+      if (!ok) {
         setError(json.error || 'Failed to initialize checkout')
         setLoading(false)
         return
@@ -62,6 +70,15 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
 
     init()
   }, [listingId, router, supabase])
+
+  async function applyCredits(amount: number) {
+    if (!data || creditsLoading) return
+    setCreditsLoading(true)
+    const { ok, json } = await createPaymentIntent(listingId, amount)
+    if (ok) setData(json)
+    else setError(json.error || 'Failed to update credits')
+    setCreditsLoading(false)
+  }
 
   if (loading) {
     return (
@@ -102,8 +119,12 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
 
   if (!data) return null
 
+  // Buyer's full available credit balance for this checkout session = current available + already applied
+  const totalAvailableCredits = data.availableBalance + data.creditsApplied
+
   return (
     <Elements
+      key={data.clientSecret}
       stripe={stripePromise}
       options={{
         clientSecret: data.clientSecret,
@@ -124,7 +145,11 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
         orderId={data.orderId}
         listing={data.listing}
         subtotal={data.subtotal}
-        total={data.total}
+        creditsApplied={data.creditsApplied}
+        cardAmount={data.cardAmount}
+        totalAvailableCredits={totalAvailableCredits}
+        creditsLoading={creditsLoading}
+        onApplyCredits={applyCredits}
       />
     </Elements>
   )
@@ -134,12 +159,20 @@ function CheckoutFormInner({
   orderId,
   listing,
   subtotal,
-  total,
+  creditsApplied,
+  cardAmount,
+  totalAvailableCredits,
+  creditsLoading,
+  onApplyCredits,
 }: {
   orderId: string
   listing: ListingInfo
   subtotal: number
-  total: number
+  creditsApplied: number
+  cardAmount: number
+  totalAvailableCredits: number
+  creditsLoading: boolean
+  onApplyCredits: (amount: number) => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -244,9 +277,15 @@ function CheckoutFormInner({
               <span className="text-zinc-500">Shipping</span>
               <span className="text-zinc-900">Free</span>
             </div>
+            {creditsApplied > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">Wallet credits</span>
+                <span className="text-green-600">-${creditsApplied.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-base font-bold pt-2 border-t border-zinc-100">
-              <span className="text-zinc-900">Total</span>
-              <span className="text-orange-500">${total.toFixed(2)}</span>
+              <span className="text-zinc-900">Card total</span>
+              <span className="text-orange-500">${cardAmount.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -323,6 +362,17 @@ function CheckoutFormInner({
           </div>
         </div>
 
+        {/* Wallet Credits */}
+        {totalAvailableCredits > 0 && (
+          <WalletCreditsCard
+            totalAvailableCredits={totalAvailableCredits}
+            creditsApplied={creditsApplied}
+            subtotal={subtotal}
+            creditsLoading={creditsLoading}
+            onApplyCredits={onApplyCredits}
+          />
+        )}
+
         {/* Payment */}
         <div className="p-6 rounded-xl bg-white border border-zinc-200">
           <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-4">Payment</h2>
@@ -337,7 +387,7 @@ function CheckoutFormInner({
 
         <button
           type="submit"
-          disabled={!stripe || processing}
+          disabled={!stripe || processing || creditsLoading}
           className="w-full px-6 py-4 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed text-white font-bold text-lg transition-colors cursor-pointer"
         >
           {processing ? (
@@ -349,10 +399,85 @@ function CheckoutFormInner({
               Processing...
             </span>
           ) : (
-            `Pay $${total.toFixed(2)}`
+            `Pay $${cardAmount.toFixed(2)}`
           )}
         </button>
       </div>
     </form>
+  )
+}
+
+function WalletCreditsCard({
+  totalAvailableCredits,
+  creditsApplied,
+  subtotal,
+  creditsLoading,
+  onApplyCredits,
+}: {
+  totalAvailableCredits: number
+  creditsApplied: number
+  subtotal: number
+  creditsLoading: boolean
+  onApplyCredits: (amount: number) => void
+}) {
+  const maxApplicable = Math.max(0, Math.min(totalAvailableCredits, subtotal - 1))
+  const [amount, setAmount] = useState(creditsApplied.toFixed(2))
+
+  // Sync local input when server state changes (e.g. after applying)
+  useEffect(() => {
+    setAmount(creditsApplied.toFixed(2))
+  }, [creditsApplied])
+
+  const isApplied = creditsApplied > 0
+  const parsedAmount = Math.max(0, Math.min(parseFloat(amount) || 0, maxApplicable))
+
+  return (
+    <div className="p-6 rounded-xl bg-white border border-zinc-200">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider">Wallet Credits</h2>
+        <span className="text-sm text-zinc-500">
+          ${totalAvailableCredits.toFixed(2)} available
+        </span>
+      </div>
+      <div className="flex items-stretch gap-2">
+        <div className="flex items-center flex-1 rounded-lg bg-zinc-50 border border-zinc-200 px-3">
+          <span className="text-zinc-500 mr-1">$</span>
+          <input
+            type="number"
+            min={0}
+            max={maxApplicable}
+            step="0.01"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            disabled={creditsLoading}
+            className="flex-1 bg-transparent py-2 outline-none text-zinc-900 placeholder-zinc-400"
+            placeholder="0.00"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => onApplyCredits(parsedAmount)}
+          disabled={creditsLoading || parsedAmount === creditsApplied}
+          className="px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-200 disabled:text-zinc-400 disabled:cursor-not-allowed text-white font-medium text-sm transition-colors cursor-pointer"
+        >
+          {creditsLoading ? '…' : isApplied && parsedAmount === creditsApplied ? 'Applied' : 'Apply'}
+        </button>
+        {isApplied && (
+          <button
+            type="button"
+            onClick={() => onApplyCredits(0)}
+            disabled={creditsLoading}
+            className="px-3 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50 text-sm transition-colors cursor-pointer"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {maxApplicable < totalAvailableCredits && (
+        <p className="text-xs text-zinc-400 mt-2">
+          Capped at ${maxApplicable.toFixed(2)} — ${(subtotal - maxApplicable).toFixed(2)} minimum on card.
+        </p>
+      )}
+    </div>
   )
 }

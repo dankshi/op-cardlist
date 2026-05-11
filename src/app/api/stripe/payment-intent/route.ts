@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { getStripe, calculatePlatformFee } from '@/lib/stripe'
+
+// Stripe requires a minimum charge of $0.50. We leave at least $1 on the card to be safe.
+const MIN_CARD_AMOUNT = 1
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -10,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { listing_id, quantity = 1 } = await request.json()
+  const { listing_id, quantity = 1, credits_applied: requestedCredits = 0 } = await request.json()
 
   if (!listing_id) {
     return NextResponse.json({ error: 'listing_id is required' }, { status: 400 })
@@ -41,56 +45,60 @@ export async function POST(request: Request) {
   const subtotal = quantity * Number(listing.price)
   const platformFee = calculatePlatformFee(subtotal)
 
+  // Validate & cap credits against current buyer balance and Stripe minimum
+  const { data: buyerProfile } = await supabase
+    .from('profiles')
+    .select('balance')
+    .eq('id', user.id)
+    .single()
+
+  const availableBalance = Number(buyerProfile?.balance || 0)
+  const maxApplicable = Math.max(0, subtotal - MIN_CARD_AMOUNT)
+  const creditsApplied = Math.max(
+    0,
+    Math.min(Number(requestedCredits) || 0, availableBalance, maxApplicable),
+  )
+  const cardAmount = subtotal - creditsApplied
+
+  const admin = getSupabaseAdmin()
+
   // Check for existing pending order for this buyer + listing
   const { data: existingOrders } = await supabase
     .from('orders')
-    .select('id, stripe_payment_intent_id, items:order_items(listing_id)')
+    .select('id, stripe_payment_intent_id, credits_applied, items:order_items(listing_id)')
     .eq('buyer_id', user.id)
     .eq('status', 'pending_payment')
     .order('created_at', { ascending: false })
 
-  const existingOrder = existingOrders?.find(o =>
+  // Cancel stale pending orders for this buyer + listing, refunding any credits
+  const staleOrders = (existingOrders || []).filter(o =>
     o.items?.some((item: { listing_id: string }) => item.listing_id === listing_id)
   )
 
-  // Reuse existing pending order if it has a valid PaymentIntent
-  if (existingOrder?.stripe_payment_intent_id) {
-    try {
-      const existingPI = await getStripe().paymentIntents.retrieve(existingOrder.stripe_payment_intent_id)
-      if (existingPI.status === 'requires_payment_method' || existingPI.status === 'requires_confirmation') {
-        return NextResponse.json({
-          clientSecret: existingPI.client_secret,
-          orderId: existingOrder.id,
-          listing: {
-            title: listing.title,
-            price: Number(listing.price),
-            photo_url: listing.photo_urls?.[0] || null,
-            condition: listing.condition,
-            grading_company: listing.grading_company || null,
-            grade: listing.grade || null,
-            quantity,
-          },
-          subtotal,
-          total: subtotal,
-        })
-      }
-    } catch {
-      // PaymentIntent invalid/expired, create a new one below
-    }
-  }
-
-  // Cancel stale pending orders for this buyer + listing
-  if (existingOrders) {
-    const staleIds = existingOrders
-      .filter(o => o.items?.some((item: { listing_id: string }) => item.listing_id === listing_id))
-      .map(o => o.id)
-
-    if (staleIds.length > 0) {
+  for (const stale of staleOrders) {
+    const staleCredits = Number(stale.credits_applied || 0)
+    if (staleCredits > 0) {
+      const { data: refundProfile } = await supabase
+        .from('profiles')
+        .select('balance')
+        .eq('id', user.id)
+        .single()
       await supabase
-        .from('orders')
-        .update({ status: 'cancelled' })
-        .in('id', staleIds)
+        .from('profiles')
+        .update({ balance: Number(refundProfile?.balance || 0) + staleCredits })
+        .eq('id', user.id)
+      await admin.from('credit_transactions').insert({
+        user_id: user.id,
+        amount: staleCredits,
+        type: 'refund_credit',
+        order_id: stale.id,
+        description: 'Refund of credits from cancelled checkout',
+      })
     }
+    await supabase
+      .from('orders')
+      .update({ status: 'cancelled' })
+      .eq('id', stale.id)
   }
 
   // Create new order
@@ -103,6 +111,7 @@ export async function POST(request: Request) {
       subtotal,
       platform_fee: platformFee,
       total: subtotal,
+      credits_applied: creditsApplied,
     })
     .select()
     .single()
@@ -122,13 +131,29 @@ export async function POST(request: Request) {
     snapshot_photo_url: listing.photo_urls?.[0] || null,
   })
 
+  // Debit credits from buyer balance now; we'll refund on cancel above if checkout is abandoned
+  if (creditsApplied > 0) {
+    await supabase
+      .from('profiles')
+      .update({ balance: availableBalance - creditsApplied })
+      .eq('id', user.id)
+    await admin.from('credit_transactions').insert({
+      user_id: user.id,
+      amount: -creditsApplied,
+      type: 'purchase_spent',
+      order_id: order.id,
+      description: 'Credits applied at checkout',
+    })
+  }
+
   const paymentIntent = await getStripe().paymentIntents.create({
-    amount: Math.round(subtotal * 100),
+    amount: Math.round(cardAmount * 100),
     currency: 'usd',
     automatic_payment_methods: { enabled: true },
     metadata: {
       order_id: order.id,
       buyer_id: user.id,
+      credits_applied: String(creditsApplied),
     },
   })
 
@@ -150,6 +175,9 @@ export async function POST(request: Request) {
       quantity,
     },
     subtotal,
+    creditsApplied,
+    cardAmount,
+    availableBalance: availableBalance - creditsApplied,
     total: subtotal,
   })
 }

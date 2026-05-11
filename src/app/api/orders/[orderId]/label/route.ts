@@ -81,6 +81,14 @@ export async function POST(
       })
       .eq('id', user.id)
 
+    await getSupabaseAdmin().from('credit_transactions').insert({
+      user_id: user.id,
+      amount: -SELLER_SHIPPING_FEE,
+      type: 'admin_adjust',
+      order_id: orderId,
+      description: 'Shipping label fee',
+    })
+
     // Notify admin that seller has shipped
     try {
       const adminEmail = process.env.ADMIN_EMAIL

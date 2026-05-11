@@ -101,6 +101,14 @@ export async function POST(
           balance: Number(sellerProfile.balance || 0) + sellerCredit,
         })
         .eq('id', order.seller_id)
+
+      await adminSupabase.from('credit_transactions').insert({
+        user_id: order.seller_id,
+        amount: sellerCredit,
+        type: 'sale_earned',
+        order_id: orderId,
+        description: `Sale credited on authentication`,
+      })
     }
   } else if (status === 'shipped_to_buyer') {
     update.shipped_to_buyer_at = now

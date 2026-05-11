@@ -91,6 +91,7 @@ export interface Order {
   shipping_cost: number
   platform_fee: number
   total: number
+  credits_applied: number
   stripe_payment_intent_id: string | null
   stripe_transfer_id: string | null
   shipping_address: ShippingAddress | null
@@ -148,6 +149,24 @@ export type IntakeResolutionType =
   | 'item_accepted'
   | 'new_item_created'
   | 'seller_contacted'
+
+export type CreditTransactionType =
+  | 'sale_earned'
+  | 'purchase_spent'
+  | 'cashout'
+  | 'refund_credit'
+  | 'admin_adjust'
+
+export interface CreditTransaction {
+  id: string
+  user_id: string
+  amount: number
+  type: CreditTransactionType
+  order_id: string | null
+  description: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
 
 export interface OrderItem {
   id: string
