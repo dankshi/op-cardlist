@@ -260,8 +260,20 @@ interface SaleRecord {
   quantity: number;
 }
 
-// Fetch all recent sales for a product from TCGPlayer
-async function fetchSales(productId: number): Promise<SaleRecord[]> {
+// Module-level counters so the caller can surface rate-limit pressure at the end.
+const fetchStats = {
+  ok: 0,
+  rateLimited: 0,
+  giveUp: 0,
+  error: 0,
+};
+
+type FetchResult =
+  | { kind: 'ok'; sales: SaleRecord[] }
+  | { kind: 'rate_limited' }
+  | { kind: 'error'; message: string };
+
+async function fetchSalesOnce(productId: number): Promise<FetchResult> {
   try {
     const res = await fetch(`https://mpapi.tcgplayer.com/v2/product/${productId}/latestsales`, {
       method: 'POST',
@@ -273,24 +285,66 @@ async function fetchSales(productId: number): Promise<SaleRecord[]> {
       body: JSON.stringify({ listingType: 'All' }),
     });
 
-    if (!res.ok) return [];
+    if (res.status === 429) return { kind: 'rate_limited' };
+    if (!res.ok) return { kind: 'error', message: `HTTP ${res.status}` };
 
     const text = await res.text();
-    if (text.startsWith('<')) return []; // HTML = rate limited
+    // Cloudflare / WAF challenge pages come back as HTML.
+    if (text.startsWith('<')) return { kind: 'rate_limited' };
 
     const data = JSON.parse(text);
     const sales = data.data || data;
-    if (!Array.isArray(sales)) return [];
+    if (!Array.isArray(sales)) return { kind: 'error', message: 'unexpected response shape' };
 
-    return sales.map((s: any) => ({
-      price: s.purchasePrice,
-      date: s.orderDate,
-      condition: s.condition ?? null,
-      quantity: s.quantity ?? 1,
-    }));
-  } catch {
+    return {
+      kind: 'ok',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sales: sales.map((s: any) => ({
+        price: s.purchasePrice,
+        date: s.orderDate,
+        condition: s.condition ?? null,
+        quantity: s.quantity ?? 1,
+      })),
+    };
+  } catch (err) {
+    return { kind: 'error', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// Fetch recent sales with rate-limit detection + exponential backoff.
+// Returns [] on persistent failure, but records the cause in fetchStats so the
+// scraper run surfaces it at the end instead of silently moving on.
+async function fetchSales(productId: number): Promise<SaleRecord[]> {
+  const MAX_ATTEMPTS = 4;
+  let backoffMs = 2000;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const result = await fetchSalesOnce(productId);
+
+    if (result.kind === 'ok') {
+      fetchStats.ok++;
+      return result.sales;
+    }
+
+    if (result.kind === 'rate_limited') {
+      fetchStats.rateLimited++;
+      if (attempt === MAX_ATTEMPTS) {
+        fetchStats.giveUp++;
+        return [];
+      }
+      const jitter = Math.random() * 1000;
+      await sleep(backoffMs + jitter);
+      backoffMs *= 2;
+      continue;
+    }
+
+    // Non-rate-limit error — don't retry blindly, just log and move on.
+    fetchStats.error++;
+    if (fetchStats.error <= 5) {
+      console.warn(`  ⚠ fetchSales(${productId}): ${result.message}`);
+    }
     return [];
   }
+  return [];
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -619,14 +673,26 @@ async function main() {
       }
 
       if (i % 50 === 0 && i > 0) {
-        process.stdout.write(`  ${i}/${matchedProductIds.length} (${totalSalesStored} sales stored)\r`);
+        process.stdout.write(
+          `  ${i}/${matchedProductIds.length} (${totalSalesStored} sales stored, ${fetchStats.rateLimited} 429s)\r`,
+        );
       }
-      await sleep(100); // Rate limit between batches
+      // Jittered backoff between batches keeps us under TCGPlayer's rate limit.
+      // 5 concurrent × ~400ms/batch ≈ 12-15 req/sec sustained.
+      await sleep(300 + Math.random() * 200);
     }
 
     // Flush remaining
     await flushPending();
     console.log(`  Found sales for ${lastSoldFound}/${matchedProductIds.length} products (${totalSalesStored} total sales stored)`);
+    console.log(
+      `  fetchSales: ok=${fetchStats.ok}  rate-limited-retries=${fetchStats.rateLimited}  gave-up=${fetchStats.giveUp}  hard-errors=${fetchStats.error}`,
+    );
+    if (fetchStats.giveUp > matchedProductIds.length * 0.05) {
+      console.warn(
+        `  ⚠ ${fetchStats.giveUp} products gave up after ${4} retries — TCGPlayer is rate-limiting hard. Consider running from a residential IP.`,
+      );
+    }
   }
 
   const totalTime = formatTime(Date.now() - startTime);

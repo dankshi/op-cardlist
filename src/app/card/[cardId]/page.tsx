@@ -7,6 +7,7 @@ import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib
 import { Card3DPreview } from "@/components/card/Card3DPreview";
 import { CardThumbnail } from "@/components/card/CardThumbnail";
 import { RecentSales } from "@/components/card/RecentSales";
+import { CardPopulations } from "@/components/card/CardPopulations";
 import { PriceChangeBadge } from "@/components/PriceChangeBadge";
 import { ShareButtons } from "@/components/ShareButtons";
 import { ListingsGrid } from "@/components/marketplace/ListingsGrid";
@@ -217,11 +218,22 @@ export default async function CardPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Population (graded copies by company + grade) */}
+      <section className="mb-6">
+        <div className="bg-white border border-zinc-100 rounded-xl p-4">
+          <CardPopulations />
+        </div>
+      </section>
+
       {/* Recent Sales — stats + filters + chart + list */}
       {(sales.length > 0 || gradedSales.length > 0) && (
         <section className="mb-8">
-          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wide mb-3">Recent Sales</h2>
           <div className="bg-white border border-zinc-100 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider">
+                Recent Sales
+              </h2>
+            </div>
             <RecentSales sales={sales} gradedSales={gradedSales} />
           </div>
         </section>
