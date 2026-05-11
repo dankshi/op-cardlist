@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -47,7 +47,7 @@ export default function AdminPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [notesMap, setNotesMap] = useState<Record<string, string>>({})
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const fetchOrders = useCallback(async () => {
     const params = new URLSearchParams()
@@ -66,30 +66,36 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/auth/sign-in'); return }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/auth/sign-in'); return }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single()
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
 
-      if (!profile?.is_admin) { router.push('/'); return }
+        if (profileError) console.error('[admin] profile fetch failed', profileError)
+        if (!profile?.is_admin) { router.push('/'); return }
 
-      // Fetch counts for each status
-      const counts: Record<string, number> = {}
-      for (const status of FILTER_STATUSES.filter(s => s !== 'all')) {
-        const { count } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', status)
-        counts[status] = count || 0
+        const counts: Record<string, number> = {}
+        for (const status of FILTER_STATUSES.filter(s => s !== 'all')) {
+          const { count, error: countError } = await supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', status)
+          if (countError) console.error('[admin] count query failed', status, countError)
+          counts[status] = count || 0
+        }
+        setStatusCounts(counts)
+
+        await fetchOrders()
+      } catch (err) {
+        console.error('[admin] init failed', err)
+      } finally {
+        setLoading(false)
       }
-      setStatusCounts(counts)
-
-      await fetchOrders()
-      setLoading(false)
     }
     init()
   }, [supabase, router, fetchOrders])
@@ -142,15 +148,7 @@ export default function AdminPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-zinc-900">Admin Panel</h1>
-        <Link
-          href="/admin/intake"
-          className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors"
-        >
-          Intake Scanner
-        </Link>
-      </div>
+      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Orders</h1>
 
       {/* Status counts */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-8">

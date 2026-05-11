@@ -293,6 +293,17 @@ export default function OrderDetailPage() {
                     <ConditionBadge condition={item.condition as CardCondition} />
                     <span className="text-xs text-zinc-500">x{item.quantity}</span>
                   </div>
+                  {item.listing_id && (
+                    <div className="mt-1 text-xs text-zinc-400 font-mono">
+                      {isSeller ? (
+                        <Link href={`/sell/${item.listing_id}/edit`} className="hover:text-orange-500 transition-colors">
+                          Listing #{item.listing_id.slice(0, 8)}
+                        </Link>
+                      ) : (
+                        <span>Listing #{item.listing_id.slice(0, 8)}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <p className="text-zinc-900 font-medium">${(Number(item.unit_price) * item.quantity).toFixed(2)}</p>
