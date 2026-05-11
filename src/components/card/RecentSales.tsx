@@ -52,16 +52,17 @@ function formatCurrency(value: number | null): string {
   return `$${value.toFixed(2)}`;
 }
 
-function formatRelativeDate(iso: string): string {
+function formatSaleDate(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffDays = Math.floor(diffMs / 86_400_000);
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+type SaleSource = 'TCG' | 'eBay';
 
 // ─────────────────────────────────────────────────────────────────────
 
@@ -171,7 +172,8 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
         rows={newestFirst.slice(0, 30).map(s => ({
           date: s.date,
           price: s.price,
-          tag: s.condition || undefined,
+          label: s.condition ?? undefined,
+          source: 'TCG' as const,
           quantity: s.quantity,
         }))}
         emptyText={`No ${condition === 'All' ? '' : condition + ' '}sales in the last ${period} days.`}
@@ -287,7 +289,8 @@ function GradedSalesView({ sales }: { sales: GradedSale[] }) {
         rows={newestFirst.slice(0, 30).map(s => ({
           date: s.date,
           price: s.price,
-          tag: `${s.grading_company} ${s.grade}`,
+          label: `${s.grading_company} ${s.grade}`,
+          source: 'eBay' as const,
           quantity: 1,
           href: s.listing_url ?? undefined,
         }))}
@@ -405,45 +408,81 @@ function TabButton({
   );
 }
 
-function SalesList({
-  rows,
-  emptyText,
-}: {
-  rows: { date: string; price: number; tag?: string; quantity: number; href?: string }[];
-  emptyText: string;
-}) {
+interface SaleRow {
+  date: string;
+  price: number;
+  label?: string;     // condition or grade — primary text on the row
+  source: SaleSource;
+  quantity: number;
+  href?: string;
+}
+
+function SalesList({ rows, emptyText }: { rows: SaleRow[]; emptyText: string }) {
   return (
-    <div className="mt-4 -mx-1">
-      <div className="text-xs font-medium text-zinc-400 uppercase tracking-wide px-1 mb-1">Recent</div>
+    <div className="mt-6">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+          Recent Transactions
+        </h3>
+        {rows.length > 0 && (
+          <span className="text-xs text-zinc-400">{rows.length} shown</span>
+        )}
+      </div>
       {rows.length === 0 ? (
-        <div className="py-4 text-center text-xs text-zinc-400">{emptyText}</div>
+        <div className="py-8 text-center text-xs text-zinc-400 border border-zinc-200 rounded-lg">
+          {emptyText}
+        </div>
       ) : (
-        <ul className="max-h-72 overflow-y-auto divide-y divide-zinc-100">
-          {rows.map((r, i) => {
-            const inner = (
-              <div className="flex items-center justify-between px-1 py-2 text-sm">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-zinc-500 tabular-nums w-16 flex-shrink-0">{formatRelativeDate(r.date)}</span>
-                  {r.tag && <span className="text-xs text-zinc-400 truncate">{r.tag}</span>}
-                  {r.quantity > 1 && <span className="text-xs text-zinc-400">×{r.quantity}</span>}
-                </div>
-                <span className="font-semibold text-zinc-900 tabular-nums">${r.price.toFixed(2)}</span>
-              </div>
-            );
-            return (
-              <li key={`${r.date}-${i}`}>
-                {r.href ? (
-                  <a href={r.href} target="_blank" rel="noopener noreferrer" className="block hover:bg-zinc-50">
-                    {inner}
-                  </a>
-                ) : (
-                  inner
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="border border-zinc-200 rounded-lg overflow-hidden">
+          <ul className="divide-y divide-zinc-100 max-h-96 overflow-y-auto">
+            {rows.map((r, i) => (
+              <SaleListItem key={`${r.date}-${i}`} row={r} />
+            ))}
+          </ul>
+        </div>
       )}
     </div>
+  );
+}
+
+function SaleListItem({ row }: { row: SaleRow }) {
+  const inner = (
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 transition-colors">
+      <SourceBadge source={row.source} />
+      <div className="flex-1 min-w-0">
+        {row.label && (
+          <div className="text-sm font-medium text-zinc-900 truncate">{row.label}</div>
+        )}
+        <div className="text-xs text-zinc-500 mt-0.5">{formatSaleDate(row.date)}</div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <div className="text-sm font-bold text-zinc-900 tabular-nums">
+          ${row.price.toFixed(2)}
+        </div>
+        {row.quantity > 1 && (
+          <div className="text-[10px] text-zinc-400">×{row.quantity}</div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <li>
+      {row.href ? (
+        <a href={row.href} target="_blank" rel="noopener noreferrer" className="block">
+          {inner}
+        </a>
+      ) : (
+        inner
+      )}
+    </li>
+  );
+}
+
+function SourceBadge({ source }: { source: SaleSource }) {
+  return (
+    <span className="flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 bg-zinc-50 border border-zinc-200 rounded px-1.5 py-0.5">
+      {source}
+    </span>
   );
 }
