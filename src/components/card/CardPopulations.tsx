@@ -106,9 +106,7 @@ export function CardPopulations({ populations, onSelect }: CardPopulationsProps)
       </div>
 
       {!hasAnyData && (
-        <p className="text-[11px] text-zinc-400">
-          Population data coming soon — we&apos;ll scrape PSA + CGC pop reports.
-        </p>
+        <p className="text-[11px] text-zinc-400">Population data not yet available.</p>
       )}
     </div>
   );
