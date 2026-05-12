@@ -71,18 +71,58 @@ export default async function Home() {
     });
   }
 
-  // Newest marketplace listings
+  // Newest marketplace listings — but only the ones that are *currently the
+  // lowest active price for their card*. Turns the section into a "new lows"
+  // / snipe feed instead of a chronological dump. A new listing only appears
+  // here if it undercuts (or matches) every other active listing for that
+  // same card, so buyers can act on real new lows.
   let enrichedListings: EnrichedListing[] = [];
   try {
     const supabase = await createClient();
+
+    // Pull a wider batch than we'll display so filtering doesn't leave the
+    // section empty on busy days.
     const { data: recentListings } = await supabase
       .from("listings")
       .select("*")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(12);
+      .limit(50);
 
+    // Look up the current min active price for each card we're considering.
+    const candidateCardIds = Array.from(
+      new Set((recentListings || []).map((l: { card_id: string }) => l.card_id)),
+    );
+    const minByCard = new Map<string, number>();
+    if (candidateCardIds.length > 0) {
+      const { data: minPrices } = await supabase
+        .from("listings")
+        .select("card_id, price")
+        .eq("status", "active")
+        .in("card_id", candidateCardIds);
+      for (const row of minPrices || []) {
+        const p = Number(row.price);
+        const cur = minByCard.get(row.card_id);
+        if (cur == null || p < cur) minByCard.set(row.card_id, p);
+      }
+    }
+
+    // Keep only listings whose price matches the current min for their card.
+    // Dedup by card_id so each card surfaces at most once (the newest
+    // qualifying listing).
+    const seen = new Set<string>();
     const mapped = (recentListings || [])
+      .filter((listing: { card_id: string; price: number | string }) => {
+        const min = minByCard.get(listing.card_id);
+        return min != null && Number(listing.price) <= min + 0.001;
+      })
+      .filter((listing: { card_id: string }) => {
+        if (seen.has(listing.card_id)) return false;
+        seen.add(listing.card_id);
+        return true;
+      })
+      .slice(0, 12)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((listing: any) => {
         const card = cardMap.get(listing.card_id);
         if (!card) return null;
@@ -98,7 +138,7 @@ export default async function Home() {
           createdAt: listing.created_at,
         } as EnrichedListing;
       });
-    enrichedListings = mapped.filter((l): l is EnrichedListing => l !== null);
+    enrichedListings = mapped.filter((l: EnrichedListing | null): l is EnrichedListing => l !== null);
   } catch {
     // Supabase unavailable — skip listings section
   }
@@ -249,8 +289,8 @@ export default async function Home() {
       {enrichedListings.length > 0 && (
         <section className="mb-12 sm:mb-16">
           <ListingCarousel
-            title="Newest Listings"
-            subtitle="Just listed on the marketplace"
+            title="New Lows"
+            subtitle="Just listed at the lowest active price — snipe before someone else does"
             icon={
               <svg
                 className="w-6 h-6 text-orange-500"
