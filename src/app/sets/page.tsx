@@ -80,9 +80,14 @@ export default async function SetsPage() {
                   {getSetShortName(set.name)}
                 </p>
                 {top10 != null && top10 > 0 && (
-                  <p className="text-sm font-bold text-zinc-900 mt-1 tabular-nums">
-                    {formatPrice(top10)}
-                  </p>
+                  <div className="mt-1">
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium">
+                      Top 10 value
+                    </p>
+                    <p className="text-sm font-bold text-zinc-900 tabular-nums">
+                      {formatPrice(top10)}
+                    </p>
+                  </div>
                 )}
               </div>
             </Link>
