@@ -288,6 +288,44 @@ export async function getCardSales(
   }));
 }
 
+export type GradeCompany = 'PSA' | 'BGS' | 'CGC' | 'TAG';
+
+export interface PopulationBucket {
+  grade: string;
+  count: number;
+}
+
+/**
+ * Get the population (census) counts for a card, grouped by grading company.
+ * Returns { PSA: [...], BGS: [...], ... } — companies with no data omitted.
+ */
+export async function getCardPopulations(
+  cardId: string,
+): Promise<Partial<Record<GradeCompany, PopulationBucket[]>>> {
+  if (!supabase) return {};
+
+  const { data: rows } = await supabase
+    .from('card_grade_populations')
+    .select('company, grade, count')
+    .eq('card_id', cardId);
+
+  if (!rows || rows.length === 0) return {};
+
+  const result: Partial<Record<GradeCompany, PopulationBucket[]>> = {};
+  for (const r of rows) {
+    const company = r.company as GradeCompany;
+    if (!result[company]) result[company] = [];
+    result[company]!.push({ grade: r.grade, count: Number(r.count) });
+  }
+
+  // Sort each company's grades high → low (PSA-style ordering)
+  for (const company of Object.keys(result) as GradeCompany[]) {
+    result[company]!.sort((a, b) => parseFloat(b.grade) - parseFloat(a.grade));
+  }
+
+  return result;
+}
+
 /**
  * Get graded (slabbed) card sales from eBay scraper data.
  */

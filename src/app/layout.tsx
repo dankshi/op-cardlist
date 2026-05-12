@@ -94,23 +94,23 @@ export default function RootLayout({
             __html: JSON.stringify(getWebSiteSchema()),
           }}
         />
-          <header className="border-b border-zinc-200 sticky top-0 bg-white/95 backdrop-blur z-50">
+          <header className="border-b border-orange-600 sticky top-0 bg-orange-500 z-50">
             <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
               <Link href="/" className="hover:opacity-90 transition-opacity">
                 <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto" />
               </Link>
               <div className="flex items-center gap-4">
-                <Link href="/marketplace" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
+                <Link href="/marketplace" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
                   Marketplace
                 </Link>
-                <Link href="/about" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
+                <Link href="/about" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
                   How It Works
                 </Link>
-                <Link href="/sell" className="text-zinc-500 hover:text-zinc-900 transition-colors text-sm font-medium">
+                <Link href="/sell" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
                   Sell
                 </Link>
                 <MyShopLink />
-                <Suspense fallback={<div className="w-8 h-8 rounded-full bg-zinc-100 animate-pulse" />}>
+                <Suspense fallback={<div className="w-8 h-8 rounded-full bg-white/20 animate-pulse" />}>
                   <AuthButton />
                 </Suspense>
               </div>

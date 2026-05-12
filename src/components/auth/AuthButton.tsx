@@ -80,14 +80,14 @@ export default function AuthButton() {
   }, [router])
 
   if (loading) {
-    return <div className="w-8 h-8 rounded-full bg-zinc-100 animate-pulse" />
+    return <div className="w-8 h-8 rounded-full bg-white/20 animate-pulse" />
   }
 
   if (!user) {
     return (
       <Link
         href="/auth/sign-in"
-        className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white text-sm font-semibold transition-colors"
+        className="px-4 py-2 rounded-lg bg-white hover:bg-zinc-50 text-orange-600 text-sm font-semibold transition-colors"
       >
         Sign In
       </Link>
@@ -104,9 +104,9 @@ export default function AuthButton() {
         className="flex items-center gap-2 cursor-pointer"
       >
         {avatarUrl ? (
-          <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full" />
+          <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full border-2 border-white/40" />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold">
+          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-orange-600 text-sm font-bold">
             {displayName[0].toUpperCase()}
           </div>
         )}

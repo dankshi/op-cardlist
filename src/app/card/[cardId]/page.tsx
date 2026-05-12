@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCardById, getParallelCards } from "@/lib/cards";
-import { getCardSales, getCardGradedSales, calculatePriceChange } from "@/lib/price-history";
+import { getCardSales, getCardGradedSales, getCardPopulations, calculatePriceChange } from "@/lib/price-history";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
 import { CardThumbnail } from "@/components/card/CardThumbnail";
@@ -99,9 +99,10 @@ export default async function CardPage({ params }: PageProps) {
     notFound();
   }
 
-  const [sales, gradedSales, priceChange] = await Promise.all([
+  const [sales, gradedSales, populations, priceChange] = await Promise.all([
     getCardSales(card.id, 90),
     getCardGradedSales(card.id, 90),
+    getCardPopulations(card.id),
     calculatePriceChange(card.id, card.price?.marketPrice ?? null, 7),
   ]);
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
@@ -221,7 +222,7 @@ export default async function CardPage({ params }: PageProps) {
       {/* Population (graded copies by company + grade) */}
       <section className="mb-6">
         <div className="bg-white border border-zinc-100 rounded-xl p-4">
-          <CardPopulations />
+          <CardPopulations populations={populations} />
         </div>
       </section>
 
