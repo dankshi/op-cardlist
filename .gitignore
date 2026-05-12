@@ -49,3 +49,5 @@ data/price-history/
 next-env.d.ts
 
 .vercel
+data/psa-spec-todo.csv
+data/psa-spec-filled.csv
