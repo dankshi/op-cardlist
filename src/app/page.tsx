@@ -354,7 +354,7 @@ export default async function Home() {
             </p>
           </div>
           <Link
-            href="/search"
+            href="/sets"
             className="text-sm text-orange-500 hover:text-orange-600 transition-colors"
           >
             View all {sets.length} sets &rarr;
