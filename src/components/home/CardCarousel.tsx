@@ -12,8 +12,13 @@ interface CardCarouselProps {
   icon?: React.ReactNode;
   cards: Card[];
   showPriceChange?: boolean;
+  showPrice?: boolean;
   priceChanges?: Record<string, number>;
   viewAllHref?: string;
+}
+
+function formatPrice(n: number): string {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function CardCarousel({
@@ -22,6 +27,7 @@ export function CardCarousel({
   icon,
   cards,
   showPriceChange,
+  showPrice,
   priceChanges,
   viewAllHref,
 }: CardCarouselProps) {
@@ -124,6 +130,11 @@ export function CardCarousel({
                   {card.name}
                 </p>
                 <p className="text-xs text-zinc-500">{card.id}</p>
+                {showPrice && card.price?.marketPrice != null && (
+                  <p className="text-sm font-bold text-zinc-900 mt-1 tabular-nums">
+                    {formatPrice(card.price.marketPrice)}
+                  </p>
+                )}
                 {showPriceChange && priceChanges?.[card.id] != null && (
                   <div className="mt-1">
                     <PriceChangeBadge

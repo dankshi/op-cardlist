@@ -179,6 +179,7 @@ export default async function Home() {
               </svg>
             }
             cards={mostValuable}
+            showPrice
             viewAllHref="/hot"
           />
         </section>
