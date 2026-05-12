@@ -110,12 +110,6 @@ export default async function SetPage({ params }: PageProps) {
     .slice(0, 10)
     .reduce((sum, c) => sum + (c.price?.marketPrice ?? 0), 0);
 
-  // Top 5 names for the inline SEO/context line
-  const topCards = [...set.cards]
-    .filter((c) => c.price?.marketPrice != null && c.price.marketPrice > 0)
-    .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))
-    .slice(0, 5);
-
   return (
     <div>
       {/* Breadcrumb */}
@@ -148,11 +142,6 @@ export default async function SetPage({ params }: PageProps) {
             Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
         </div>
-        {topCards.length > 0 && (
-          <p className="text-xs text-zinc-400 mt-3">
-            Most valuable: {topCards.map((c) => `${c.name} ($${c.price!.marketPrice!.toFixed(2)})`).join(', ')}
-          </p>
-        )}
       </header>
 
       {/* Card Grid with Filters */}
