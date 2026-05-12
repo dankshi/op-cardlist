@@ -135,10 +135,6 @@ export default async function SetPage({ params }: PageProps) {
               </span>
             </>
           )}
-          <span>·</span>
-          <span>
-            Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </span>
         </div>
       </header>
 
