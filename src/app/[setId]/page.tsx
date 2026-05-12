@@ -124,18 +124,12 @@ export default async function SetPage({ params }: PageProps) {
       {/* Header — tight one-liner under the title */}
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-zinc-900">{shortName}</h1>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-          <span>{set.cardCount} cards</span>
-          {top10Value > 0 && (
-            <>
-              <span>·</span>
-              <span>
-                Top 10 value{' '}
-                <strong className="text-zinc-900">${top10Value.toFixed(2)}</strong>
-              </span>
-            </>
-          )}
-        </div>
+        {top10Value > 0 && (
+          <div className="mt-1 text-sm text-zinc-500">
+            Top 10 value{' '}
+            <strong className="text-zinc-900">${top10Value.toFixed(2)}</strong>
+          </div>
+        )}
       </header>
 
       {/* Card Grid with Filters */}
