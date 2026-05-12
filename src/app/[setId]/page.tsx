@@ -4,7 +4,6 @@ import Link from "next/link";
 import { getSetBySlug, getAllSets, HIDDEN_RARITIES } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
 import SetStats from "@/components/SetStats";
-import BoxEVCalculator from "@/components/BoxEVCalculator";
 import { calculateBatchPriceChanges } from "@/lib/price-history";
 import { SITE_URL, SITE_NAME, getSetKeywords, getSetShortName, getBreadcrumbSchema } from "@/lib/seo";
 
@@ -162,10 +161,7 @@ export default async function SetPage({ params }: PageProps) {
       </header>
 
       {/* Set Value Metrics */}
-      <SetStats cards={set.cards} setId={set.id} />
-
-      {/* Box Expected Value */}
-      <BoxEVCalculator cards={set.cards} />
+      <SetStats cards={set.cards} />
 
       {/* Inline SEO text for price-related searches */}
       {(() => {
