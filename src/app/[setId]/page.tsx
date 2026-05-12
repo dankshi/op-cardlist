@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getSetBySlug, getAllSets, HIDDEN_RARITIES } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
-import SetStats from "@/components/SetStats";
 import { calculateBatchPriceChanges } from "@/lib/price-history";
 import { SITE_URL, SITE_NAME, getSetKeywords, getSetShortName, getBreadcrumbSchema } from "@/lib/seo";
 
@@ -104,16 +103,23 @@ export default async function SetPage({ params }: PageProps) {
   }
   const priceChanges = calculateBatchPriceChanges(currentPrices);
 
-  // Count card types
-  const leaders = set.cards.filter((c) => c.type === "LEADER").length;
-  const characters = set.cards.filter((c) => c.type === "CHARACTER").length;
-  const events = set.cards.filter((c) => c.type === "EVENT").length;
-  const stages = set.cards.filter((c) => c.type === "STAGE").length;
+  // Top 10 value for the inline header stat
+  const top10Value = [...set.cards]
+    .filter((c) => c.price?.marketPrice != null && c.price.marketPrice > 0)
+    .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))
+    .slice(0, 10)
+    .reduce((sum, c) => sum + (c.price?.marketPrice ?? 0), 0);
+
+  // Top 5 names for the inline SEO/context line
+  const topCards = [...set.cards]
+    .filter((c) => c.price?.marketPrice != null && c.price.marketPrice > 0)
+    .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))
+    .slice(0, 5);
 
   return (
     <div>
       {/* Breadcrumb */}
-      <nav className="text-sm text-zinc-500 mb-6">
+      <nav className="text-sm text-zinc-500 mb-4">
         <Link href="/" className="hover:text-zinc-900 transition-colors">
           Home
         </Link>
@@ -121,66 +127,35 @@ export default async function SetPage({ params }: PageProps) {
         <span className="text-zinc-900">{set.id.toUpperCase()}</span>
       </nav>
 
-      {/* Header */}
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{set.id.toUpperCase()} ({set.id.replace('-', '').toUpperCase()}) {shortName} Card List</h1>
-        <div className="flex items-center gap-3 mb-4">
-          <p className="text-zinc-600">{set.name}</p>
-          <span className="text-xs text-zinc-500">·</span>
-          <p className="text-xs text-zinc-500">
-            Prices updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </p>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="flex flex-wrap gap-4 text-sm">
-          <span className="px-3 py-1 bg-zinc-100 rounded-full">
-            {set.cardCount} cards
+      {/* Header — tight one-liner under the title */}
+      <header className="mb-6">
+        <h1 className="text-3xl font-bold text-zinc-900">{shortName}</h1>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+          <span className="font-mono text-zinc-700">{set.id.toUpperCase()}</span>
+          <span>·</span>
+          <span>{set.cardCount} cards</span>
+          {top10Value > 0 && (
+            <>
+              <span>·</span>
+              <span>
+                Top 10 value{' '}
+                <strong className="text-zinc-900">${top10Value.toFixed(2)}</strong>
+              </span>
+            </>
+          )}
+          <span>·</span>
+          <span>
+            Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
-          {leaders > 0 && (
-            <span className="px-3 py-1 bg-zinc-100 rounded-full">
-              {leaders} Leaders
-            </span>
-          )}
-          {characters > 0 && (
-            <span className="px-3 py-1 bg-zinc-100 rounded-full">
-              {characters} Characters
-            </span>
-          )}
-          {events > 0 && (
-            <span className="px-3 py-1 bg-zinc-100 rounded-full">
-              {events} Events
-            </span>
-          )}
-          {stages > 0 && (
-            <span className="px-3 py-1 bg-zinc-100 rounded-full">
-              {stages} Stages
-            </span>
-          )}
         </div>
+        {topCards.length > 0 && (
+          <p className="text-xs text-zinc-400 mt-3">
+            Most valuable: {topCards.map((c) => `${c.name} ($${c.price!.marketPrice!.toFixed(2)})`).join(', ')}
+          </p>
+        )}
       </header>
 
-      {/* Set Value Metrics */}
-      <SetStats cards={set.cards} />
-
-      {/* Inline SEO text for price-related searches */}
-      {(() => {
-        const topCards = set.cards
-          .filter((c) => c.price?.marketPrice != null && c.price.marketPrice > 0)
-          .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))
-          .slice(0, 5);
-        if (topCards.length === 0) return null;
-        const setNoHyphen = set.id.replace('-', '').toUpperCase();
-        const topList = topCards.map((c) => `${c.name} ($${c.price!.marketPrice!.toFixed(2)})`).join(', ');
-        return (
-          <p className="text-xs text-zinc-500 mb-6">
-            Most valuable {setNoHyphen} cards: {topList}. Prices updated daily from TCGPlayer.
-          </p>
-        );
-      })()}
-
       {/* Card Grid with Filters */}
-      <h2 className="text-xl font-bold mb-4">All {set.id.toUpperCase()} Cards</h2>
       <CardGrid cards={set.cards.filter(c => !HIDDEN_RARITIES.has(c.rarity))} setId={set.id} priceChanges={priceChanges} />
 
       {/* BreadcrumbList Schema */}
