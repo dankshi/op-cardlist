@@ -257,6 +257,11 @@ interface SaleRecord {
   price: number;
   date: string;
   condition: string | null;
+  variant: string | null;
+  language: string | null;
+  listingType: string | null;
+  shippingPrice: number | null;
+  customListingId: string | null;
   quantity: number;
 }
 
@@ -266,36 +271,59 @@ const fetchStats = {
   rateLimited: 0,
   giveUp: 0,
   error: 0,
+  // Cookie health: did we ever hit a "looks like an authed response" page?
+  authedPages: 0,
+  pagesWith25: 0,    // signal that auth is working — anon caps at 5
 };
 
-type FetchResult =
-  | { kind: 'ok'; sales: SaleRecord[] }
+type FetchPage =
+  | { kind: 'ok'; sales: SaleRecord[]; hasMore: boolean; totalResults: number }
   | { kind: 'rate_limited' }
   | { kind: 'error'; message: string };
 
-async function fetchSalesOnce(productId: number): Promise<FetchResult> {
+const TCG_AUTH_COOKIE = process.env.TCGPLAYER_AUTH_COOKIE;
+const PAGE_SIZE = 25;
+const MAX_PAGES_PER_PRODUCT = 10; // 10 * 25 = 250 sales max ≈ way more than needed for 90d window
+const CUTOFF_DAYS = 90;
+
+async function fetchSalesPage(
+  productId: number,
+  offset: number,
+  snapshotTime: number,
+): Promise<FetchPage> {
   try {
     const res = await fetch(`https://mpapi.tcgplayer.com/v2/product/${productId}/latestsales`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Origin': 'https://www.tcgplayer.com',
+        'Referer': 'https://www.tcgplayer.com/',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+        ...(TCG_AUTH_COOKIE
+          ? { Cookie: `TCGAuthTicket_Production=${TCG_AUTH_COOKIE}` }
+          : {}),
       },
-      body: JSON.stringify({ listingType: 'All' }),
+      body: JSON.stringify({
+        conditions: [],
+        languages: [],
+        variants: [],
+        listingType: 'All',
+        offset,
+        limit: PAGE_SIZE,
+        time: snapshotTime,
+      }),
     });
 
-    // 429 = rate-limit. 403 = TCGPlayer's anti-bot fingerprint block — also
-    // worth retrying since it sometimes lifts within the same run.
     if (res.status === 429 || res.status === 403) return { kind: 'rate_limited' };
     if (!res.ok) return { kind: 'error', message: `HTTP ${res.status}` };
 
     const text = await res.text();
-    // Cloudflare / WAF challenge pages come back as HTML.
     if (text.startsWith('<')) return { kind: 'rate_limited' };
 
     const data = JSON.parse(text);
-    const sales = data.data || data;
+    const sales = data.data;
     if (!Array.isArray(sales)) return { kind: 'error', message: 'unexpected response shape' };
 
     return {
@@ -305,48 +333,78 @@ async function fetchSalesOnce(productId: number): Promise<FetchResult> {
         price: s.purchasePrice,
         date: s.orderDate,
         condition: s.condition ?? null,
+        variant: s.variant ?? null,
+        language: s.language ?? null,
+        listingType: s.listingType ?? null,
+        shippingPrice: s.shippingPrice ?? null,
+        customListingId: s.customListingId ?? null,
         quantity: s.quantity ?? 1,
       })),
+      hasMore: data.nextPage === 'Yes',
+      totalResults: Number(data.totalResults ?? sales.length),
     };
   } catch (err) {
     return { kind: 'error', message: err instanceof Error ? err.message : String(err) };
   }
 }
 
-// Fetch recent sales with rate-limit detection + exponential backoff.
-// Returns [] on persistent failure, but records the cause in fetchStats so the
-// scraper run surfaces it at the end instead of silently moving on.
-async function fetchSales(productId: number): Promise<SaleRecord[]> {
+// Single attempt wrapped in exponential-backoff retry on rate-limit / 403.
+async function fetchSalesPageWithRetry(
+  productId: number,
+  offset: number,
+  snapshotTime: number,
+): Promise<FetchPage> {
   const MAX_ATTEMPTS = 4;
   let backoffMs = 2000;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const result = await fetchSalesOnce(productId);
-
-    if (result.kind === 'ok') {
-      fetchStats.ok++;
-      return result.sales;
+    const result = await fetchSalesPage(productId, offset, snapshotTime);
+    if (result.kind === 'ok' || result.kind === 'error') return result;
+    // rate_limited
+    fetchStats.rateLimited++;
+    if (attempt === MAX_ATTEMPTS) {
+      fetchStats.giveUp++;
+      return { kind: 'rate_limited' };
     }
-
-    if (result.kind === 'rate_limited') {
-      fetchStats.rateLimited++;
-      if (attempt === MAX_ATTEMPTS) {
-        fetchStats.giveUp++;
-        return [];
-      }
-      const jitter = Math.random() * 1000;
-      await sleep(backoffMs + jitter);
-      backoffMs *= 2;
-      continue;
-    }
-
-    // Non-rate-limit error — don't retry blindly, just log and move on.
-    fetchStats.error++;
-    if (fetchStats.error <= 5) {
-      console.warn(`  ⚠ fetchSales(${productId}): ${result.message}`);
-    }
-    return [];
+    const jitter = Math.random() * 1000;
+    await sleep(backoffMs + jitter);
+    backoffMs *= 2;
   }
-  return [];
+  return { kind: 'rate_limited' };
+}
+
+// Paginated fetch — walks pages until no more, hits MAX_PAGES, or sales reach
+// the 90-day cutoff. Returns [] on persistent failure.
+async function fetchSales(productId: number): Promise<SaleRecord[]> {
+  const all: SaleRecord[] = [];
+  const snapshotTime = Date.now();
+  const cutoff = Date.now() - CUTOFF_DAYS * 86_400_000;
+
+  for (let page = 0; page < MAX_PAGES_PER_PRODUCT; page++) {
+    const offset = page * PAGE_SIZE;
+    const result = await fetchSalesPageWithRetry(productId, offset, snapshotTime);
+
+    if (result.kind !== 'ok') {
+      if (result.kind === 'error' && fetchStats.error <= 5) {
+        console.warn(`  ⚠ fetchSales(${productId}): ${result.message}`);
+      }
+      if (result.kind === 'error') fetchStats.error++;
+      // On rate-limit we return what we already have rather than nothing.
+      return all;
+    }
+
+    fetchStats.ok++;
+    if (result.sales.length === PAGE_SIZE) fetchStats.pagesWith25++;
+    if (TCG_AUTH_COOKIE && result.totalResults > 5) fetchStats.authedPages++;
+
+    all.push(...result.sales);
+
+    // Stop if no next page, or oldest sale on this page is older than cutoff.
+    const oldest = result.sales[result.sales.length - 1];
+    const oldestMs = oldest ? new Date(oldest.date).getTime() : Infinity;
+    if (!result.hasMore || oldestMs < cutoff) break;
+  }
+
+  return all;
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -616,7 +674,18 @@ async function main() {
     let lastSoldFound = 0;
     let totalSalesStored = 0;
     let pendingLastSold: { card_id: string; last_sold_price: number; last_sold_date: string }[] = [];
-    let pendingSales: { tcgplayer_product_id: number; sold_at: string; price: number; condition: string | null; quantity: number }[] = [];
+    let pendingSales: {
+      tcgplayer_product_id: number;
+      sold_at: string;
+      price: number;
+      condition: string | null;
+      variant: string | null;
+      language: string | null;
+      listing_type: string | null;
+      shipping_price: number | null;
+      custom_listing_id: string | null;
+      quantity: number;
+    }[] = [];
     const FLUSH_SIZE = 500;
     const batchSize = 5;
 
@@ -631,7 +700,10 @@ async function main() {
       if (pendingSales.length > 0) {
         const { error } = await supabase
           .from('card_sales')
-          .upsert(pendingSales, { onConflict: 'tcgplayer_product_id,sold_at,price,condition', ignoreDuplicates: true });
+          .upsert(pendingSales, {
+            onConflict: 'tcgplayer_product_id,sold_at,price,condition,variant,language',
+            ignoreDuplicates: true,
+          });
         if (error) {
           console.error(`  Supabase card_sales upsert error:`, error.message);
         } else {
@@ -663,6 +735,11 @@ async function main() {
               sold_at: sale.date,
               price: sale.price,
               condition: sale.condition,
+              variant: sale.variant,
+              language: sale.language,
+              listing_type: sale.listingType,
+              shipping_price: sale.shippingPrice,
+              custom_listing_id: sale.customListingId,
               quantity: sale.quantity,
             });
           }
@@ -688,11 +765,19 @@ async function main() {
     await flushPending();
     console.log(`  Found sales for ${lastSoldFound}/${matchedProductIds.length} products (${totalSalesStored} total sales stored)`);
     console.log(
-      `  fetchSales: ok=${fetchStats.ok}  rate-limited-retries=${fetchStats.rateLimited}  gave-up=${fetchStats.giveUp}  hard-errors=${fetchStats.error}`,
+      `  fetchSales: ok-pages=${fetchStats.ok}  rate-limited-retries=${fetchStats.rateLimited}  gave-up=${fetchStats.giveUp}  hard-errors=${fetchStats.error}`,
     );
+    console.log(
+      `  cookie: pages-with-25=${fetchStats.pagesWith25}  authed-pages=${fetchStats.authedPages}  ${TCG_AUTH_COOKIE ? '(cookie present)' : '(NO COOKIE — anon mode, capped at 5 sales/product)'}`,
+    );
+    if (TCG_AUTH_COOKIE && fetchStats.authedPages === 0 && fetchStats.ok > 0) {
+      console.warn(
+        `  ⚠ Cookie is set but every authed response looked anonymous (totalResults <= 5). Cookie has likely expired — refresh TCGPLAYER_AUTH_COOKIE.`,
+      );
+    }
     if (fetchStats.giveUp > matchedProductIds.length * 0.05) {
       console.warn(
-        `  ⚠ ${fetchStats.giveUp} products gave up after ${4} retries — TCGPlayer is rate-limiting hard. Consider running from a residential IP.`,
+        `  ⚠ ${fetchStats.giveUp} products gave up after retries — TCGPlayer is rate-limiting hard. Consider running from a residential IP.`,
       );
     }
   }
