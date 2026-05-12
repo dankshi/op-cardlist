@@ -30,3 +30,8 @@ jobs:
           NODE_ENV: production
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # Authenticated TCGPlayer session — unlocks the deep latestsales feed.
+          # If unset, the scraper silently falls back to anon mode (5 sales/product cap).
+          # Rotate when expired: log out + back in on tcgplayer.com, grab new
+          # TCGAuthTicket_Production cookie, `gh secret set TCGPLAYER_AUTH_COOKIE -b "..."`.
+          TCGPLAYER_AUTH_COOKIE: ${{ secrets.TCGPLAYER_AUTH_COOKIE }}

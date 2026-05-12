@@ -8,6 +8,10 @@ interface RawSale {
   date: string;
   price: number;
   condition: string | null;
+  variant: string | null;
+  language: string | null;
+  listing_type: string | null;
+  custom_listing_id: string | null;
   quantity: number;
 }
 
@@ -105,11 +109,49 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
   const [period, setPeriod] = useState(30);
   const [condition, setCondition] = useState<ConditionFilter>('NM');
 
+  // Variant + language filters — auto-build from sales data.
+  // Default to "All" so we don't accidentally hide data when only one variant exists.
+  const availableVariants = useMemo(() => {
+    const set = new Set<string>();
+    sales.forEach(s => s.variant && set.add(s.variant));
+    return Array.from(set).sort();
+  }, [sales]);
+  const availableLanguages = useMemo(() => {
+    const set = new Set<string>();
+    sales.forEach(s => s.language && set.add(s.language));
+    return Array.from(set).sort();
+  }, [sales]);
+
+  const [variant, setVariant] = useState<string>('All');
+  const [language, setLanguage] = useState<string>('All');
+
+  // Default to most common variant/language once data loads.
+  // (English Foil is by far the most common for One Piece TCG.)
+  useMemo(() => {
+    if (variant === 'All' && availableVariants.length === 1) {
+      setVariant(availableVariants[0]);
+    }
+  }, [availableVariants, variant]);
+  useMemo(() => {
+    if (language === 'All' && availableLanguages.length === 1) {
+      setLanguage(availableLanguages[0]);
+    }
+  }, [availableLanguages, language]);
+
   const filtered = useMemo(() => {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - period);
-    return sales.filter(s => new Date(s.date) >= cutoff && matchesCondition(s.condition, condition));
-  }, [sales, period, condition]);
+    return sales.filter(s => {
+      if (new Date(s.date) < cutoff) return false;
+      if (!matchesCondition(s.condition, condition)) return false;
+      if (variant !== 'All' && s.variant !== variant) return false;
+      if (language !== 'All' && s.language !== language) return false;
+      // Filter out seller-customized listings — those are someone listing a
+      // different product under our SKU and inflate noise.
+      if (s.custom_listing_id && s.custom_listing_id !== '0') return false;
+      return true;
+    });
+  }, [sales, period, condition, variant, language]);
 
   const newestFirst = useMemo(
     () => [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -145,8 +187,24 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
         trendPct={trendPct}
       />
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4 flex-wrap">
         <ChipGroup options={CONDITIONS} value={condition} onChange={setCondition} ariaLabel="Condition" />
+        {availableVariants.length > 1 && (
+          <ChipGroup
+            options={['All', ...availableVariants]}
+            value={variant}
+            onChange={setVariant}
+            ariaLabel="Variant"
+          />
+        )}
+        {availableLanguages.length > 1 && (
+          <ChipGroup
+            options={['All', ...availableLanguages]}
+            value={language}
+            onChange={setLanguage}
+            ariaLabel="Language"
+          />
+        )}
         <div className="hidden sm:block w-px h-5 bg-zinc-200" />
         <ChipGroup
           options={PERIODS.map(p => p.label)}

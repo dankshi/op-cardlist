@@ -229,6 +229,10 @@ export interface SalePoint {
   date: string;
   price: number;
   condition: string | null;
+  variant: string | null;
+  language: string | null;
+  listing_type: string | null;
+  custom_listing_id: string | null;
   quantity: number;
 }
 
@@ -265,7 +269,7 @@ export async function getCardSales(
 
   const { data: rows } = await supabase
     .from('card_sales')
-    .select('sold_at, price, condition, quantity')
+    .select('sold_at, price, condition, variant, language, listing_type, custom_listing_id, quantity')
     .eq('tcgplayer_product_id', mapping.tcgplayer_product_id)
     .gte('sold_at', startDate.toISOString())
     .order('sold_at', { ascending: true });
@@ -276,6 +280,10 @@ export async function getCardSales(
     date: r.sold_at,
     price: Number(r.price),
     condition: r.condition,
+    variant: r.variant ?? null,
+    language: r.language ?? null,
+    listing_type: r.listing_type ?? null,
+    custom_listing_id: r.custom_listing_id ?? null,
     quantity: r.quantity ?? 1,
   }));
 }

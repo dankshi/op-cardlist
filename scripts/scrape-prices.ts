@@ -283,8 +283,14 @@ type FetchPage =
 
 const TCG_AUTH_COOKIE = process.env.TCGPLAYER_AUTH_COOKIE;
 const PAGE_SIZE = 25;
-const MAX_PAGES_PER_PRODUCT = 10; // 10 * 25 = 250 sales max ≈ way more than needed for 90d window
+// Cap at 6 pages (150 sales) per product. Covers 90 days for nearly every card
+// and limits how far we paginate on the rare high-volume chase card.
+const MAX_PAGES_PER_PRODUCT = 6;
 const CUTOFF_DAYS = 90;
+// Polite per-page delay inside a product's pagination loop. A real seller
+// scrolling the Sales History modal would have a similar gap between page-2
+// and page-3 fetches.
+const INTER_PAGE_DELAY_MS = [400, 900];
 
 async function fetchSalesPage(
   productId: number,
@@ -380,6 +386,10 @@ async function fetchSales(productId: number): Promise<SaleRecord[]> {
   const cutoff = Date.now() - CUTOFF_DAYS * 86_400_000;
 
   for (let page = 0; page < MAX_PAGES_PER_PRODUCT; page++) {
+    if (page > 0) {
+      const [lo, hi] = INTER_PAGE_DELAY_MS;
+      await sleep(lo + Math.random() * (hi - lo));
+    }
     const offset = page * PAGE_SIZE;
     const result = await fetchSalesPageWithRetry(productId, offset, snapshotTime);
 
@@ -668,12 +678,42 @@ async function main() {
     }
   }
 
-  // Fetch sales history for all matched products — flush to DB as we go
+  // Fetch sales history for matched products on a staleness rotation —
+  // touch only the N most-stale products per run so traffic looks natural
+  // and we stay under TCGPlayer's anti-bot threshold. Full coverage in
+  // ~ceil(matchedProductIds.length / ROTATION_LIMIT) days.
+  const ROTATION_LIMIT = process.env.SCRAPE_ALL_PRODUCTS
+    ? matchedProductIds.length
+    : 300;
+
   if (matchedProductIds.length > 0) {
-    console.log(`\nFetching sales for ${matchedProductIds.length} products...`);
+    // Order by sales_scraped_at NULLS FIRST so unseen + stalest cards come first.
+    const matchedIdSet = new Set(matchedProductIds.map(m => m.productId));
+    const { data: staleness } = await supabase
+      .from('card_prices')
+      .select('tcgplayer_product_id, sales_scraped_at')
+      .in('tcgplayer_product_id', Array.from(matchedIdSet))
+      .order('sales_scraped_at', { ascending: true, nullsFirst: true });
+
+    const orderedIds = new Map(
+      (staleness ?? []).map((r, i) => [r.tcgplayer_product_id, i]),
+    );
+    matchedProductIds.sort((a, b) => {
+      const ia = orderedIds.get(a.productId) ?? Number.MAX_SAFE_INTEGER;
+      const ib = orderedIds.get(b.productId) ?? Number.MAX_SAFE_INTEGER;
+      return ia - ib;
+    });
+
+    const targets = matchedProductIds.slice(0, ROTATION_LIMIT);
+    const skipped = matchedProductIds.length - targets.length;
+    console.log(
+      `\nFetching sales for ${targets.length} stalest products${skipped > 0 ? ` (skipping ${skipped} fresh ones)` : ''}...`,
+    );
+
     let lastSoldFound = 0;
     let totalSalesStored = 0;
     let pendingLastSold: { card_id: string; last_sold_price: number; last_sold_date: string }[] = [];
+    let pendingSalesScraped: { tcgplayer_product_id: number; sales_scraped_at: string }[] = [];
     let pendingSales: {
       tcgplayer_product_id: number;
       sold_at: string;
@@ -687,7 +727,9 @@ async function main() {
       quantity: number;
     }[] = [];
     const FLUSH_SIZE = 500;
-    const batchSize = 5;
+    // Lower concurrency for stealth — 2 simultaneous fetches with longer
+    // jitter between batches is harder to fingerprint as a bot.
+    const batchSize = 2;
 
     async function flushPending() {
       if (pendingLastSold.length > 0) {
@@ -696,6 +738,24 @@ async function main() {
           .upsert(pendingLastSold, { onConflict: 'card_id' });
         if (error) console.error(`  Supabase last sold upsert error:`, error.message);
         pendingLastSold = [];
+      }
+      if (pendingSalesScraped.length > 0) {
+        // Update sales_scraped_at in parallel so rotation tracking is fast.
+        const updates = await Promise.all(
+          pendingSalesScraped.map(row =>
+            supabase
+              .from('card_prices')
+              .update({ sales_scraped_at: row.sales_scraped_at })
+              .eq('tcgplayer_product_id', row.tcgplayer_product_id),
+          ),
+        );
+        const failures = updates.filter(r => r.error);
+        if (failures.length > 0) {
+          console.error(
+            `  sales_scraped_at: ${failures.length}/${pendingSalesScraped.length} updates failed; first error: ${failures[0].error?.message}`,
+          );
+        }
+        pendingSalesScraped = [];
       }
       if (pendingSales.length > 0) {
         const { error } = await supabase
@@ -713,14 +773,20 @@ async function main() {
       }
     }
 
-    for (let i = 0; i < matchedProductIds.length; i += batchSize) {
-      const batch = matchedProductIds.slice(i, i + batchSize);
+    for (let i = 0; i < targets.length; i += batchSize) {
+      const batch = targets.slice(i, i + batchSize);
       const results = await Promise.all(
         batch.map(({ productId }) => fetchSales(productId))
       );
+      const now = new Date().toISOString();
       for (let j = 0; j < batch.length; j++) {
         const { cardId, productId } = batch[j];
         const sales = results[j];
+        // Always mark as attempted so rotation moves on, even if no sales returned.
+        pendingSalesScraped.push({
+          tcgplayer_product_id: productId,
+          sales_scraped_at: now,
+        });
         if (sales.length > 0) {
           pendingLastSold.push({
             card_id: cardId,
@@ -753,17 +819,17 @@ async function main() {
 
       if (i % 50 === 0 && i > 0) {
         process.stdout.write(
-          `  ${i}/${matchedProductIds.length} (${totalSalesStored} sales stored, ${fetchStats.rateLimited} 429s)\r`,
+          `  ${i}/${targets.length} (${totalSalesStored} sales stored, ${fetchStats.rateLimited} 429s)\r`,
         );
       }
-      // Jittered backoff between batches keeps us under TCGPlayer's rate limit.
-      // 5 concurrent × ~400ms/batch ≈ 12-15 req/sec sustained.
-      await sleep(300 + Math.random() * 200);
+      // Polite inter-batch jitter — 2 concurrent × pagination (~3-5 reqs) every
+      // 1.5-3s averages out to ~1-2 req/sec, well under any sane rate limit.
+      await sleep(1500 + Math.random() * 1500);
     }
 
     // Flush remaining
     await flushPending();
-    console.log(`  Found sales for ${lastSoldFound}/${matchedProductIds.length} products (${totalSalesStored} total sales stored)`);
+    console.log(`  Found sales for ${lastSoldFound}/${targets.length} products (${totalSalesStored} total sales stored)`);
     console.log(
       `  fetchSales: ok-pages=${fetchStats.ok}  rate-limited-retries=${fetchStats.rateLimited}  gave-up=${fetchStats.giveUp}  hard-errors=${fetchStats.error}`,
     );
@@ -775,9 +841,9 @@ async function main() {
         `  ⚠ Cookie is set but every authed response looked anonymous (totalResults <= 5). Cookie has likely expired — refresh TCGPLAYER_AUTH_COOKIE.`,
       );
     }
-    if (fetchStats.giveUp > matchedProductIds.length * 0.05) {
+    if (fetchStats.giveUp > targets.length * 0.05) {
       console.warn(
-        `  ⚠ ${fetchStats.giveUp} products gave up after retries — TCGPlayer is rate-limiting hard. Consider running from a residential IP.`,
+        `  ⚠ ${fetchStats.giveUp} products gave up after retries — TCGPlayer is rate-limiting hard. Consider lowering ROTATION_LIMIT or running from a residential IP.`,
       );
     }
   }
