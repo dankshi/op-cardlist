@@ -125,8 +125,6 @@ export default async function SetPage({ params }: PageProps) {
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-zinc-900">{shortName}</h1>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
-          <span className="font-mono text-zinc-700">{set.id.toUpperCase()}</span>
-          <span>·</span>
           <span>{set.cardCount} cards</span>
           {top10Value > 0 && (
             <>
