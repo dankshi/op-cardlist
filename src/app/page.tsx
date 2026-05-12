@@ -207,6 +207,7 @@ export default async function Home() {
               </svg>
             }
             cards={trendingCards}
+            showPrice
             showPriceChange
             priceChanges={priceChanges}
             viewAllHref="/hot"
@@ -236,6 +237,7 @@ export default async function Home() {
               </svg>
             }
             cards={dealCards}
+            showPrice
             showPriceChange
             priceChanges={dealPriceChanges}
             viewAllHref="/hot"
@@ -291,6 +293,7 @@ export default async function Home() {
               </svg>
             }
             cards={newReleaseCards}
+            showPrice
             viewAllHref={`/${newestSet.id}`}
           />
         </section>
