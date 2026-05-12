@@ -82,14 +82,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-const colorClasses: Record<string, string> = {
-  Red: "bg-red-500",
-  Green: "bg-green-500",
-  Blue: "bg-blue-500",
-  Purple: "bg-purple-500",
-  Black: "bg-zinc-600",
-  Yellow: "bg-yellow-500",
-};
 
 export default async function CardPage({ params }: PageProps) {
   const { cardId } = await params;
@@ -177,44 +169,11 @@ export default async function CardPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Card details */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-4">
-            <h3 className="text-xs font-semibold text-zinc-700 uppercase tracking-wide mb-3">Card Details</h3>
-            <div className="text-xs text-zinc-500 space-y-2">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-              {card.colors.map((color) => (
-                <span key={color} className="inline-flex items-center gap-1">
-                  <span className={`w-2 h-2 rounded-full ${colorClasses[color]}`} />
-                  {color}
-                </span>
-              ))}
-              <span>{card.type === "LEADER" ? "Life" : "Cost"} {card.type === "LEADER" ? (card.life ?? "-") : (card.cost ?? "-")}</span>
-              <span>Power {card.power?.toLocaleString() ?? "-"}</span>
-              {card.counter != null && <span>Counter +{card.counter.toLocaleString()}</span>}
-              {card.attribute && <span>{card.attribute}</span>}
-            </div>
-            {card.traits.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {card.traits.map((trait) => (
-                  <span key={trait} className="px-1.5 py-0.5 bg-zinc-100 rounded text-[11px]">{trait}</span>
-                ))}
-              </div>
-            )}
-            <p className="text-zinc-500 leading-relaxed">{card.effect || "No effect."}</p>
-            {card.trigger && (
-              <p><span className="text-amber-600 font-medium">Trigger:</span> {card.trigger}</p>
-            )}
-            <div className="flex items-center justify-between pt-2">
-              <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-                {card.price?.lowestPrice != null && <span>Low ${card.price.lowestPrice.toFixed(2)}</span>}
-                {card.price?.medianPrice != null && <span>Med ${card.price.medianPrice.toFixed(2)}</span>}
-                {card.price?.tcgplayerUrl && (
-                  <a href={card.price.tcgplayerUrl} target="_blank" rel="noopener noreferrer" className="hover:text-orange-500 transition-colors">TCGPlayer</a>
-                )}
-              </div>
-              <ShareButtons card={card} />
-            </div>
-          </div>
+          {/* Card details — hidden for now; restore from git if you need
+              the gameplay metadata (colors, power, traits, effect, trigger)
+              + TCGPlayer link + share buttons block. */}
+          <div className="flex justify-end">
+            <ShareButtons card={card} />
           </div>
         </div>
       </div>
