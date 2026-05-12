@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { getAllSets, getAllSetImages } from "@/lib/cards";
+import { getAllSets, getAllSetImages, getBrowsableCards } from "@/lib/cards";
 
 export const metadata: Metadata = {
   title: "All Sets",
@@ -13,9 +13,29 @@ function getSetShortName(fullName: string): string {
   return match ? match[1] : fullName;
 }
 
-export default function SetsPage() {
+function formatPrice(n: number): string {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export default async function SetsPage() {
   const sets = getAllSets();
   const setImages = getAllSetImages();
+  const allCards = await getBrowsableCards();
+
+  // Top 10 value per set (sum of top 10 cards in each set by market_price).
+  const top10BySet = new Map<string, number>();
+  const cardsBySet = new Map<string, number[]>();
+  for (const c of allCards) {
+    const p = c.price?.marketPrice;
+    if (p == null || p <= 0) continue;
+    const arr = cardsBySet.get(c.setId) ?? [];
+    arr.push(p);
+    cardsBySet.set(c.setId, arr);
+  }
+  for (const [setId, prices] of cardsBySet) {
+    prices.sort((a, b) => b - a);
+    top10BySet.set(setId, prices.slice(0, 10).reduce((s, p) => s + p, 0));
+  }
 
   // Newest releases first
   const sortedSets = [...sets].sort(
@@ -34,6 +54,7 @@ export default function SetsPage() {
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
         {sortedSets.map((set) => {
           const setImage = setImages[set.id];
+          const top10 = top10BySet.get(set.id);
           return (
             <Link
               key={set.id}
@@ -58,9 +79,11 @@ export default function SetsPage() {
                 <p className="text-zinc-500 text-xs mt-0.5 line-clamp-1">
                   {getSetShortName(set.name)}
                 </p>
-                <p className="text-zinc-400 text-[11px] mt-0.5">
-                  {set.cardCount} cards
-                </p>
+                {top10 != null && top10 > 0 && (
+                  <p className="text-sm font-bold text-zinc-900 mt-1 tabular-nums">
+                    {formatPrice(top10)}
+                  </p>
+                )}
               </div>
             </Link>
           );

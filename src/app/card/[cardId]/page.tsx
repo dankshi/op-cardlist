@@ -118,6 +118,8 @@ export default async function CardPage({ params }: PageProps) {
       <nav className="text-sm text-zinc-500 mb-6">
         <Link href="/" className="hover:text-zinc-900 transition-colors">Home</Link>
         <span className="mx-2">/</span>
+        <Link href="/sets" className="hover:text-zinc-900 transition-colors">Sets</Link>
+        <span className="mx-2">/</span>
         <Link href={`/${card.setId}`} className="hover:text-zinc-900 transition-colors">
           {card.setId.toUpperCase()}
         </Link>
@@ -275,6 +277,7 @@ export default async function CardPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(getBreadcrumbSchema([
             { name: "Home", url: SITE_URL },
+            { name: "Sets", url: `${SITE_URL}/sets` },
             { name: `${card.setId.toUpperCase()} Cards`, url: `${SITE_URL}/${card.setId}` },
             { name: card.name, url: `${SITE_URL}/card/${card.id.toLowerCase()}` },
           ])),

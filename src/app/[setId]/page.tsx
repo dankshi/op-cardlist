@@ -118,6 +118,10 @@ export default async function SetPage({ params }: PageProps) {
           Home
         </Link>
         <span className="mx-2">/</span>
+        <Link href="/sets" className="hover:text-zinc-900 transition-colors">
+          Sets
+        </Link>
+        <span className="mx-2">/</span>
         <span className="text-zinc-900">{set.id.toUpperCase()}</span>
       </nav>
 
@@ -141,6 +145,7 @@ export default async function SetPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(getBreadcrumbSchema([
             { name: "Home", url: SITE_URL },
+            { name: "Sets", url: `${SITE_URL}/sets` },
             { name: `${set.id.toUpperCase()} Card List`, url: `${SITE_URL}/${set.id}` },
           ])),
         }}
