@@ -72,20 +72,23 @@ export default async function SetsPage() {
                   />
                 </div>
               )}
-              <div className="p-2 text-center">
-                <h3 className="font-semibold text-sm group-hover:text-orange-500 transition-colors">
-                  {set.id.toUpperCase()}
-                </h3>
-                <p className="text-zinc-500 text-xs mt-0.5 line-clamp-1">
+              <div className="p-3 text-center">
+                {/* Set identity — secondary */}
+                <h3 className="font-semibold text-sm text-zinc-900 group-hover:text-orange-500 transition-colors line-clamp-1">
                   {getSetShortName(set.name)}
+                </h3>
+                <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                  {set.id.toUpperCase()}
                 </p>
+
+                {/* Top 10 value — the standout */}
                 {top10 != null && top10 > 0 && (
-                  <div className="mt-1">
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium">
-                      Top 10 value
-                    </p>
-                    <p className="text-sm font-bold text-zinc-900 tabular-nums">
+                  <div className="mt-2 pt-2 border-t border-zinc-100">
+                    <p className="text-lg font-bold text-zinc-900 tabular-nums leading-none">
                       {formatPrice(top10)}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-400 mt-1">
+                      Top 10 value
                     </p>
                   </div>
                 )}
