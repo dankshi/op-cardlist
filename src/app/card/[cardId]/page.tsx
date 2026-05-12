@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCardById, getParallelCards } from "@/lib/cards";
 import { getCardSales, getCardGradedSales, getCardPopulations, calculatePriceChange } from "@/lib/price-history";
+import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
 import { CardThumbnail } from "@/components/card/CardThumbnail";
@@ -91,12 +92,23 @@ export default async function CardPage({ params }: PageProps) {
     notFound();
   }
 
-  const [sales, gradedSales, populations, priceChange] = await Promise.all([
+  const supabase = await createClient();
+  const [sales, gradedSales, populations, priceChange, listingAgg] = await Promise.all([
     getCardSales(card.id, 90),
     getCardGradedSales(card.id, 90),
     getCardPopulations(card.id),
     calculatePriceChange(card.id, card.price?.marketPrice ?? null, 7),
+    // Cheapest active Nomi listing + total active count.
+    supabase
+      .from("listings")
+      .select("price", { count: "exact" })
+      .eq("card_id", card.id)
+      .eq("status", "active")
+      .order("price", { ascending: true })
+      .limit(1),
   ]);
+  const lowestListingPrice = listingAgg.data?.[0]?.price ?? null;
+  const activeListingCount = listingAgg.count ?? 0;
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
   const relatedCards = parallelCards.filter(c => c.id !== card.id);
 
@@ -143,18 +155,53 @@ export default async function CardPage({ params }: PageProps) {
           </div>
           <h1 className="text-2xl font-bold text-zinc-900 mb-3">{card.name}</h1>
 
-          {/* Price */}
-          {card.price?.marketPrice != null && (
-            <div className="flex items-baseline gap-3 mb-4">
-              <span className="text-3xl font-bold text-zinc-900">
-                ${card.price.marketPrice.toFixed(2)}
-              </span>
-              {priceChange && (
-                <PriceChangeBadge changePercent={priceChange.changePercent} size="sm" />
-              )}
-              <span className="text-xs text-zinc-400">TCGPlayer Market</span>
-            </div>
-          )}
+          {/* Price block — Nomi-first, market price as reference.
+              If the card is listed on Nomi, the buy price is the headline.
+              Otherwise we say "not currently listed" and show market for context. */}
+          <div className="mb-4">
+            {lowestListingPrice != null ? (
+              <>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  {activeListingCount > 1 && (
+                    <span className="text-sm text-zinc-500">from</span>
+                  )}
+                  <span className="text-3xl font-bold text-zinc-900">
+                    ${Number(lowestListingPrice).toFixed(2)}
+                  </span>
+                  <span className="text-sm font-semibold text-orange-500">on Nomi</span>
+                  {activeListingCount > 1 && (
+                    <span className="text-xs text-zinc-400">
+                      ({activeListingCount} listings)
+                    </span>
+                  )}
+                </div>
+                {card.price?.marketPrice != null && (
+                  <div className="flex items-baseline gap-2 mt-1 text-sm text-zinc-500">
+                    <span className="tabular-nums">${card.price.marketPrice.toFixed(2)}</span>
+                    <span className="text-xs text-zinc-400">TCGPlayer market</span>
+                    {priceChange && (
+                      <PriceChangeBadge changePercent={priceChange.changePercent} size="sm" />
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-medium text-zinc-700">
+                  Not currently listed on Nomi
+                </p>
+                {card.price?.marketPrice != null && (
+                  <div className="flex items-baseline gap-2 mt-1 text-sm text-zinc-500">
+                    <span className="tabular-nums">${card.price.marketPrice.toFixed(2)}</span>
+                    <span className="text-xs text-zinc-400">TCGPlayer market</span>
+                    {priceChange && (
+                      <PriceChangeBadge changePercent={priceChange.changePercent} size="sm" />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Marketplace section */}
           <div className="rounded-xl border border-zinc-200 bg-white p-4 mb-5">
