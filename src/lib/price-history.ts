@@ -298,32 +298,31 @@ export interface PopulationBucket {
 /**
  * Get the population (census) counts for a card, grouped by grading company.
  * Returns { PSA: [...], BGS: [...], ... } — companies with no data omitted.
+ *
+ * Reads from per-company pops_<company> tables. Today only pops_psa
+ * exists; add pops_bgs / pops_cgc / pops_tag here as they're built.
  */
 export async function getCardPopulations(
   cardId: string,
 ): Promise<Partial<Record<GradeCompany, PopulationBucket[]>>> {
   if (!supabase) return {};
 
-  const { data: rows } = await supabase
-    .from('card_grade_populations')
-    .select('company, grade, count')
-    .eq('card_id', cardId);
+  const { data: psaRow } = await supabase
+    .from('pops_psa')
+    .select('grade_10, grade_9, grade_8, grade_7')
+    .eq('card_id', cardId)
+    .maybeSingle();
 
-  if (!rows || rows.length === 0) return {};
+  if (!psaRow) return {};
 
-  const result: Partial<Record<GradeCompany, PopulationBucket[]>> = {};
-  for (const r of rows) {
-    const company = r.company as GradeCompany;
-    if (!result[company]) result[company] = [];
-    result[company]!.push({ grade: r.grade, count: Number(r.count) });
-  }
+  const psa: PopulationBucket[] = [
+    { grade: '10', count: Number(psaRow.grade_10 ?? 0) },
+    { grade: '9',  count: Number(psaRow.grade_9  ?? 0) },
+    { grade: '8',  count: Number(psaRow.grade_8  ?? 0) },
+    { grade: '7',  count: Number(psaRow.grade_7  ?? 0) },
+  ];
 
-  // Sort each company's grades high → low (PSA-style ordering)
-  for (const company of Object.keys(result) as GradeCompany[]) {
-    result[company]!.sort((a, b) => parseFloat(b.grade) - parseFloat(a.grade));
-  }
-
-  return result;
+  return { PSA: psa };
 }
 
 /**

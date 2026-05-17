@@ -22,7 +22,6 @@ const DEFAULT_BUCKETS: Record<Company, PopulationBucket[]> = {
   PSA: [
     { grade: '10', count: null },
     { grade: '9', count: null },
-    { grade: '8.5', count: null },
     { grade: '8', count: null },
   ],
   BGS: [

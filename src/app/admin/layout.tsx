@@ -12,6 +12,12 @@ const NAV_SECTIONS: { heading: string; items: { href: string; label: string }[] 
       { href: '/admin/intake/issues', label: 'Issues' },
     ],
   },
+  {
+    heading: 'Data Quality',
+    items: [
+      { href: '/admin/psa-pops', label: 'PSA Pop Mappings' },
+    ],
+  },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
