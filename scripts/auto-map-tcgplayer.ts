@@ -110,18 +110,42 @@ function matchesVariant(card: CardRow, product: TcgProductRow): boolean {
   if (card.art_style === 'manga') return has('(manga)');
   // Wanted Poster art style: name should have "(Wanted Poster)".
   if (card.art_style === 'wanted') return has('(wanted poster)');
-  // Alternate art: name should have "(Parallel)" or "(Alternate Art)"
-  // but NOT carry any of the more-specific variant markers.
+
+  // Alternate art has special handling for PRB (Premium Booster) reprint
+  // collections. PRB-XX sets re-issue cards from many older sets, and
+  // Bandai marks variants like `_p1`/`_r1` while TCGplayer labels each
+  // listing with its own suffix — `(Alternate Art)`, `(Pirate Foil)`,
+  // or `(Reprint)`. The convention:
+  //   `_p*` suffix → match any non-Reprint variant (Alt Art OR Pirate Foil)
+  //   `_r*` suffix → match the `(Reprint)` variant
+  // For non-PRB sets, fall back to the standard Alt Art rule (just
+  // `(Parallel)` / `(Alternate Art)` markers, no Pirate Foil etc.).
   if (card.art_style === 'alternate') {
+    const isPRB = card.set_id?.startsWith('prb-') ?? false;
+
+    if (isPRB) {
+      const isPVariant = /_p\d+$/i.test(card.id);
+      const isRVariant = /_r\d+$/i.test(card.id);
+      if (isRVariant) return has('(reprint)');
+      if (isPVariant) {
+        const isNonReprintAlt = has('(alternate art)') || has('(parallel)') || has('(pirate foil)');
+        const isOtherSpecial = has('(manga)') || has('(sp)') || has('(tr)') ||
+                               has('(super alternate art)') || has('(wanted poster)') || has('(reprint)');
+        return isNonReprintAlt && !isOtherSpecial;
+      }
+      // No suffix on a PRB card (base) — fall through to standard rule.
+    }
+
     const isAA = has('(parallel)') || has('(alternate art)');
     const isSpecial = has('(manga)') || has('(sp)') || has('(tr)') ||
                       has('(super alternate art)') || has('(wanted poster)');
     return isAA && !isSpecial;
   }
+
   // Standard (base) card: name should have NO variant markers.
   const hasAnyMarker = has('(parallel)') || has('(alternate art)') || has('(manga)') ||
                        has('(sp)') || has('(tr)') || has('(super alternate art)') ||
-                       has('(wanted poster)');
+                       has('(wanted poster)') || has('(pirate foil)') || has('(reprint)');
   return !hasAnyMarker;
 }
 
