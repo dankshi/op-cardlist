@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSetBySlug, getAllSets, HIDDEN_RARITIES } from "@/lib/cards";
+import { getSetBySlug, getAllSets, isHiddenCard } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
 import { calculateBatchPriceChanges } from "@/lib/price-history";
 import { SITE_URL, SITE_NAME, getSetKeywords, getSetShortName, getBreadcrumbSchema } from "@/lib/seo";
@@ -137,7 +137,7 @@ export default async function SetPage({ params }: PageProps) {
       </header>
 
       {/* Card Grid with Filters */}
-      <CardGrid cards={set.cards.filter(c => !HIDDEN_RARITIES.has(c.rarity))} setId={set.id} priceChanges={priceChanges} />
+      <CardGrid cards={set.cards.filter(c => !isHiddenCard(c))} setId={set.id} priceChanges={priceChanges} />
 
       {/* BreadcrumbList Schema */}
       <script

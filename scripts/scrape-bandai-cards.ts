@@ -173,6 +173,14 @@ function detectArtStyle(cardId: string, imageUrl: string, variant: string | unde
     return 'standard';
   }
 
+  // _r* suffix = Reprint (Premium Booster sets only). It's a re-issue of
+  // the base card with the same original artwork — not a new alt art.
+  // Bandai uses the suffix to disambiguate the printing, but the art is
+  // identical to the base. Only appears in prb-XX sets.
+  if (variant && /^r\d+$/i.test(variant)) {
+    return 'standard';
+  }
+
   // Check against known wanted poster cards
   if (WANTED_CARDS.has(cardId)) {
     return 'wanted';

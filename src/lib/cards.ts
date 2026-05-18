@@ -237,18 +237,30 @@ export async function getSetBySlug(slug: string): Promise<CardSet | undefined> {
   return setWithMergedPrices(set, prices);
 }
 
-/** Rarities excluded from browsing surfaces (too low value for marketplace). */
-export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R']);
+/** Base rarities we don't sell standard prints of. Their alt arts, manga
+ *  variants, and wanted-poster variants are still sellable — see
+ *  `isHiddenCard()`. Higher rarities (SP, TR, SEC, L) are always shown. */
+export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R', 'P', 'SR']);
+
+/** A card is hidden from browse/search/set surfaces if it's a low-rarity
+ *  *standard* print. Alternate arts (Premium Booster AAs, manga variants,
+ *  wanted-poster art) of the same base card stay visible — those are
+ *  pull-rate variants with real market value even when the base rarity
+ *  letter is R/UC/C. */
+export function isHiddenCard(card: Card): boolean {
+  return HIDDEN_RARITIES.has(card.rarity) && (card.artStyle ?? 'standard') === 'standard';
+}
 
 export async function getAllCards(): Promise<Card[]> {
   const [cards, prices] = await Promise.all([fetchCardRows(), fetchPrices()]);
   return cards.map(card => mergePrice(card, prices));
 }
 
-/** All cards excluding C/UC/R — used for browsing, search, and carousels. */
+/** All cards excluding low-rarity standard prints — used for browsing,
+ *  search, and carousels. Alt arts / manga / wanted variants stay in. */
 export async function getBrowsableCards(): Promise<Card[]> {
   const all = await getAllCards();
-  return all.filter(card => !HIDDEN_RARITIES.has(card.rarity));
+  return all.filter(card => !isHiddenCard(card));
 }
 
 export async function getCardById(cardId: string): Promise<Card | undefined> {
@@ -315,7 +327,7 @@ export async function searchCards(query: string, nameOnly = false): Promise<Card
   const matcher = nameOnly ? tokenMatchesCardName : tokenMatchesCard;
   const [allCards, setNameLookup] = await Promise.all([getAllCards(), fetchSetNameLookup()]);
   return allCards
-    .filter(card => !HIDDEN_RARITIES.has(card.rarity))
+    .filter(card => !isHiddenCard(card))
     .filter(card => searchTokens.every(token => matcher(token, card, setNameLookup)))
     .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0));
 }

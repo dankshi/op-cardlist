@@ -1,6 +1,6 @@
-/* eslint-disable @next/next/no-img-element */
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { HoverThumb } from '@/components/admin/HoverThumb'
 
 export const dynamic = 'force-dynamic'
 
@@ -156,9 +156,7 @@ export default async function PSAPopsAdminPage() {
                     <tr key={r.spec_id} className="border-t border-zinc-100">
                       <td className="px-3 py-2 w-20">
                         {card?.image_url ? (
-                          <a href={card.image_url} target="_blank" rel="noreferrer">
-                            <img src={card.image_url} alt={r.card_id ?? ''} className="w-16 rounded border border-zinc-200 hover:opacity-80" />
-                          </a>
+                          <HoverThumb src={card.image_url} alt={r.card_id ?? ''} className="w-16 rounded border border-zinc-200" />
                         ) : <span className="text-zinc-300 text-xs">no img</span>}
                       </td>
                       <td className="px-3 py-2">

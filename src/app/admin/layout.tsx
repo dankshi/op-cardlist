@@ -17,6 +17,7 @@ const NAV_SECTIONS: { heading: string; items: { href: string; label: string }[] 
     items: [
       { href: '/admin/mappings', label: 'TCGplayer Mappings' },
       { href: '/admin/psa-pops', label: 'PSA Pop Mappings' },
+      { href: '/admin/visibility', label: 'Card Visibility' },
     ],
   },
 ]

@@ -86,6 +86,26 @@ function bandaiNumber(cardId: string): string {
   return cardId.split('_')[0];
 }
 
+// Variant ordering for PRB _p* tie-breaking. When a card has multiple
+// non-Reprint TCGplayer candidates, the lowest Bandai _p# claims the
+// highest-priority variant. Empirically:
+//   PRB-02: _p2 → Pirate Foil, _p3 → Alt Art, _p4 → Manga (rare)
+//   PRB-01: _p2 → Jolly Roger Foil, _p3 → Alt Art (or Textured Foil)
+// Lower priority number = claimed first.
+function variantPriority(product: TcgProductRow): number {
+  const name = product.product_name.toLowerCase();
+  // Foil-treatment variants (same art as base) — claimed by lowest _p#.
+  if (name.includes('(pirate foil)')) return 1;
+  if (name.includes('(jolly roger foil)')) return 1;
+  // New-art variants.
+  if (name.includes('(parallel)') || name.includes('(alternate art)')) return 2;
+  if (name.includes('(textured foil)')) return 3;
+  if (name.includes('(manga)')) return 4;
+  if (name.includes('(wanted poster)')) return 5;
+  if (name.includes('(sp)') || name.includes('(super alternate art)')) return 6;
+  return 99;
+}
+
 // Test a candidate TCGplayer product against the card's expected variant.
 // Returns true if the product is a possible match for this card_id; the
 // caller still applies the "exactly one candidate" rule.
@@ -98,30 +118,58 @@ function matchesVariant(card: CardRow, product: TcgProductRow): boolean {
   // can be labeled (Alternate Art), an SR card can be labeled (Manga),
   // and so on. The _p*/_r* suffix is the truth for these. Standard
   // SP/TR/rarity rules apply to non-PRB cards below.
+
+  // PRB-01: suffix-aligned convention (the _p# number directly
+  // determines the variant type, regardless of what other suffixes
+  // exist for the card).
+  //   _p2 → (Jolly Roger Foil)
+  //   _p3 → (Alternate Art) / (Parallel) / (Textured Foil)
+  //   _p4+ → manual (Full Art, Gold, and other one-off markers don't
+  //          follow a predictable suffix pattern)
+  //   _r* → (Reprint)
+  if (card.set_id === 'prb-01') {
+    const pMatch = card.id.match(/_p(\d+)$/i);
+    if (/_r\d+$/i.test(card.id)) return has('(reprint)');
+    if (pMatch) {
+      const pNum = parseInt(pMatch[1], 10);
+      if (pNum === 2) return has('(jolly roger foil)');
+      if (pNum === 3) return has('(parallel)') || has('(alternate art)') || has('(textured foil)');
+      return false; // _p4+ need manual assignment
+    }
+    // base card (no suffix) falls through to standard logic below
+  }
+
+  // PRB-02 (and any future PRB-XX with similar conventions): positional
+  // matching — accept any non-Reprint variant marker, then variantPriority
+  // + claim tracking pairs lowest _p# with highest-priority variant.
   if (card.set_id?.startsWith('prb-')) {
     const isPVariant = /_p\d+$/i.test(card.id);
     const isRVariant = /_r\d+$/i.test(card.id);
     if (isRVariant) return has('(reprint)');
     if (isPVariant) {
-      const isAA = has('(parallel)') || has('(alternate art)') ||
-                   has('(manga)') || has('(pirate foil)') ||
-                   has('(sp)') || has('(super alternate art)');
-      const isReprint = has('(reprint)');
-      return isAA && !isReprint;
+      const isAcceptedMarker =
+        has('(parallel)') || has('(alternate art)') ||
+        has('(pirate foil)') || has('(manga)') ||
+        has('(sp)') || has('(super alternate art)');
+      const isExcluded = has('(reprint)') || has('(full art)') || has('(gold)');
+      return isAcceptedMarker && !isExcluded;
     }
     // base card (no suffix) falls through to standard logic below
   }
 
-  // SP / TR rarity is unreliable on TCGplayer's side — they typically
-  // tag those products with the underlying card's rarity (e.g., a SP
-  // Rebecca card with base rarity SR shows up as rarity='SR' on TCG).
-  // Trust the name marker for these, and check those FIRST so the
-  // generic rarity gate below doesn't reject the match.
+  // SP / TR rarity is ambiguous on TCGplayer's side:
+  //   - In PRB reprint sets (handled above), SP/TR is a *pull-rate* slot
+  //     applied to a card whose base rarity is different (e.g. a SR
+  //     Rebecca becomes a SP). TCGplayer lists those with the base rarity
+  //     in the column and adds a "(SP)" / "(Treasure Rare)" name marker.
+  //   - In normal booster sets, SP/TR is the card's actual rarity.
+  //     TCGplayer puts SP/TR in the rarity column and adds no marker.
+  // Accept either form: rarity-column match OR explicit name marker.
   if (card.rarity === 'SP') {
-    return has('(sp)') || has('(super alternate art)');
+    return product.rarity === 'SP' || has('(sp)') || has('(super alternate art)');
   }
   if (card.rarity === 'TR') {
-    return has('(tr)') || has('(treasure rare)');
+    return product.rarity === 'TR' || has('(tr)') || has('(treasure rare)');
   }
 
   // Rarity gate for non-SP/TR — when both sides have it, must match.
@@ -132,6 +180,9 @@ function matchesVariant(card: CardRow, product: TcgProductRow): boolean {
   if (card.art_style === 'wanted') return has('(wanted poster)');
 
   // Standard Alt Art rule (PRB _p*/_r* already handled at top of function).
+  // Strictly accepts (Parallel) / (Alternate Art) and rejects (Manga) —
+  // manga variants of unknown cards need to be set manually because
+  // there's no reliable signal from the Bandai scraper alone.
   if (card.art_style === 'alternate') {
     const isAA = has('(parallel)') || has('(alternate art)');
     const isSpecial = has('(manga)') || has('(sp)') || has('(tr)') ||
@@ -210,6 +261,18 @@ async function main() {
     return a.id.localeCompare(b.id);
   });
 
+  // PRB-01 cards with _p4 or higher suffixes break the standard
+  // suffix-aligned rule (_p2=JRF, _p3=AA) — when extra variants exist
+  // the conventional mapping shifts (e.g. _p3 might be JRF instead of
+  // _p2). Skip auto-matching for the WHOLE card_number in those cases
+  // and force manual assignment via the admin UI.
+  const prb01SkipNumbers = new Set<string>();
+  for (const c of cards) {
+    if (c.set_id === 'prb-01' && /_p([4-9]|\d{2,})$/i.test(c.id)) {
+      prb01SkipNumbers.add(bandaiNumber(c.id));
+    }
+  }
+
   for (const card of sortedCards) {
     const tcgSetNames = SET_NAME_MAP[card.set_id];
     if (!tcgSetNames || tcgSetNames.length === 0) {
@@ -218,6 +281,13 @@ async function main() {
     }
 
     const bandai = bandaiNumber(card.id);
+
+    // Skip PRB-01 cards whose card_number has _p4+ siblings — convention
+    // is unreliable, leave for manual assignment.
+    if (card.set_id === 'prb-01' && prb01SkipNumbers.has(bandai)) {
+      stats.ambiguous++;
+      continue;
+    }
     // Pool: every TCGplayer product in any of this Bandai set's slugs at
     // the right card_number.
     const pool: TcgProductRow[] = [];
@@ -239,18 +309,31 @@ async function main() {
     if (unclaimed.length === 1) {
       winner = unclaimed[0];
     } else {
-      // Multi-candidate fallback for PRB _p* cards: TCGplayer lists
-      // multiple non-Reprint variants per card_number (Alt Art + Pirate
-      // Foil + Manga), and Bandai has matching _p1/_p2/_p3 variants in
-      // our DB. Sort both by natural order — TCGplayer products by
-      // product_id ascending, our cards by id (so _p1 comes before _p2).
-      // Combined with claim tracking, this pairs them positionally:
-      // lowest-numbered _p variant claims the lowest-product-id variant
-      // first, leaving higher-numbered variants for higher product_ids.
+      // Multi-candidate fallback for PRB _p* cards only: TCGplayer lists
+      // multiple non-Reprint variants per card_number (Pirate Foil + Alt
+      // Art + Manga + etc.) and Bandai uses _p1/_p2/_p3 to distinguish.
+      //
+      // Convention discovered empirically: the LOWEST _p# claims the
+      // highest-priority variant first — (Pirate Foil) for C/UC where it
+      // exists, then (Alternate Art) / (Parallel), then (Manga), then
+      // others. Sorting by TCGplayer product_id is unreliable (e.g.
+      // ST18-001 has AA at a lower product_id than PF, OP07-040 has them
+      // reversed). variantPriority + claim tracking + sorted card order
+      // gives the right pairing.
+      //
+      // Non-PRB sets (OP15-EB04 etc.) are intentionally NOT covered here
+      // because the matcher's strict alt-art rule rejects (Manga) markers,
+      // leaving _p2 manga variants unmatched. Those are set manually since
+      // there are only a handful per set.
       const isPRB = card.set_id?.startsWith('prb-') ?? false;
       const isPVariant = /_p\d+$/i.test(card.id);
       if (isPRB && isPVariant) {
-        winner = [...unclaimed].sort((a, b) => a.product_id - b.product_id)[0];
+        winner = [...unclaimed].sort((a, b) => {
+          const pa = variantPriority(a);
+          const pb = variantPriority(b);
+          if (pa !== pb) return pa - pb;
+          return a.product_id - b.product_id;
+        })[0];
       } else {
         stats.ambiguous++;
         continue;
@@ -308,6 +391,47 @@ async function main() {
     }
   }
   console.log(`\nUpserted ${toWrite.length} mappings into card_tcgplayer_mapping.`);
+
+  // 7. Derive art_style from the mapped TCGplayer product name. The
+  // product marker is the most reliable signal we have for variant type:
+  //   `(Pirate Foil)` / `(Jolly Roger Foil)` / `(Reprint)` → standard
+  //                                                  (same art as base)
+  //   `(Alternate Art)` / `(Parallel)` / `(Textured Foil)` → alternate
+  //                                                  (new artwork)
+  //   `(Manga)`                         → manga
+  //   `(Wanted Poster)`                 → wanted
+  // Anything else (no marker, or markers like (SP) which are rarity
+  // labels not art changes) leaves art_style untouched. This is
+  // bidirectional — if a card's mapping changes from PF to AA in a
+  // re-run, art_style flips accordingly.
+  console.log('\nDeriving art_style from product names...');
+  const updates: { id: string; art_style: string }[] = [];
+  for (const row of toWrite) {
+    const name = (row.tcgplayer_name ?? '').toLowerCase();
+    let derived: string | null = null;
+    if (name.includes('(pirate foil)') || name.includes('(jolly roger foil)') || name.includes('(reprint)')) derived = 'standard';
+    else if (name.includes('(manga)')) derived = 'manga';
+    else if (name.includes('(wanted poster)')) derived = 'wanted';
+    else if (name.includes('(parallel)') || name.includes('(alternate art)') || name.includes('(textured foil)')) derived = 'alternate';
+    if (!derived) continue;
+    const card = cards.find(c => c.id === row.card_id);
+    if (card && card.art_style !== derived) updates.push({ id: row.card_id, art_style: derived });
+  }
+  if (updates.length === 0) {
+    console.log('  No art_style corrections needed.');
+  } else {
+    let fixed = 0;
+    for (let i = 0; i < updates.length; i += 20) {
+      const chunk = updates.slice(i, i + 20);
+      const results = await Promise.all(chunk.map(u =>
+        supabase.from('cards').update({ art_style: u.art_style }).eq('id', u.id),
+      ));
+      const fails = results.filter(r => r.error);
+      if (fails.length > 0) console.error(`  batch ${i}: ${fails.length} failed; first:`, fails[0].error?.message);
+      fixed += chunk.length - fails.length;
+    }
+    console.log(`  Updated art_style on ${fixed} cards.`);
+  }
 }
 
 main().catch(err => {

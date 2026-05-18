@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase, type MappingSubmission } from '@/lib/supabase';
+import { createClient as createServerSupabase } from '@/lib/supabase/server';
 
 // GET /api/mappings - Get all mappings (approved only for public, all for admin)
 export async function GET(request: Request) {
@@ -67,10 +68,53 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const submissions: MappingSubmission[] = Array.isArray(body) ? body : [body];
-    const submittedBy = body.submittedBy || 'anonymous';
 
     if (submissions.length === 0) {
       return NextResponse.json({ error: 'No mappings provided' }, { status: 400 });
+    }
+
+    // Backfill tcgName/tcgUrl from our products table when the client only
+    // sent a product_id (the URL-pasted manual fallback path). Lets the
+    // admin assign without typing the name; if the product isn't in our
+    // table yet, we keep whatever the client sent.
+    for (const sub of submissions) {
+      if (sub.tcgName && sub.tcgUrl) continue;
+      const { data: prod } = await supabase
+        .from('tcgplayer_products')
+        .select('product_name, product_url_name')
+        .eq('product_id', sub.tcgProductId)
+        .maybeSingle();
+      if (prod) {
+        sub.tcgName = sub.tcgName || prod.product_name || `product ${sub.tcgProductId}`;
+        sub.tcgUrl = sub.tcgUrl || (prod.product_url_name
+          ? `https://www.tcgplayer.com/product/${sub.tcgProductId}/${prod.product_url_name}`
+          : `https://www.tcgplayer.com/product/${sub.tcgProductId}`);
+      } else {
+        sub.tcgName = sub.tcgName || `product ${sub.tcgProductId}`;
+        sub.tcgUrl = sub.tcgUrl || `https://www.tcgplayer.com/product/${sub.tcgProductId}`;
+      }
+    }
+
+    // Resolve the acting admin from the auth cookie so audit columns
+    // (submitted_by / mapped_by) record who actually clicked Assign.
+    // Falls back to body.submittedBy or 'anonymous' if there's no
+    // authenticated user (e.g. the legacy /test page POSTing before).
+    const serverSupabase = await createServerSupabase();
+    const { data: { user } } = await serverSupabase.auth.getUser();
+    let submittedBy = body.submittedBy || 'anonymous';
+    if (user) {
+      const { data: profile } = await serverSupabase
+        .from('profiles')
+        .select('display_name, username, is_admin')
+        .eq('id', user.id)
+        .single();
+      if (profile?.is_admin) {
+        submittedBy = profile.display_name || profile.username || user.email || user.id;
+      } else if (profile) {
+        // Authenticated but not admin — reject; only admins should be
+        // changing TCGplayer mappings.
+        return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      }
     }
 
     // 1. Save to card_mappings (audit trail)
@@ -132,6 +176,24 @@ export async function POST(request: Request) {
     if (priceError) {
       console.error('Supabase error (tcgplayer_card_prices):', priceError);
       // Don't fail — card_tcgplayer_mapping already saved
+    }
+
+    // 4. Derive cards.art_style from the mapped product name. Mirrors the
+    //    post-mapping correction step in scripts/auto-map-tcgplayer.ts so a
+    //    manual assignment immediately reflects the right art_style (e.g.
+    //    assigning a JRF/Pirate Foil/Reprint product flips a card to
+    //    'standard', which the isHiddenCard filter then drops from
+    //    /admin/mappings and the public site).
+    for (const sub of submissions) {
+      const name = (sub.tcgName ?? '').toLowerCase();
+      let derived: string | null = null;
+      if (name.includes('(pirate foil)') || name.includes('(jolly roger foil)') || name.includes('(reprint)')) derived = 'standard';
+      else if (name.includes('(manga)')) derived = 'manga';
+      else if (name.includes('(wanted poster)')) derived = 'wanted';
+      else if (name.includes('(parallel)') || name.includes('(alternate art)') || name.includes('(textured foil)')) derived = 'alternate';
+      if (!derived) continue;
+      const { error: artError } = await supabase.from('cards').update({ art_style: derived }).eq('id', sub.cardId);
+      if (artError) console.error(`Failed to update art_style for ${sub.cardId}:`, artError.message);
     }
 
     return NextResponse.json({

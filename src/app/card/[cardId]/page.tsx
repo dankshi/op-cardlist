@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCardById, getParallelCards } from "@/lib/cards";
+import { getCardById, getParallelCards, isHiddenCard } from "@/lib/cards";
 import { getCardSales, getCardGradedSales, getCardPopulations, getCardPsaInfo, calculatePriceChange } from "@/lib/price-history";
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
@@ -125,7 +125,10 @@ export default async function CardPage({ params }: PageProps) {
   const lowestListingPrice = listingAgg.data?.[0]?.price ?? null;
   const activeListingCount = listingAgg.count ?? 0;
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
-  const relatedCards = parallelCards.filter(c => c.id !== card.id);
+  // Drop self + any hidden variants (base C/UC/R/P/SR standards we don't
+  // sell). The current card stays visible even if hidden, since the user
+  // navigated here directly.
+  const relatedCards = parallelCards.filter(c => c.id !== card.id && !isHiddenCard(c));
 
   // Bandai's official cardlist page. Each card on the page is an HTML
   // element with id={cardId}, so the fragment jumps directly to the row.
