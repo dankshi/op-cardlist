@@ -38,6 +38,10 @@ function rowToCard(row: Record<string, unknown>): Card {
   };
 }
 
+// Note: mapping fields (tcgplayerProductId, tcgplayerUrl, tcgplayerProductName)
+// are now sourced from card_tcgplayer_mapping in fetchPrices() below,
+// not from the price row. This function returns them as null; fetchPrices
+// overlays them from the mapping join.
 function rowToCardPrice(row: Record<string, unknown>): CardPrice {
   return {
     marketPrice: (row.market_price as number) ?? null,
@@ -47,9 +51,9 @@ function rowToCardPrice(row: Record<string, unknown>): CardPrice {
     lastSoldPrice: (row.last_sold_price as number) ?? null,
     lastSoldDate: (row.last_sold_date as string) ?? null,
     lastUpdated: (row.updated_at as string) ?? null,
-    tcgplayerUrl: (row.tcgplayer_url as string) ?? null,
-    tcgplayerProductId: (row.tcgplayer_product_id as number) ?? null,
-    tcgplayerProductName: (row.tcgplayer_product_name as string) ?? null,
+    tcgplayerUrl: null,
+    tcgplayerProductId: null,
+    tcgplayerProductName: null,
   };
 }
 

@@ -157,10 +157,12 @@ async function main() {
     byProductId.set(p.product_id, p);
   }
 
-  // 3. Load existing card_prices mappings (for conflict detection).
-  console.log('Loading existing card_prices mappings...');
+  // 3. Load existing mappings from card_tcgplayer_mapping (for conflict
+  //    detection — if auto-match picks a different product than what's
+  //    already there, flag source='review' instead of overwriting silently).
+  console.log('Loading existing card_tcgplayer_mapping rows...');
   const existing = await paginated<{ card_id: string; tcgplayer_product_id: number | null }>((from, to) =>
-    supabase.from('tcgplayer_card_prices').select('card_id, tcgplayer_product_id').not('tcgplayer_product_id', 'is', null).range(from, to),
+    supabase.from('card_tcgplayer_mapping').select('card_id, tcgplayer_product_id').range(from, to),
   );
   const existingMap = new Map<string, number>();
   for (const e of existing) {

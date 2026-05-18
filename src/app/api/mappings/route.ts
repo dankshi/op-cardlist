@@ -116,16 +116,13 @@ export async function POST(request: Request) {
       // Don't fail — card_mappings (legacy audit) already saved
     }
 
-    // 3. Also write a stub row to card_prices so the scraper has a row to
-    //    UPDATE prices into. Mapping cols are kept-but-unused here until
-    //    Migration D strips them.
+    // 3. Stub a row in tcgplayer_card_prices with the submitted price so
+    //    the card has a price row before the next scrape runs. Mapping
+    //    cols moved to card_tcgplayer_mapping (written above); only the
+    //    price columns live here now.
     const priceRows = submissions.map(sub => ({
       card_id: sub.cardId,
-      tcgplayer_product_id: sub.tcgProductId,
-      tcgplayer_url: sub.tcgUrl,
       market_price: sub.price ?? null,
-      manually_mapped: true,
-      mapped_by: submittedBy,
     }));
 
     const { error: priceError } = await supabase
@@ -133,7 +130,7 @@ export async function POST(request: Request) {
       .upsert(priceRows, { onConflict: 'card_id' });
 
     if (priceError) {
-      console.error('Supabase error (card_prices):', priceError);
+      console.error('Supabase error (tcgplayer_card_prices):', priceError);
       // Don't fail — card_tcgplayer_mapping already saved
     }
 

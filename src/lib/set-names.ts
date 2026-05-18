@@ -19,5 +19,11 @@ export const SET_NAME_MAP: Record<string, string[]> = {
   'eb-02': ['extra-booster-anime-25th-collection'],
   'eb-03': ['extra-booster-one-piece-heroines-edition'],
   'op14-eb04': ['extra-booster-the-azure-seas-seven', 'the-azure-seas-seven', 'the-azure-seas-seven-release-event-cards'],
+  'op15-eb04': ['adventure-on-kamis-island'],
   'prb-01': ['premium-booster-the-best'],
+  'prb-02': ['premium-booster-the-best-vol-2'],
+  // Promo / other-product are catch-all categories on Bandai's side that
+  // map to TCGplayer's "Promotion Cards" + "Demo Deck Cards" sets.
+  'promo': ['one-piece-promotion-cards'],
+  'other-product': ['one-piece-demo-deck-cards'],
 };
