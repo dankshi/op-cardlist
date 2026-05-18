@@ -86,5 +86,5 @@ export function InlineCardFieldEdit({ cardId, field, current, options, fallback,
   )
 }
 
-export const ART_STYLE_OPTIONS = ['standard', 'alternate', 'manga', 'wanted'] as const
-export const RARITY_OPTIONS = ['C', 'UC', 'R', 'SR', 'SEC', 'L', 'P', 'SP', 'TR', 'TF'] as const
+export const ART_STYLE_OPTIONS = ['standard', 'alternate', 'manga', 'wanted', 'textured'] as const
+export const RARITY_OPTIONS = ['C', 'UC', 'R', 'SR', 'SEC', 'L', 'P', 'SP', 'TR'] as const

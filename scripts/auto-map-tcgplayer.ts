@@ -412,7 +412,8 @@ async function main() {
     if (name.includes('(pirate foil)') || name.includes('(jolly roger foil)') || name.includes('(reprint)')) derived = 'standard';
     else if (name.includes('(manga)')) derived = 'manga';
     else if (name.includes('(wanted poster)')) derived = 'wanted';
-    else if (name.includes('(parallel)') || name.includes('(alternate art)') || name.includes('(textured foil)')) derived = 'alternate';
+    else if (name.includes('(textured foil)')) derived = 'textured';
+    else if (name.includes('(parallel)') || name.includes('(alternate art)')) derived = 'alternate';
     if (!derived) continue;
     const card = cards.find(c => c.id === row.card_id);
     if (card && card.art_style !== derived) updates.push({ id: row.card_id, art_style: derived });

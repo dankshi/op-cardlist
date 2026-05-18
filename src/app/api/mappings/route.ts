@@ -242,7 +242,8 @@ export async function POST(request: Request) {
       if (name.includes('(pirate foil)') || name.includes('(jolly roger foil)') || name.includes('(reprint)')) derived = 'standard';
       else if (name.includes('(manga)')) derived = 'manga';
       else if (name.includes('(wanted poster)')) derived = 'wanted';
-      else if (name.includes('(parallel)') || name.includes('(alternate art)') || name.includes('(textured foil)')) derived = 'alternate';
+      else if (name.includes('(textured foil)')) derived = 'textured';
+      else if (name.includes('(parallel)') || name.includes('(alternate art)')) derived = 'alternate';
       if (!derived) continue;
       // cards table is SELECT-only for anon — use service role for writes.
       const admin = getSupabaseAdmin();

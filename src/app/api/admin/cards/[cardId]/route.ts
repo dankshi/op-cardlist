@@ -3,12 +3,12 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
-const ALLOWED_ART_STYLES = new Set(['standard', 'alternate', 'manga', 'wanted'])
+// Textured Foil is an art_style (PRB premium foil treatment), not a
+// rarity — the underlying card keeps its real rarity (often UC/R/SR).
+const ALLOWED_ART_STYLES = new Set(['standard', 'alternate', 'manga', 'wanted', 'textured'])
 // Rarities we recognise. SP/TR/SEC/L are "high rarities" (always shown);
-// C/UC/R/P/SR are low rarities (hidden when art_style='standard'). TF
-// (Textured Foil) is the PRB-01-style premium foil treatment — a special
-// variant always worth selling, not hidden.
-const ALLOWED_RARITIES = new Set(['C', 'UC', 'R', 'SR', 'SEC', 'L', 'P', 'SP', 'TR', 'TF'])
+// C/UC/R/P/SR are low rarities (hidden when art_style='standard').
+const ALLOWED_RARITIES = new Set(['C', 'UC', 'R', 'SR', 'SEC', 'L', 'P', 'SP', 'TR'])
 
 /** PATCH /api/admin/cards/[cardId]
  *  Body: { art_style?: string, rarity?: string }
