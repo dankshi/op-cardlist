@@ -93,19 +93,20 @@ function matchesVariant(card: CardRow, product: TcgProductRow): boolean {
   const name = product.product_name.toLowerCase();
   const has = (s: string) => name.includes(s);
 
-  // Rarity gate — when both sides have it, must match. This is the
-  // strongest filter and dominates everything else.
-  if (card.rarity && product.rarity && card.rarity !== product.rarity) return false;
-
-  // SP cards: bandai marks them rarity='SP'. TCGplayer tags them as "(SP)"
-  // or sometimes "(Super Alternate Art)" / "(Red Super Alternate Art)".
+  // SP / TR rarity is unreliable on TCGplayer's side — they typically
+  // tag those products with the underlying card's rarity (e.g., a SP
+  // Rebecca card with base rarity SR shows up as rarity='SR' on TCG).
+  // Trust the name marker for these, and check those FIRST so the
+  // generic rarity gate below doesn't reject the match.
   if (card.rarity === 'SP') {
     return has('(sp)') || has('(super alternate art)');
   }
-  // Treasure Rare: bandai marks them rarity='TR'. TCGplayer uses "(TR)".
   if (card.rarity === 'TR') {
     return has('(tr)') || has('(treasure rare)');
   }
+
+  // Rarity gate for non-SP/TR — when both sides have it, must match.
+  if (card.rarity && product.rarity && card.rarity !== product.rarity) return false;
   // Manga art style: name should have "(Manga)".
   if (card.art_style === 'manga') return has('(manga)');
   // Wanted Poster art style: name should have "(Wanted Poster)".
@@ -116,22 +117,30 @@ function matchesVariant(card: CardRow, product: TcgProductRow): boolean {
   // Bandai marks variants like `_p1`/`_r1` while TCGplayer labels each
   // listing with its own suffix — `(Alternate Art)`, `(Pirate Foil)`,
   // or `(Reprint)`. The convention:
-  //   `_p*` suffix → match any non-Reprint variant (Alt Art OR Pirate Foil)
-  //   `_r*` suffix → match the `(Reprint)` variant
-  // For non-PRB sets, fall back to the standard Alt Art rule (just
-  // `(Parallel)` / `(Alternate Art)` markers, no Pirate Foil etc.).
+  //   `_r*` suffix → `(Reprint)` (always, all rarities)
+  //   `_p*` suffix on C/UC card → `(Pirate Foil)` (only common rarities get this treatment)
+  //   `_p*` suffix on R+ card → `(Alternate Art)` / `(Parallel)`
+  // For non-PRB sets, fall back to the standard Alt Art rule.
   if (card.art_style === 'alternate') {
     const isPRB = card.set_id?.startsWith('prb-') ?? false;
 
     if (isPRB) {
       const isPVariant = /_p\d+$/i.test(card.id);
       const isRVariant = /_r\d+$/i.test(card.id);
+      const isCommonish = card.rarity === 'C' || card.rarity === 'UC';
+
       if (isRVariant) return has('(reprint)');
       if (isPVariant) {
-        const isNonReprintAlt = has('(alternate art)') || has('(parallel)') || has('(pirate foil)');
-        const isOtherSpecial = has('(manga)') || has('(sp)') || has('(tr)') ||
-                               has('(super alternate art)') || has('(wanted poster)') || has('(reprint)');
-        return isNonReprintAlt && !isOtherSpecial;
+        if (isCommonish) {
+          // C/UC: only (Pirate Foil) is the right match. Reject Alt Art.
+          return has('(pirate foil)');
+        }
+        // R / SR / SEC / etc: match (Alternate Art) / (Parallel) only.
+        const isAA = has('(parallel)') || has('(alternate art)');
+        const isOther = has('(manga)') || has('(sp)') || has('(tr)') ||
+                        has('(super alternate art)') || has('(wanted poster)') ||
+                        has('(pirate foil)') || has('(reprint)');
+        return isAA && !isOther;
       }
       // No suffix on a PRB card (base) — fall through to standard rule.
     }
