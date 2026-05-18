@@ -2,7 +2,9 @@ import * as dotenv from 'dotenv';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { createClient } from '@supabase/supabase-js';
 
+// .env.local has Supabase creds, .env has R2 creds — load both.
 dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env' });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -101,9 +103,10 @@ function getImageKey(imageUrl: string): string {
   if (match) {
     return `cards/${match[1]}`;
   }
-  // Fallback: use filename
+  // Fallback: use the last segment of the URL path as the filename.
   const url = new URL(imageUrl);
-  return `cards/${path.basename(url.pathname)}`;
+  const segments = url.pathname.split('/').filter(Boolean);
+  return `cards/${segments[segments.length - 1] ?? 'unknown.png'}`;
 }
 
 async function processInBatches<T, R>(
@@ -205,17 +208,22 @@ async function main() {
       for (const id of cardIds) updates.push({ id, image_url: r2Url });
     }
 
-    const CHUNK = 200;
+    // UPDATE by id (not UPSERT) — UPSERT tries to INSERT first and the
+    // NOT NULL columns (base_id, set_id, etc.) we don't include cause it
+    // to fail before the ON CONFLICT branch runs. Per-row UPDATE is
+    // safer; parallelize batches of 20 for throughput.
+    const CONC = 20;
     let written = 0;
-    for (let i = 0; i < updates.length; i += CHUNK) {
-      const chunk = updates.slice(i, i + CHUNK);
-      // upsert on id; only updates image_url + bumps updated_at.
-      const { error } = await supabase.from('cards').upsert(chunk, { onConflict: 'id' });
-      if (error) {
-        console.error(`  chunk ${i}: ${error.message}`);
-        continue;
+    for (let i = 0; i < updates.length; i += CONC) {
+      const chunk = updates.slice(i, i + CONC);
+      const results = await Promise.all(chunk.map(u =>
+        supabase.from('cards').update({ image_url: u.image_url }).eq('id', u.id),
+      ));
+      const failures = results.filter(r => r.error);
+      if (failures.length > 0) {
+        console.error(`  batch starting ${i}: ${failures.length}/${chunk.length} failed; first error: ${failures[0].error?.message}`);
       }
-      written += chunk.length;
+      written += chunk.length - failures.length;
     }
     console.log(`Updated ${written}/${updates.length} cards.image_url rows.`);
   }
