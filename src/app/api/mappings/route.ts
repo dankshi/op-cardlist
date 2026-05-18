@@ -1,6 +1,42 @@
 import { NextResponse } from 'next/server';
 import { supabase, type MappingSubmission } from '@/lib/supabase';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
+import { getSupabaseAdmin } from '@/lib/supabase/admin';
+
+// Known TCGplayer variant suffixes. When parsing a URL slug like
+// "Three Thousand Worlds Alternate Art", we want to recover the standard
+// "(Alternate Art)" parenthesized form so the downstream art_style
+// derivation can detect markers. Longer phrases first so "Super Alternate
+// Art" gets wrapped before "Alternate Art" runs and chops it.
+const VARIANT_SUFFIXES = [
+  'Super Alternate Art',
+  'Red Super Alternate Art',
+  'Alternate Art',
+  'Wanted Poster',
+  'Jolly Roger Foil',
+  'Textured Foil',
+  'Pirate Foil',
+  'Full Art',
+  'Reprint',
+  'Manga',
+  'Parallel',
+  'Gold',
+  'SP',
+  'TR',
+];
+
+function markVariantSuffixes(name: string): string {
+  let result = name;
+  for (const suffix of VARIANT_SUFFIXES) {
+    // Match the suffix at end-of-string, optionally already in parens.
+    const re = new RegExp(`(?:\\s*\\()?\\s*${suffix.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\)?\\s*$`, 'i');
+    if (re.test(result)) {
+      result = result.replace(re, '').trim() + ` (${suffix})`;
+      break; // one suffix is enough — most products have only one
+    }
+  }
+  return result;
+}
 
 // GET /api/mappings - Get all mappings (approved only for public, all for admin)
 export async function GET(request: Request) {
@@ -73,12 +109,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No mappings provided' }, { status: 400 });
     }
 
-    // Backfill tcgName/tcgUrl from our products table when the client only
-    // sent a product_id (the URL-pasted manual fallback path). Lets the
-    // admin assign without typing the name; if the product isn't in our
-    // table yet, we keep whatever the client sent.
+    // Backfill tcgName/tcgUrl when the client only sent a product_id (the
+    // URL-pasted path). Lookup order:
+    //   1. Our cached tcgplayer_products row (authoritative when present)
+    //   2. URL slug parsed from the user-supplied URL — gives a name like
+    //      "Three Thousand Worlds (Alternate Art)" so the art_style
+    //      derivation step downstream can detect variant markers even for
+    //      products we haven't ingested into tcgplayer_products yet.
+    //   3. Fall back to "product {id}" as a last resort.
     for (const sub of submissions) {
-      if (sub.tcgName && sub.tcgUrl) continue;
       const { data: prod } = await supabase
         .from('tcgplayer_products')
         .select('product_name, product_url_name')
@@ -86,11 +125,24 @@ export async function POST(request: Request) {
         .maybeSingle();
       if (prod) {
         sub.tcgName = sub.tcgName || prod.product_name || `product ${sub.tcgProductId}`;
-        sub.tcgUrl = sub.tcgUrl || (prod.product_url_name
+        // Always rebuild the canonical URL from the cached slug — the
+        // user's pasted URL often has tracking params or different casing.
+        sub.tcgUrl = prod.product_url_name
           ? `https://www.tcgplayer.com/product/${sub.tcgProductId}/${prod.product_url_name}`
-          : `https://www.tcgplayer.com/product/${sub.tcgProductId}`);
+          : `https://www.tcgplayer.com/product/${sub.tcgProductId}`;
       } else {
-        sub.tcgName = sub.tcgName || `product ${sub.tcgProductId}`;
+        // Parse name from the URL slug: /product/<id>/<slug>?...
+        // The slug is the seo-friendly form of the product name with
+        // hyphens or %20 between words. Strip query string, decode, then
+        // wrap variant suffixes in parens so the art_style derivation
+        // step below can pick them up.
+        const slugMatch = sub.tcgUrl?.match(/\/product\/\d+\/([^?#]+)/);
+        if (slugMatch) {
+          const decoded = decodeURIComponent(slugMatch[1]).replace(/[-_]+/g, ' ').trim();
+          sub.tcgName = sub.tcgName || markVariantSuffixes(decoded);
+        } else {
+          sub.tcgName = sub.tcgName || `product ${sub.tcgProductId}`;
+        }
         sub.tcgUrl = sub.tcgUrl || `https://www.tcgplayer.com/product/${sub.tcgProductId}`;
       }
     }
@@ -192,7 +244,9 @@ export async function POST(request: Request) {
       else if (name.includes('(wanted poster)')) derived = 'wanted';
       else if (name.includes('(parallel)') || name.includes('(alternate art)') || name.includes('(textured foil)')) derived = 'alternate';
       if (!derived) continue;
-      const { error: artError } = await supabase.from('cards').update({ art_style: derived }).eq('id', sub.cardId);
+      // cards table is SELECT-only for anon — use service role for writes.
+      const admin = getSupabaseAdmin();
+      const { error: artError } = await admin.from('cards').update({ art_style: derived }).eq('id', sub.cardId);
       if (artError) console.error(`Failed to update art_style for ${sub.cardId}:`, artError.message);
     }
 

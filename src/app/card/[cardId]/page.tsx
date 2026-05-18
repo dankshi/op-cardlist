@@ -6,6 +6,8 @@ import { getCardSales, getCardGradedSales, getCardPopulations, getCardPsaInfo, c
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
+import { InlineCardFieldEdit, ART_STYLE_OPTIONS, RARITY_OPTIONS } from "@/components/card/InlineCardFieldEdit";
+import { ManualUrlAssign } from "@/components/admin/ManualUrlAssign";
 import { CardThumbnail } from "@/components/card/CardThumbnail";
 import { RecentSales } from "@/components/card/RecentSales";
 import { CardPopulations } from "@/components/card/CardPopulations";
@@ -178,9 +180,9 @@ export default async function CardPage({ params }: PageProps) {
             <span className="text-sky-400">cards</span>{'\n'}
             <span className="text-zinc-500">{'  id          '}</span><span className="text-orange-300">{card.id}</span>{'\n'}
             <span className="text-zinc-500">{'  name        '}</span><span className="text-orange-300">{card.name}</span>{'\n'}
-            <span className="text-zinc-500">{'  rarity      '}</span><span className="text-orange-300">{card.rarity}</span>{'\n'}
+            <span className="text-zinc-500">{'  rarity      '}</span><InlineCardFieldEdit cardId={card.id} field="rarity" current={card.rarity} options={RARITY_OPTIONS} fallback="C" />{'\n'}
             <span className="text-zinc-500">{'  type        '}</span><span className="text-orange-300">{card.type}</span>{'\n'}
-            <span className="text-zinc-500">{'  art_style   '}</span><span className="text-orange-300">{card.artStyle ?? <span className="italic text-zinc-600">—</span>}</span>{'\n'}
+            <span className="text-zinc-500">{'  art_style   '}</span><InlineCardFieldEdit cardId={card.id} field="art_style" current={card.artStyle ?? null} options={ART_STYLE_OPTIONS} fallback="standard" />{'\n'}
             <span className="text-zinc-500">{'  bandai_url  '}</span>
             {bandaiUrl ? (
               <a href={bandaiUrl} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline break-all">
@@ -200,10 +202,15 @@ export default async function CardPage({ params }: PageProps) {
             ) : (
               <span className="italic text-zinc-600">none</span>
             )}{'\n'}
+            <span className="text-zinc-500">{'  update      '}</span>
+            <span className="inline-block align-top">
+              <ManualUrlAssign cardId={card.id} refreshOnDone />
+            </span>{'\n'}
             {'\n'}
             <span className="text-sky-400">pops_psa</span>{'\n'}
             {psaInfo ? (
               <>
+                <span className="text-zinc-500">{'  set_code    '}</span><span className="text-orange-300">{psaInfo.set_code ?? <span className="italic text-zinc-600">—</span>}</span>{'\n'}
                 <span className="text-zinc-500">{'  spec_id     '}</span><span className="text-orange-300">{psaInfo.spec_id}</span>{'\n'}
                 <span className="text-zinc-500">{'  description '}</span><span className="text-orange-300">{psaInfo.description ?? <span className="italic text-zinc-600">—</span>}</span>{'\n'}
                 <span className="text-zinc-500">{'  psa_url     '}</span>

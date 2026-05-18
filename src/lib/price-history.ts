@@ -328,6 +328,7 @@ export async function getCardPopulations(
 export interface CardPsaInfo {
   spec_id: number;
   description: string | null;
+  set_code: string | null;
 }
 
 /**
@@ -341,10 +342,14 @@ export async function getCardPsaInfo(cardId: string): Promise<CardPsaInfo | null
   if (!supabase) return null;
   const { data } = await supabase
     .from('pops_psa')
-    .select('spec_id, description')
+    .select('spec_id, description, set_code')
     .eq('card_id', cardId)
     .maybeSingle();
-  return data ? { spec_id: Number(data.spec_id), description: data.description } : null;
+  return data ? {
+    spec_id: Number(data.spec_id),
+    description: data.description,
+    set_code: data.set_code ?? null,
+  } : null;
 }
 
 /**

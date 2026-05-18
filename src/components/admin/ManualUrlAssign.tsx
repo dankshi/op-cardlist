@@ -1,10 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface Props {
   cardId: string
   onDone?: () => void
+  /** Set true on pages that show the current mapping (e.g. card detail
+   *  debug section) so the new tcg_name pulls down without a manual
+   *  reload. Off by default — admin grid pages stay still to avoid
+   *  layout shift while bulk-assigning. */
+  refreshOnDone?: boolean
 }
 
 /** Fallback input for when none of the auto-suggested candidates are
@@ -13,7 +19,8 @@ interface Props {
  *  products that weren't pulled into tcgplayer_products at all.
  *  Accepts a TCG product URL, extracts the product_id, and assigns. The
  *  API resolves the product name from tcgplayer_products if it exists. */
-export function ManualUrlAssign({ cardId, onDone }: Props) {
+export function ManualUrlAssign({ cardId, onDone, refreshOnDone = false }: Props) {
+  const router = useRouter()
   const [url, setUrl] = useState('')
   const [state, setState] = useState<'idle' | 'pending' | 'done'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -46,6 +53,7 @@ export function ManualUrlAssign({ cardId, onDone }: Props) {
       }
       setState('done')
       onDone?.()
+      if (refreshOnDone) router.refresh()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'failed')
       setState('idle')

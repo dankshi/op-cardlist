@@ -239,8 +239,10 @@ export async function getSetBySlug(slug: string): Promise<CardSet | undefined> {
 
 /** Base rarities we don't sell standard prints of. Their alt arts, manga
  *  variants, and wanted-poster variants are still sellable — see
- *  `isHiddenCard()`. Higher rarities (SP, TR, SEC, L) are always shown. */
-export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R', 'P', 'SR']);
+ *  `isHiddenCard()`. Higher rarities (SP, TR, SEC) are always shown.
+ *  L (Leader) standard prints are hidden too — only their alt art /
+ *  parallel versions have collector value. */
+export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R', 'P', 'SR', 'L']);
 
 /** A card is hidden from browse/search/set surfaces if it's a low-rarity
  *  *standard* print. Alternate arts (Premium Booster AAs, manga variants,
