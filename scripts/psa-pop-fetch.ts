@@ -228,11 +228,15 @@ function autoMatchSpec(
     return null;
   }
 
-  if (variety === 'Special Alternate Art' || variety === 'Treasure Rare') {
-    // Cross-set: PSA reuses the original print's CardNumber, so search
-    // every card in our DB whose bandai number matches, then narrow by
-    // normalized subject name + variant marker.
-    const marker = variety === 'Special Alternate Art' ? '(sp)' : '(tr)';
+  if (variety === 'Special Alternate Art' || variety === 'Treasure Rare' || variety === 'Wanted Alternate Art') {
+    // Cross-set: PSA reuses the original print's CardNumber for these
+    // reprint varieties, so search every card in our DB whose bandai
+    // number matches, then narrow by normalized subject name + variant
+    // marker.
+    const marker =
+      variety === 'Special Alternate Art' ? '(sp)' :
+      variety === 'Treasure Rare' ? '(tr)' :
+      '(wanted poster)';
     const subj = normalizeName(spec.SubjectName);
     const pool = byCardNumber.get(paddedNum) ?? [];
     const candidates = pool.filter(c =>
@@ -282,7 +286,7 @@ async function main() {
   let totalCards = 0;
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
-      .from('card_prices')
+      .from('tcgplayer_card_prices')
       .select('card_id, tcgplayer_product_name')
       .order('card_id')
       .range(from, from + PAGE - 1);

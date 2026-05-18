@@ -4,24 +4,32 @@
 
 | Data | Where | Written By |
 |------|-------|------------|
-| Card data (names, images, effects) | `data/cards.json` | `scripts/scrape.ts` (from Bandai) |
-| Prices + TCGPlayer mappings | Supabase `card_prices` table | `scripts/scrape-prices.ts` + `/test` page |
+| Card catalog (names, rarity, images, effects) | Supabase `cards` + `card_sets` tables | `scripts/scrape-bandai-cards.ts` (from Bandai) |
+| Prices + TCGPlayer mappings | Supabase `tcgplayer_card_prices` table | `scripts/scrape-prices.ts` + `/test` page |
 | Manual mapping audit trail | Supabase `card_mappings` table | `/test` page |
 | TCGPlayer sealed products | `data/products.json` | `scripts/scrape-products.ts` |
+| PSA grading populations | Supabase `pops_psa` table | `scripts/psa-pop-fetch.ts` |
 
 ## How It Works
 
-1. **Card data** is static — scraped from Bandai's official site per set, stored in `cards.json`
-2. **Prices** live in Supabase `card_prices` — the single source of truth
-3. The app reads prices from Supabase at request time, cached per-request via React `cache()`
-4. The `/test` page lets users fix wrong card→product mappings; fixes go directly to `card_prices`
-5. The scraper respects `manually_mapped = true` — it keeps the product ID but refreshes prices
+1. **Card catalog** is scraped from Bandai's official site per set and UPSERTed directly into Supabase `cards` + `card_sets`. The scraper is incremental — pass set series IDs to scrape only those sets without touching the rest. Reprint protection: if a card is already in the DB under a different `set_id` (e.g. a PRB-02 reprint of an EB01 card), the original set_id is preserved.
+2. **Prices** live in Supabase `tcgplayer_card_prices` — the single source of truth.
+3. The app reads card metadata + prices from Supabase at request time, cached per-request via React `cache()` in [src/lib/cards.ts](../src/lib/cards.ts).
+4. The `/test` page lets users fix wrong card→product mappings; fixes go directly to `tcgplayer_card_prices`.
+5. The scraper respects `manually_mapped = true` — it keeps the product ID but refreshes prices.
 
 ## Daily Pipeline
 
 ```bash
-npx tsx scripts/scrape.ts           # 1. Card data from Bandai → cards.json
-npx tsx scripts/scrape-prices.ts    # 2. Prices from TCGPlayer → Supabase card_prices
+npx tsx scripts/scrape-bandai-cards.ts           # 1. Card catalog from Bandai → cards + card_sets tables
+npx tsx scripts/scrape-prices.ts                 # 2. Prices from TCGPlayer → Supabase tcgplayer_card_prices
+```
+
+For a new set release, pass the series IDs to scrape only those:
+
+```bash
+npx tsx scripts/scrape-bandai-cards.ts 569115 569302  # scrape only OP-15 + PRB-02
+npx tsx scripts/backup-images.ts --update-db          # upload new images to R2 + rewrite cards.image_url
 ```
 
 ## /test Page Safeguards
@@ -44,7 +52,7 @@ These checks use:
 ```
 src/
 ├── lib/
-│   ├── cards.ts            # Merges cards.json + Supabase prices (async)
+│   ├── cards.ts            # Queries cards + card_sets + card_prices tables (async, React-cached)
 │   ├── supabase.ts         # Supabase client
 │   ├── set-names.ts        # SET_NAME_MAP (shared between scraper + search APIs)
 │   └── products.ts         # TCGPlayer sealed product data
@@ -59,7 +67,9 @@ src/
 │   ├── products/           # Sealed products browser
 │   └── search/             # Card search page
 scripts/
-├── scrape.ts               # Card data scraper (Bandai → cards.json)
-├── scrape-prices.ts        # Price scraper (TCGPlayer → Supabase)
-└── scrape-products.ts      # Sealed product scraper (TCGPlayer → products.json)
+├── scrape-bandai-cards.ts  # Card catalog scraper (Bandai → cards + card_sets tables, UPSERT)
+├── scrape-prices.ts        # Price scraper (TCGPlayer → Supabase tcgplayer_card_prices)
+├── scrape-products.ts      # Sealed product scraper (TCGPlayer → products.json)
+├── backup-images.ts        # Mirror card images to Cloudflare R2 (--update-db rewrites cards.image_url)
+└── psa-pop-fetch.ts        # PSA population scraper (Bandai PSA pop pages → pops_psa)
 ```

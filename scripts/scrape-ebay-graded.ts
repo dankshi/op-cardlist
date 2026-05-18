@@ -270,7 +270,7 @@ async function selectTargets(opts: {
 }): Promise<CardTarget[]> {
   if (opts.cardId) {
     const { data } = await supabase
-      .from('card_prices')
+      .from('tcgplayer_card_prices')
       .select('card_id, tcgplayer_product_name')
       .eq('card_id', opts.cardId)
       .single()
@@ -283,7 +283,7 @@ async function selectTargets(opts: {
   }
 
   let query = supabase
-    .from('card_prices')
+    .from('tcgplayer_card_prices')
     .select('card_id, market_price, tcgplayer_product_name')
     .not('market_price', 'is', null)
     .order('market_price', { ascending: false })

@@ -16,7 +16,7 @@ export async function GET() {
 
   while (!done) {
     const { data, error } = await supabase
-      .from('card_prices')
+      .from('tcgplayer_card_prices')
       .select('*')
       .range(from, from + PAGE_SIZE - 1);
 

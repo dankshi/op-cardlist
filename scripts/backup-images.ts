@@ -1,8 +1,16 @@
-import 'dotenv/config';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as dotenv from 'dotenv';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import type { CardDatabase } from '../src/types/card';
+import { createClient } from '@supabase/supabase-js';
+
+dotenv.config({ path: '.env.local' });
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase env vars (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+  process.exit(1);
+}
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // R2 Configuration from environment variables
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
@@ -122,42 +130,54 @@ async function processInBatches<T, R>(
 async function main() {
   const args = process.argv.slice(2);
   const skipExisting = !args.includes('--force');
-  const updateJson = args.includes('--update-json');
+  // Flag renamed from --update-json (the JSON file is gone). The new flag
+  // updates the cards table's image_url column to point at R2.
+  const updateDb = args.includes('--update-db') || args.includes('--update-json');
 
   console.log('One Piece Card Image Backup Tool');
   console.log('=================================');
   console.log('Mode: Direct stream to R2 (no local storage)\n');
 
-  // Load card database
-  const dataPath = path.join(process.cwd(), 'data', 'cards.json');
-  if (!fs.existsSync(dataPath)) {
-    console.error('Error: data/cards.json not found. Run "npm run scrape" first.');
-    process.exit(1);
-  }
-
-  const database: CardDatabase = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-
-  // Collect all unique image URLs
-  const imageUrls = new Map<string, string>(); // key -> url
-  for (const set of database.sets) {
-    for (const card of set.cards) {
-      if (card.imageUrl) {
-        const key = getImageKey(card.imageUrl);
-        imageUrls.set(key, card.imageUrl);
-      }
+  // Load all card image URLs from the cards table (paginated to defeat
+  // Supabase's 1000-row default cap).
+  console.log('Loading card image URLs from DB...');
+  const rows: { id: string; image_url: string | null }[] = [];
+  const PAGE_SIZE = 1000;
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('cards')
+      .select('id, image_url')
+      .order('id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) {
+      console.error('Error fetching cards:', error.message);
+      process.exit(1);
     }
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE_SIZE) break;
   }
 
-  console.log(`Found ${imageUrls.size} unique images across ${database.sets.length} sets\n`);
+  // Collect unique image URLs by R2 key.
+  const imageUrls = new Map<string, string>(); // key -> source url
+  const keyToCardIds = new Map<string, string[]>(); // key -> all card_ids using this image
+  for (const row of rows) {
+    if (!row.image_url) continue;
+    const key = getImageKey(row.image_url);
+    imageUrls.set(key, row.image_url);
+    const ids = keyToCardIds.get(key);
+    if (ids) ids.push(row.id); else keyToCardIds.set(key, [row.id]);
+  }
 
-  // Stream images directly to R2
+  console.log(`Found ${imageUrls.size} unique images across ${rows.length} cards\n`);
+
+  // Stream images directly to R2.
   console.log('Uploading images to Cloudflare R2...');
   if (skipExisting) {
     console.log('(Skipping images that already exist in R2)\n');
   }
 
   const client = createR2Client();
-
   const items = Array.from(imageUrls.entries()).map(([key, url]) => ({ key, url }));
 
   const results = await processInBatches(items, CONCURRENCY, async (item) => {
@@ -174,30 +194,40 @@ async function main() {
   console.log(`  Skipped (already exists): ${skipped}`);
   console.log(`  Failed: ${failed}`);
 
-  // Optionally update cards.json with new URLs
-  if (updateJson && R2_PUBLIC_URL) {
-    console.log('\nUpdating cards.json with R2 URLs...');
-
-    for (const set of database.sets) {
-      for (const card of set.cards) {
-        if (card.imageUrl) {
-          const key = getImageKey(card.imageUrl);
-          card.imageUrl = `${R2_PUBLIC_URL}/${key}`;
-        }
-      }
+  // Optionally rewrite cards.image_url to point at R2. We do this in
+  // chunked UPDATE-by-id batches since the supabase-js client doesn't
+  // expose a clean bulk UPDATE; chunk size 200 keeps each request small.
+  if (updateDb && R2_PUBLIC_URL) {
+    console.log('\nUpdating cards.image_url to R2 URLs...');
+    const updates: { id: string; image_url: string }[] = [];
+    for (const [key, cardIds] of keyToCardIds) {
+      const r2Url = `${R2_PUBLIC_URL}/${key}`;
+      for (const id of cardIds) updates.push({ id, image_url: r2Url });
     }
 
-    database.lastUpdated = new Date().toISOString();
-    fs.writeFileSync(dataPath, JSON.stringify(database, null, 2));
-    console.log('Updated cards.json with new image URLs');
+    const CHUNK = 200;
+    let written = 0;
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const chunk = updates.slice(i, i + CHUNK);
+      // upsert on id; only updates image_url + bumps updated_at.
+      const { error } = await supabase.from('cards').upsert(chunk, { onConflict: 'id' });
+      if (error) {
+        console.error(`  chunk ${i}: ${error.message}`);
+        continue;
+      }
+      written += chunk.length;
+    }
+    console.log(`Updated ${written}/${updates.length} cards.image_url rows.`);
   }
 
   console.log('\nDone!');
-
   if (R2_PUBLIC_URL) {
     console.log(`\nImages available at: ${R2_PUBLIC_URL}/cards/[CARD_ID].png`);
     console.log('Example: ' + R2_PUBLIC_URL + '/cards/OP01-001.png');
   }
 }
 
-main().catch(console.error);
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});

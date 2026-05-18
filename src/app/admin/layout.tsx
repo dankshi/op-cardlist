@@ -15,6 +15,7 @@ const NAV_SECTIONS: { heading: string; items: { href: string; label: string }[] 
   {
     heading: 'Data Quality',
     items: [
+      { href: '/admin/mappings', label: 'TCGplayer Mappings' },
       { href: '/admin/psa-pops', label: 'PSA Pop Mappings' },
     ],
   },

@@ -11,7 +11,7 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  const slugs = getAllCharacterSlugs();
+  const slugs = await getAllCharacterSlugs();
   return slugs.map((slug) => ({ name: slug }));
 }
 

@@ -97,7 +97,7 @@ async function main() {
 
   // 15 most valuable (matches home page "Most Valuable" carousel)
   const { data: topByPrice } = await supabase
-    .from('card_prices')
+    .from('tcgplayer_card_prices')
     .select('card_id, tcgplayer_product_id, tcgplayer_product_name')
     .not('market_price', 'is', null)
     .order('market_price', { ascending: false })
@@ -105,7 +105,7 @@ async function main() {
 
   // Every Sugar
   const { data: sugars } = await supabase
-    .from('card_prices')
+    .from('tcgplayer_card_prices')
     .select('card_id, tcgplayer_product_id, tcgplayer_product_name')
     .ilike('tcgplayer_product_name', '%sugar%');
 
@@ -152,7 +152,7 @@ async function main() {
 
         const latest = sales[0];
         await supabase
-          .from('card_prices')
+          .from('tcgplayer_card_prices')
           .update({
             last_sold_price: latest.purchasePrice,
             last_sold_date: latest.orderDate,
@@ -161,7 +161,7 @@ async function main() {
           .eq('card_id', t.cardId);
       } else {
         await supabase
-          .from('card_prices')
+          .from('tcgplayer_card_prices')
           .update({ sales_scraped_at: new Date().toISOString() })
           .eq('card_id', t.cardId);
       }

@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     if (cardIds.length === 0) {
       // Approve all pending
       const { data, error } = await supabase
-        .from('card_mappings')
+        .from('card_mappings_legacy')
         .update({ approved: true })
         .eq('approved', false)
         .select();
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     // Approve specific cards
     const { data, error } = await supabase
-      .from('card_mappings')
+      .from('card_mappings_legacy')
       .update({ approved: true })
       .in('card_id', cardIds)
       .select();
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
     }
 
     const { count, error } = await supabase
-      .from('card_mappings')
+      .from('card_mappings_legacy')
       .select('*', { count: 'exact', head: true })
       .eq('approved', false);
 

@@ -69,8 +69,8 @@ npm run backup:images
 # Force re-upload all images (skip existence check)
 npm run backup:images -- --force
 
-# Also update cards.json to use R2 URLs
-npm run backup:images -- --update-json
+# Also update cards.image_url in the DB to point at R2
+npm run backup:images -- --update-db
 ```
 
 ### URL Structure
@@ -107,7 +107,7 @@ To switch the app to use R2 images instead of the official source:
    npm run backup:images -- --update-json
    ```
 
-2. This updates all `imageUrl` fields in `data/cards.json` to point to R2
+2. This updates all `image_url` fields in the `cards` table to point to R2
 
 3. Update `next.config.ts` with your R2 domain (see above)
 

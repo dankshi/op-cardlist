@@ -27,8 +27,7 @@ function getSetShortName(fullName: string): string {
 }
 
 export default async function Home() {
-  const sets = getAllSets();
-  const allCards = await getBrowsableCards();
+  const [sets, allCards] = await Promise.all([getAllSets(), getBrowsableCards()]);
   const totalCards = sets.reduce((sum, set) => sum + set.cardCount, 0);
   const setImages = getAllSetImages();
   const cardMap = new Map(allCards.map((c) => [c.id, c]));

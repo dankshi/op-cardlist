@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCardById, getParallelCards } from "@/lib/cards";
-import { getCardSales, getCardGradedSales, getCardPopulations, calculatePriceChange } from "@/lib/price-history";
+import { getCardSales, getCardGradedSales, getCardPopulations, getCardPsaInfo, calculatePriceChange } from "@/lib/price-history";
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
@@ -93,10 +93,11 @@ export default async function CardPage({ params }: PageProps) {
   }
 
   const supabase = await createClient();
-  const [sales, gradedSales, populations, priceChange, listingAgg] = await Promise.all([
+  const [sales, gradedSales, populations, psaInfo, priceChange, listingAgg] = await Promise.all([
     getCardSales(card.id, 90),
     getCardGradedSales(card.id, 90),
     getCardPopulations(card.id),
+    getCardPsaInfo(card.id),
     calculatePriceChange(card.id, card.price?.marketPrice ?? null, 7),
     // Cheapest active Nomi listing + total active count.
     supabase
@@ -140,22 +141,51 @@ export default async function CardPage({ params }: PageProps) {
 
         {/* Right: Details + Market */}
         <div>
-          {/* Card Identity */}
-          <div className="flex items-center gap-2 mb-1 text-xs text-zinc-500">
-            <span className="font-mono">{card.id}</span>
-            <span className="px-1.5 py-0.5 bg-zinc-100 rounded">{card.rarity}</span>
-            <span className="px-1.5 py-0.5 bg-zinc-100 rounded">{card.type}</span>
-            {card.isParallel && (
-              <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-200 rounded font-medium">
-                {card.artStyle === 'wanted' ? 'WANTED' : card.artStyle === 'manga' ? 'MANGA' : 'ALT'}
-              </span>
-            )}
-            <span className="text-zinc-300">|</span>
-            <Link href={`/${card.setId}`} className="hover:text-orange-500 transition-colors">
-              {card.setId.toUpperCase()}
-            </Link>
-          </div>
           <h1 className="text-2xl font-bold text-zinc-900 mb-3">{card.name}</h1>
+
+          {/* Debug: per-source field dump styled like a VSCode editor.
+              Dark theme makes it obviously dev-only and not part of the
+              normal UI. Includes clickable links to verify against the
+              source systems. */}
+          <pre className="mb-3 text-xs font-mono bg-[#1e1e1e] border border-zinc-800 rounded-md px-3 py-2 overflow-x-auto leading-relaxed text-zinc-300">
+            <span className="text-emerald-400"># debug: data sources</span>{'\n'}
+            <span className="text-sky-400">cards</span>{'\n'}
+            <span className="text-zinc-500">{'  id          '}</span><span className="text-orange-300">{card.id}</span>{'\n'}
+            <span className="text-zinc-500">{'  name        '}</span><span className="text-orange-300">{card.name}</span>{'\n'}
+            <span className="text-zinc-500">{'  rarity      '}</span><span className="text-orange-300">{card.rarity}</span>{'\n'}
+            <span className="text-zinc-500">{'  type        '}</span><span className="text-orange-300">{card.type}</span>{'\n'}
+            <span className="text-zinc-500">{'  art_style   '}</span><span className="text-orange-300">{card.artStyle ?? <span className="italic text-zinc-600">—</span>}</span>{'\n'}
+            {'\n'}
+            <span className="text-sky-400">card_prices</span>{'\n'}
+            <span className="text-zinc-500">{'  tcg_name    '}</span><span className="text-orange-300">{card.price?.tcgplayerProductName ?? <span className="italic text-zinc-600">none</span>}</span>{'\n'}
+            <span className="text-zinc-500">{'  tcg_url     '}</span>
+            {card.price?.tcgplayerUrl ? (
+              <a href={card.price.tcgplayerUrl} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline break-all">
+                {card.price.tcgplayerUrl}
+              </a>
+            ) : (
+              <span className="italic text-zinc-600">none</span>
+            )}{'\n'}
+            {'\n'}
+            <span className="text-sky-400">pops_psa</span>{'\n'}
+            {psaInfo ? (
+              <>
+                <span className="text-zinc-500">{'  spec_id     '}</span><span className="text-orange-300">{psaInfo.spec_id}</span>{'\n'}
+                <span className="text-zinc-500">{'  description '}</span><span className="text-orange-300">{psaInfo.description ?? <span className="italic text-zinc-600">—</span>}</span>{'\n'}
+                <span className="text-zinc-500">{'  psa_url     '}</span>
+                <a
+                  href={`https://www.psacard.com/spec/psa/${psaInfo.spec_id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cyan-400 hover:underline break-all"
+                >
+                  https://www.psacard.com/spec/psa/{psaInfo.spec_id}
+                </a>
+              </>
+            ) : (
+              <span className="italic text-zinc-600">  unmapped</span>
+            )}
+          </pre>
 
           {/* Price block — Nomi-first, market price as reference.
               If the card is listed on Nomi, the buy price is the headline.
@@ -180,7 +210,18 @@ export default async function CardPage({ params }: PageProps) {
                 {card.price?.marketPrice != null && (
                   <div className="flex items-baseline gap-2 mt-1 text-sm text-zinc-500">
                     <span className="tabular-nums">${card.price.marketPrice.toFixed(2)}</span>
-                    <span className="text-xs text-zinc-400">TCGPlayer market</span>
+                    {card.price.tcgplayerUrl ? (
+                      <a
+                        href={card.price.tcgplayerUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-zinc-400 hover:text-orange-500 hover:underline"
+                      >
+                        TCGPlayer market ↗
+                      </a>
+                    ) : (
+                      <span className="text-xs text-zinc-400">TCGPlayer market</span>
+                    )}
                     {priceChange && (
                       <PriceChangeBadge changePercent={priceChange.changePercent} size="sm" />
                     )}
@@ -195,7 +236,18 @@ export default async function CardPage({ params }: PageProps) {
                 {card.price?.marketPrice != null && (
                   <div className="flex items-baseline gap-2 mt-1 text-sm text-zinc-500">
                     <span className="tabular-nums">${card.price.marketPrice.toFixed(2)}</span>
-                    <span className="text-xs text-zinc-400">TCGPlayer market</span>
+                    {card.price.tcgplayerUrl ? (
+                      <a
+                        href={card.price.tcgplayerUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-zinc-400 hover:text-orange-500 hover:underline"
+                      >
+                        TCGPlayer market ↗
+                      </a>
+                    ) : (
+                      <span className="text-xs text-zinc-400">TCGPlayer market</span>
+                    )}
                     {priceChange && (
                       <PriceChangeBadge changePercent={priceChange.changePercent} size="sm" />
                     )}

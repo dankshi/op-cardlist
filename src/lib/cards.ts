@@ -1,108 +1,233 @@
 import { cache } from 'react';
-import type { Card, CardSet, CardDatabase, CardPrice, SetImagesDatabase, SetImageData } from '@/types/card';
+import type { Card, CardSet, CardPrice, SetImagesDatabase, SetImageData, Rarity, CardType, CardColor, Attribute, ArtStyle } from '@/types/card';
 import { supabase } from '@/lib/supabase';
-import cardsData from '../../data/cards.json';
 
-// Try to import set images file
+// set-images.json stays as a static file — it's a small separate concern
+// (booster box images for set-tile rendering) and isn't part of the
+// Bandai card catalog we just moved into Postgres.
 let setImagesData: SetImagesDatabase | null = null;
 try {
   setImagesData = require('../../data/set-images.json');
 } catch {
-  // set-images.json doesn't exist yet
+  // file optional
 }
 
-const database = cardsData as CardDatabase;
+// --- Row → app type mappers ---------------------------------------------
 
-// Map Supabase snake_case row to CardPrice camelCase
-function rowToCardPrice(row: any): CardPrice {
+function rowToCard(row: Record<string, unknown>): Card {
   return {
-    marketPrice: row.market_price ?? null,
-    lowestPrice: row.lowest_price ?? null,
-    medianPrice: row.median_price ?? null,
-    totalListings: row.total_listings ?? null,
-    lastSoldPrice: row.last_sold_price ?? null,
-    lastSoldDate: row.last_sold_date ?? null,
-    lastUpdated: row.updated_at ?? null,
-    tcgplayerUrl: row.tcgplayer_url ?? null,
-    tcgplayerProductId: row.tcgplayer_product_id ?? null,
-    tcgplayerProductName: row.tcgplayer_product_name ?? null,
+    id: row.id as string,
+    baseId: row.base_id as string,
+    name: row.name as string,
+    type: (row.type as CardType) ?? 'CHARACTER',
+    colors: (row.colors as CardColor[]) ?? [],
+    rarity: (row.rarity as Rarity) ?? 'C',
+    cost: (row.cost as number) ?? null,
+    power: (row.power as number) ?? null,
+    counter: (row.counter as number) ?? null,
+    life: (row.life as number) ?? null,
+    attribute: (row.attribute as Attribute) ?? null,
+    traits: (row.traits as string[]) ?? [],
+    effect: (row.effect as string) ?? '',
+    trigger: (row.trigger_text as string) ?? null,
+    imageUrl: (row.image_url as string) ?? '',
+    setId: row.set_id as string,
+    variant: (row.variant as string) ?? undefined,
+    isParallel: (row.is_parallel as boolean) ?? false,
+    artStyle: (row.art_style as ArtStyle) ?? 'standard',
   };
 }
 
-// Fetch all prices from Supabase, cached per-request via React cache()
+function rowToCardPrice(row: Record<string, unknown>): CardPrice {
+  return {
+    marketPrice: (row.market_price as number) ?? null,
+    lowestPrice: (row.lowest_price as number) ?? null,
+    medianPrice: (row.median_price as number) ?? null,
+    totalListings: (row.total_listings as number) ?? null,
+    lastSoldPrice: (row.last_sold_price as number) ?? null,
+    lastSoldDate: (row.last_sold_date as string) ?? null,
+    lastUpdated: (row.updated_at as string) ?? null,
+    tcgplayerUrl: (row.tcgplayer_url as string) ?? null,
+    tcgplayerProductId: (row.tcgplayer_product_id as number) ?? null,
+    tcgplayerProductName: (row.tcgplayer_product_name as string) ?? null,
+  };
+}
+
+// --- Cached DB fetchers (per-request via React.cache()) -----------------
+
+// Paginate around Supabase's 1000-row default cap.
+async function paginated<T>(
+  fetcher: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let f = 0; ; f += pageSize) {
+    const { data, error } = await fetcher(f, f + pageSize - 1);
+    if (error) {
+      console.error('paginated fetch error:', error);
+      return [];
+    }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return all;
+}
+
+const fetchCardRows = cache(async (): Promise<Card[]> => {
+  if (!supabase) return [];
+  const rows = await paginated<Record<string, unknown>>((from, to) =>
+    supabase!.from('cards').select('*').order('id').range(from, to),
+  );
+  return rows.map(rowToCard);
+});
+
+interface SetMeta {
+  id: string;
+  name: string;
+  seriesId: string;
+  releaseDate: string;
+  cardCount: number;
+}
+
+const fetchSetRows = cache(async (): Promise<SetMeta[]> => {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('card_sets')
+    .select('*')
+    .order('release_date', { ascending: false });
+  if (error) {
+    console.error('fetchSetRows error:', error);
+    return [];
+  }
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    name: row.name as string,
+    seriesId: (row.series_id as string) ?? '',
+    releaseDate: (row.release_date as string) ?? '',
+    cardCount: (row.card_count as number) ?? 0,
+  }));
+});
+
+// Prices are joined with the new card_tcgplayer_mapping table at read
+// time. Once we strip the duplicate mapping cols from card_prices
+// (Migration D), this becomes the only source for the TCGplayer link.
+// Until then we prefer card_tcgplayer_mapping over the duplicated cols
+// on card_prices (same data; the mapping table wins for clarity).
 const fetchPrices = cache(async (): Promise<Record<string, CardPrice>> => {
   if (!supabase) return {};
+  const [priceRows, mappingRows] = await Promise.all([
+    paginated<Record<string, unknown>>((from, to) =>
+      supabase!.from('tcgplayer_card_prices').select('*').range(from, to),
+    ),
+    paginated<Record<string, unknown>>((from, to) =>
+      supabase!.from('card_tcgplayer_mapping').select('card_id, tcgplayer_product_id, tcgplayer_url, tcgplayer_name').range(from, to),
+    ),
+  ]);
 
-  // Supabase limits to 1000 rows by default, use range to get all
-  const allRows: any[] = [];
-  const PAGE_SIZE = 1000;
-  let from = 0;
-  let done = false;
-
-  while (!done) {
-    const { data, error } = await supabase
-      .from('card_prices')
-      .select('*')
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (error) {
-      console.error('Error fetching card_prices:', error);
-      return {};
-    }
-
-    if (data) {
-      allRows.push(...data);
-    }
-
-    if (!data || data.length < PAGE_SIZE) {
-      done = true;
-    } else {
-      from += PAGE_SIZE;
-    }
+  // Index mappings by card_id so we can attach them to each price row.
+  const mappingByCard = new Map<string, { product_id: number; url: string | null; name: string | null }>();
+  for (const m of mappingRows) {
+    mappingByCard.set(m.card_id as string, {
+      product_id: (m.tcgplayer_product_id as number) ?? 0,
+      url: (m.tcgplayer_url as string) ?? null,
+      name: (m.tcgplayer_name as string) ?? null,
+    });
   }
 
   const prices: Record<string, CardPrice> = {};
-  for (const row of allRows) {
-    prices[row.card_id] = rowToCardPrice(row);
+  for (const row of priceRows) {
+    const cardId = row.card_id as string;
+    const basePrice = rowToCardPrice(row);
+    const mapping = mappingByCard.get(cardId);
+    prices[cardId] = mapping
+      ? {
+          ...basePrice,
+          tcgplayerProductId: mapping.product_id,
+          tcgplayerUrl: mapping.url,
+          tcgplayerProductName: mapping.name,
+        }
+      : basePrice;
   }
+
+  // Also surface cards that have a mapping but no price row yet (e.g.
+  // freshly-mapped via auto-map-tcgplayer.ts but scrape-prices hasn't run).
+  for (const [cardId, mapping] of mappingByCard) {
+    if (prices[cardId]) continue;
+    prices[cardId] = {
+      marketPrice: null,
+      lowestPrice: null,
+      medianPrice: null,
+      totalListings: null,
+      lastSoldPrice: null,
+      lastSoldDate: null,
+      lastUpdated: null,
+      tcgplayerProductId: mapping.product_id,
+      tcgplayerUrl: mapping.url,
+      tcgplayerProductName: mapping.name,
+    };
+  }
+
   return prices;
 });
 
-// Merge price data with card
+// Compose: full sets with their cards (no prices merged yet — that's a
+// separate step so callers that don't need prices skip the join).
+const fetchAllSets = cache(async (): Promise<CardSet[]> => {
+  const [cards, setMetas] = await Promise.all([fetchCardRows(), fetchSetRows()]);
+  const cardsBySet = new Map<string, Card[]>();
+  for (const card of cards) {
+    const list = cardsBySet.get(card.setId);
+    if (list) list.push(card);
+    else cardsBySet.set(card.setId, [card]);
+  }
+  return setMetas.map(meta => ({
+    ...meta,
+    cards: cardsBySet.get(meta.id) ?? [],
+  }));
+});
+
+// "OP-01 - Romance Dawn" → { 'op-01': 'romance dawn' } — used by search.
+const fetchSetNameLookup = cache(async (): Promise<Record<string, string>> => {
+  const sets = await fetchSetRows();
+  const lookup: Record<string, string> = {};
+  for (const set of sets) {
+    const match = set.name.match(/^[A-Z0-9-]+ - (.+)$/i);
+    lookup[set.id] = match ? match[1].toLowerCase() : set.name.toLowerCase();
+  }
+  return lookup;
+});
+
+// --- Helpers ------------------------------------------------------------
+
 function mergePrice(card: Card, prices: Record<string, CardPrice>): Card {
   const price = prices[card.id];
-  if (price) {
-    return { ...card, price };
-  }
-  return card;
+  return price ? { ...card, price } : card;
 }
 
-// Helper to return set with merged prices on cards
 function setWithMergedPrices(set: CardSet, prices: Record<string, CardPrice>): CardSet {
-  return {
-    ...set,
-    cards: set.cards.map(card => mergePrice(card, prices)),
-  };
+  return { ...set, cards: set.cards.map(c => mergePrice(c, prices)) };
 }
 
-export function getAllSets(): CardSet[] {
-  return database.sets;
+// --- Public API ---------------------------------------------------------
+
+export async function getAllSets(): Promise<CardSet[]> {
+  return fetchAllSets();
 }
 
 export async function getSetById(setId: string): Promise<CardSet | undefined> {
-  const set = database.sets.find(set => set.id === setId);
+  const sets = await fetchAllSets();
+  const set = sets.find(s => s.id === setId);
   if (!set) return undefined;
   const prices = await fetchPrices();
   return setWithMergedPrices(set, prices);
 }
 
 export async function getSetBySlug(slug: string): Promise<CardSet | undefined> {
-  // Support both 'op-13' and 'op13' formats
+  // Support both 'op-13' and 'op13' forms
   const normalizedSlug = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const set = database.sets.find(set => {
-    const normalizedSetId = set.id.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return normalizedSetId === normalizedSlug;
-  });
+  const sets = await fetchAllSets();
+  const set = sets.find(s => s.id.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedSlug);
   if (!set) return undefined;
   const prices = await fetchPrices();
   return setWithMergedPrices(set, prices);
@@ -112,8 +237,8 @@ export async function getSetBySlug(slug: string): Promise<CardSet | undefined> {
 export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R']);
 
 export async function getAllCards(): Promise<Card[]> {
-  const prices = await fetchPrices();
-  return database.sets.flatMap(set => set.cards).map(card => mergePrice(card, prices));
+  const [cards, prices] = await Promise.all([fetchCardRows(), fetchPrices()]);
+  return cards.map(card => mergePrice(card, prices));
 }
 
 /** All cards excluding C/UC/R — used for browsing, search, and carousels. */
@@ -124,11 +249,9 @@ export async function getBrowsableCards(): Promise<Card[]> {
 
 export async function getCardById(cardId: string): Promise<Card | undefined> {
   const normalized = cardId.toUpperCase();
-  const card = database.sets
-    .flatMap(set => set.cards)
-    .find(card => card.id.toUpperCase() === normalized);
+  const [cards, prices] = await Promise.all([fetchCardRows(), fetchPrices()]);
+  const card = cards.find(c => c.id.toUpperCase() === normalized);
   if (!card) return undefined;
-  const prices = await fetchPrices();
   return mergePrice(card, prices);
 }
 
@@ -145,20 +268,9 @@ export async function getCardsBySet(setId: string): Promise<Card[]> {
   return set?.cards ?? [];
 }
 
-// Build a set ID → short name lookup for searching by set name
-function getSetNameLookup(): Record<string, string> {
-  const lookup: Record<string, string> = {};
-  for (const set of database.sets) {
-    const match = set.name.match(/^[A-Z0-9-]+ - (.+)$/i);
-    lookup[set.id] = match ? match[1].toLowerCase() : set.name.toLowerCase();
-  }
-  return lookup;
-}
+// --- Search -------------------------------------------------------------
 
-const setNameLookup = getSetNameLookup();
-
-// Check if a single token matches any field on a card
-function tokenMatchesCard(token: string, card: Card): boolean {
+function tokenMatchesCard(token: string, card: Card, setNameLookup: Record<string, string>): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(escaped, 'i');
   const wordRegex = new RegExp(`\\b${escaped}\\b`, 'i');
@@ -175,8 +287,7 @@ function tokenMatchesCard(token: string, card: Card): boolean {
   );
 }
 
-// Name-only matching: card name, ID, and set — no effect/trait text
-function tokenMatchesCardName(token: string, card: Card): boolean {
+function tokenMatchesCardName(token: string, card: Card, setNameLookup: Record<string, string>): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(escaped, 'i');
   const wordRegex = new RegExp(`\\b${escaped}\\b`, 'i');
@@ -191,40 +302,34 @@ function tokenMatchesCardName(token: string, card: Card): boolean {
 }
 
 export async function searchCards(query: string, nameOnly = false): Promise<Card[]> {
-  // Tokenize: split on whitespace, filter out empty/noise tokens
   const noiseWords = new Set(['one', 'piece', 'card', 'tcg', 'the', 'a', 'of', 'and', 'in', 'from']);
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
-  // Keep meaningful tokens; if all are noise, use them anyway
   const meaningful = tokens.filter(t => !noiseWords.has(t));
   const searchTokens = meaningful.length > 0 ? meaningful : tokens;
-
   if (searchTokens.length === 0) return [];
 
   const matcher = nameOnly ? tokenMatchesCardName : tokenMatchesCard;
-
-  const allCards = await getAllCards();
+  const [allCards, setNameLookup] = await Promise.all([getAllCards(), fetchSetNameLookup()]);
   return allCards
     .filter(card => !HIDDEN_RARITIES.has(card.rarity))
-    .filter(card => searchTokens.every(token => matcher(token, card)))
+    .filter(card => searchTokens.every(token => matcher(token, card, setNameLookup)))
     .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0));
 }
 
-// Search sets by name or ID — returns matching sets for set-level results
-export function searchSets(query: string): { id: string; name: string; shortName: string; cardCount: number }[] {
+export async function searchSets(query: string): Promise<{ id: string; name: string; shortName: string; cardCount: number }[]> {
   const noiseWords = new Set(['one', 'piece', 'card', 'tcg', 'the', 'a', 'of', 'and', 'in', 'from', 'list', 'price', 'guide', 'cards']);
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(t => t.length > 0);
   const meaningful = tokens.filter(t => !noiseWords.has(t));
   const searchTokens = meaningful.length > 0 ? meaningful : tokens;
-
   if (searchTokens.length === 0) return [];
 
-  return database.sets
+  const [sets, setNameLookup] = await Promise.all([fetchSetRows(), fetchSetNameLookup()]);
+  return sets
     .filter(set => {
       const idLower = set.id.toLowerCase();
       const idNoHyphen = set.id.replace(/-/g, '').toLowerCase();
       const shortName = (setNameLookup[set.id] || '').toLowerCase();
       const fullNameLower = set.name.toLowerCase();
-
       return searchTokens.every(token =>
         idLower.includes(token) ||
         idNoHyphen.includes(token) ||
@@ -240,9 +345,7 @@ export function searchSets(query: string): { id: string; name: string; shortName
     }));
 }
 
-export function getLastUpdated(): string {
-  return database.lastUpdated;
-}
+// --- Set images (still backed by JSON file) -----------------------------
 
 export function getSetImage(setId: string): SetImageData | null {
   if (!setImagesData) return null;
@@ -253,6 +356,8 @@ export function getAllSetImages(): Record<string, SetImageData> {
   if (!setImagesData) return {};
   return setImagesData.sets;
 }
+
+// --- Index entries for search index API / sets page ---------------------
 
 export interface SearchIndexEntry {
   id: string;
@@ -276,9 +381,10 @@ export interface SetIndexEntry {
   imageUrl: string | null;
 }
 
-export function getSetIndex(): SetIndexEntry[] {
+export async function getSetIndex(): Promise<SetIndexEntry[]> {
   const images = getAllSetImages();
-  return database.sets.map(set => ({
+  const [sets, setNameLookup] = await Promise.all([fetchSetRows(), fetchSetNameLookup()]);
+  return sets.map(set => ({
     id: set.id,
     name: set.name,
     shortName: setNameLookup[set.id] || set.name,
@@ -288,7 +394,8 @@ export function getSetIndex(): SetIndexEntry[] {
 }
 
 export async function getSearchIndex(): Promise<SearchIndexEntry[]> {
-  return (await getBrowsableCards()).map(card => ({
+  const [cards, setNameLookup] = await Promise.all([getBrowsableCards(), fetchSetNameLookup()]);
+  return cards.map(card => ({
     id: card.id,
     name: card.name,
     tcgName: card.price?.tcgplayerProductName ?? null,

@@ -70,7 +70,7 @@ export async function calculatePriceChange(
 
   // Look up tcgplayer_product_id
   const { data: mapping } = await supabase
-    .from('card_prices')
+    .from('tcgplayer_card_prices')
     .select('tcgplayer_product_id')
     .eq('card_id', cardId)
     .single();
@@ -83,7 +83,7 @@ export async function calculatePriceChange(
   const dateStr = targetDate.toISOString().split('T')[0];
 
   const { data: row } = await supabase
-    .from('card_price_history')
+    .from('tcgplayer_card_price_history')
     .select('market_price')
     .eq('tcgplayer_product_id', mapping.tcgplayer_product_id)
     .lte('recorded_date', dateStr)
@@ -196,7 +196,7 @@ export async function getCardPriceHistory(
 
   // Look up tcgplayer_product_id
   const { data: mapping } = await supabase
-    .from('card_prices')
+    .from('tcgplayer_card_prices')
     .select('tcgplayer_product_id')
     .eq('card_id', cardId)
     .single();
@@ -209,7 +209,7 @@ export async function getCardPriceHistory(
   const dateStr = startDate.toISOString().split('T')[0];
 
   const { data: rows } = await supabase
-    .from('card_price_history')
+    .from('tcgplayer_card_price_history')
     .select('recorded_date, market_price')
     .eq('tcgplayer_product_id', mapping.tcgplayer_product_id)
     .gte('recorded_date', dateStr)
@@ -257,7 +257,7 @@ export async function getCardSales(
   if (!supabase) return [];
 
   const { data: mapping } = await supabase
-    .from('card_prices')
+    .from('tcgplayer_card_prices')
     .select('tcgplayer_product_id')
     .eq('card_id', cardId)
     .single();
@@ -323,6 +323,28 @@ export async function getCardPopulations(
   ];
 
   return { PSA: psa };
+}
+
+export interface CardPsaInfo {
+  spec_id: number;
+  description: string | null;
+}
+
+/**
+ * Get the PSA spec record for a card — id + description. Used by the
+ * debug-names section on the card page so we can spot-check that the
+ * bandai / TCGplayer / PSA names actually refer to the same physical
+ * card, and link directly to PSA / TCGplayer for verification.
+ * Returns null when the card has no pops_psa mapping.
+ */
+export async function getCardPsaInfo(cardId: string): Promise<CardPsaInfo | null> {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from('pops_psa')
+    .select('spec_id, description')
+    .eq('card_id', cardId)
+    .maybeSingle();
+  return data ? { spec_id: Number(data.spec_id), description: data.description } : null;
 }
 
 /**

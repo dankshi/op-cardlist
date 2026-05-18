@@ -142,7 +142,7 @@ async function processDate(
     for (let i = 0; i < historyRows.length; i += BATCH_SIZE) {
       const batch = historyRows.slice(i, i + BATCH_SIZE);
       const { error } = await supabase
-        .from('card_price_history')
+        .from('tcgplayer_card_price_history')
         .upsert(batch, { onConflict: 'tcgplayer_product_id,recorded_date', ignoreDuplicates: false });
 
       if (error) {

@@ -46,11 +46,12 @@ export function buildCharacterIndex(allCards: Card[]): CharacterEntry[] {
 }
 
 /**
- * Get all unique character slugs for static generation.
- * Uses synchronous getAllSets() so no price data is needed.
+ * Get all unique character slugs for static generation. Queries the cards
+ * table (no prices needed); cached per-request via React.cache() in
+ * lib/cards.ts.
  */
-export function getAllCharacterSlugs(): string[] {
-  const sets = getAllSets();
+export async function getAllCharacterSlugs(): Promise<string[]> {
+  const sets = await getAllSets();
   const allCards = sets.flatMap((s) => s.cards);
   const characterCards = allCards.filter(
     (c) => c.type === 'CHARACTER' || c.type === 'LEADER'

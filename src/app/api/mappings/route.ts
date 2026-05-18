@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     // Check if admin key matches (for viewing unapproved)
     const isAdmin = adminKey === process.env.ADMIN_KEY;
 
-    let query = supabase.from('card_mappings').select('*');
+    let query = supabase.from('card_mappings_legacy').select('*');
 
     // Only show approved unless admin requests all
     if (!isAdmin || !includeUnapproved) {
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     }));
 
     const { data, error } = await supabase
-      .from('card_mappings')
+      .from('card_mappings_legacy')
       .upsert(mappingRows, { onConflict: 'card_id' })
       .select();
 
@@ -95,7 +95,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to save mappings', details: error.message }, { status: 500 });
     }
 
-    // 2. Save to card_prices (source of truth for the app)
+    // 2. Save to card_tcgplayer_mapping (source of truth for card_id ↔
+    //    tcgplayer_product_id). Marked source='manual' since this came
+    //    from a human via the /test page.
+    const tcgMappingRows = submissions.map(sub => ({
+      card_id: sub.cardId,
+      tcgplayer_product_id: sub.tcgProductId,
+      tcgplayer_url: sub.tcgUrl,
+      tcgplayer_name: sub.tcgName,
+      source: 'manual' as const,
+      mapped_by: submittedBy,
+    }));
+
+    const { error: mappingError } = await supabase
+      .from('card_tcgplayer_mapping')
+      .upsert(tcgMappingRows, { onConflict: 'card_id' });
+
+    if (mappingError) {
+      console.error('Supabase error (card_tcgplayer_mapping):', mappingError);
+      // Don't fail — card_mappings (legacy audit) already saved
+    }
+
+    // 3. Also write a stub row to card_prices so the scraper has a row to
+    //    UPDATE prices into. Mapping cols are kept-but-unused here until
+    //    Migration D strips them.
     const priceRows = submissions.map(sub => ({
       card_id: sub.cardId,
       tcgplayer_product_id: sub.tcgProductId,
@@ -106,12 +129,12 @@ export async function POST(request: Request) {
     }));
 
     const { error: priceError } = await supabase
-      .from('card_prices')
+      .from('tcgplayer_card_prices')
       .upsert(priceRows, { onConflict: 'card_id' });
 
     if (priceError) {
       console.error('Supabase error (card_prices):', priceError);
-      // Don't fail — card_mappings already saved
+      // Don't fail — card_tcgplayer_mapping already saved
     }
 
     return NextResponse.json({

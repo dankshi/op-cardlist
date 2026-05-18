@@ -1,10 +1,20 @@
 import * as cheerio from 'cheerio';
-import * as fs from 'fs';
-import * as path from 'path';
-import type { Card, CardSet, CardDatabase, CardColor, CardType, Rarity, Attribute, ArtStyle } from '../src/types/card';
+import * as dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
+import type { Card, CardSet, CardColor, CardType, Rarity, Attribute, ArtStyle } from '../src/types/card';
+
+dotenv.config({ path: '.env.local' });
 
 const BASE_URL_EN = 'https://en.onepiece-cardgame.com';
 const BASE_URL_ASIA = 'https://asia-en.onepiece-cardgame.com';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase env vars (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+  process.exit(1);
+}
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Map of set series IDs to their info
 // English site sets (569xxx) - scraped directly from en.onepiece-cardgame.com
@@ -54,9 +64,13 @@ const SETS: Record<string, SetInfo> = {
   //   English images available on en.onepiece-cardgame.com.
   // Previously used '556204' with site:'asia', englishImages:false (Japanese images only).
   '569114': { id: 'op14-eb04', name: 'OP14-EB04 - The Azure Sea\'s Seven', releaseDate: '2026-01-16' },
+  // OP15-EB04: same combined-set pattern as OP14. Release date is a best
+  // guess based on PSA's pop report year (2026) — correct when known.
+  '569115': { id: 'op15-eb04', name: 'OP15-EB04 - Adventure on Kami\'s Island', releaseDate: '2026-04-17' },
   // Premium Booster Packs (now available on English site)
   // Previously used Asia site (556301) - switched to English site (569301) for native English images.
   '569301': { id: 'prb-01', name: 'PRB-01 - One Piece Card The Best', releaseDate: '2024-11-08' },
+  '569302': { id: 'prb-02', name: 'PRB-02 - One Piece Card The Best vol.2', releaseDate: '2025-05-30' },
   // Promotion Cards & Other Product Cards (English site)
   // These are ongoing categories, not time-limited sets. Release date is approximate (first cards appeared).
   '569901': { id: 'promo', name: 'Promotion Cards', releaseDate: '2022-12-02' },
@@ -329,33 +343,181 @@ async function scrapeSet(seriesId: string): Promise<CardSet | null> {
   }
 }
 
+// --- DB upsert helpers --------------------------------------------------
+
+interface CardSetRow {
+  id: string;
+  name: string;
+  series_id: string | null;
+  release_date: string | null;
+  card_count: number | null;
+}
+
+interface CardRow {
+  id: string;
+  base_id: string;
+  set_id: string;
+  name: string;
+  type: string;
+  colors: string[];
+  rarity: string | null;
+  cost: number | null;
+  power: number | null;
+  counter: number | null;
+  life: number | null;
+  attribute: string | null;
+  traits: string[];
+  effect: string | null;
+  trigger_text: string | null;
+  image_url: string | null;
+  variant: string | null;
+  is_parallel: boolean;
+  art_style: string | null;
+}
+
+function setToRow(s: CardSet, seriesId: string): CardSetRow {
+  return {
+    id: s.id,
+    name: s.name,
+    series_id: seriesId,
+    release_date: s.releaseDate ?? null,
+    card_count: s.cardCount ?? null,
+  };
+}
+
+function cardToRow(c: Card): CardRow {
+  return {
+    id: c.id,
+    base_id: c.baseId ?? c.id,
+    set_id: c.setId,
+    name: c.name,
+    type: c.type,
+    colors: c.colors ?? [],
+    rarity: c.rarity ?? null,
+    cost: c.cost ?? null,
+    power: c.power ?? null,
+    counter: c.counter ?? null,
+    life: c.life ?? null,
+    attribute: c.attribute ?? null,
+    traits: c.traits ?? [],
+    effect: c.effect ?? null,
+    trigger_text: c.trigger ?? null,
+    image_url: c.imageUrl ?? null,
+    variant: c.variant ?? null,
+    is_parallel: c.isParallel ?? false,
+    art_style: c.artStyle ?? null,
+  };
+}
+
+async function upsertInChunks<T>(table: string, rows: T[], onConflict: string, chunkSize = 500): Promise<void> {
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await supabase.from(table).upsert(chunk, { onConflict });
+    if (error) {
+      throw new Error(`${table} upsert failed at chunk ${i}: ${error.message}`);
+    }
+  }
+}
+
+// --- main ---------------------------------------------------------------
+
 async function main() {
   const args = process.argv.slice(2);
-  const seriesIds = args.length > 0 ? args : Object.keys(SETS);
+  const dryRun = args.includes('--dry-run');
+  const seriesIds = args.filter(a => !a.startsWith('--'));
+  const targets = seriesIds.length > 0 ? seriesIds : Object.keys(SETS);
 
-  console.log(`Scraping ${seriesIds.length} set(s)...`);
+  console.log(`Scraping ${targets.length} set(s)...`);
 
-  const sets: CardSet[] = [];
+  const sets: { set: CardSet; seriesId: string }[] = [];
 
-  for (const seriesId of seriesIds) {
+  for (const seriesId of targets) {
     const set = await scrapeSet(seriesId);
     if (set) {
-      sets.push(set);
+      sets.push({ set, seriesId });
     }
-    // Small delay between requests
+    // Small delay between requests so we don't hammer Bandai
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-  const database: CardDatabase = {
-    sets,
-    lastUpdated: new Date().toISOString(),
-  };
+  if (sets.length === 0) {
+    console.log('Nothing to upsert (no sets scraped successfully).');
+    return;
+  }
 
-  const outputPath = path.join(process.cwd(), 'data', 'cards.json');
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, JSON.stringify(database, null, 2));
+  const totalCards = sets.reduce((sum, { set }) => sum + set.cardCount, 0);
+  console.log(`\nScraped ${sets.length} set(s), ${totalCards} cards total.`);
 
-  console.log(`\nSaved ${sets.length} set(s) with ${sets.reduce((sum, s) => sum + s.cardCount, 0)} total cards to ${outputPath}`);
+  // Dedupe cards by id. A small number of cards appear in multiple sets
+  // (e.g. promo reprints listed under both "promo" and "other-product");
+  // Postgres won't UPSERT two rows with the same conflict key in one batch.
+  const cardMap = new Map<string, CardRow>();
+  const dupes: string[] = [];
+  for (const { set } of sets) {
+    for (const c of set.cards) {
+      const row = cardToRow(c);
+      if (cardMap.has(row.id)) dupes.push(row.id);
+      else cardMap.set(row.id, row);
+    }
+  }
+  const setRows: CardSetRow[] = sets.map(({ set, seriesId }) => setToRow(set, seriesId));
+  const cardRows: CardRow[] = Array.from(cardMap.values());
+  if (dupes.length > 0) {
+    console.log(`  (deduped ${dupes.length} cross-set duplicate id(s): ${dupes.slice(0, 5).join(', ')}${dupes.length > 5 ? '...' : ''})`);
+  }
+
+  // Reprint protection. Bandai's "collection" pages (PRB, EB, etc.) list
+  // reprints of cards from many other sets — if we naively UPSERT, we
+  // overwrite each reprinted card's set_id, breaking the original set's
+  // listing. Pre-fetch existing card → set_id mappings; for any incoming
+  // card that already exists under a DIFFERENT set, skip it. Cards with
+  // a matching set_id still get updated (so name/rarity/etc. corrections
+  // from Bandai still propagate when re-scraping the original set).
+  console.log('Loading existing cards to detect reprints...');
+  const existingSetId = new Map<string, string>();
+  const PAGE = 1000;
+  for (let f = 0; ; f += PAGE) {
+    const { data, error } = await supabase.from('cards').select('id, set_id').range(f, f + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const r of data) existingSetId.set(r.id, r.set_id);
+    if (data.length < PAGE) break;
+  }
+
+  const upsertable: CardRow[] = [];
+  const reprints: { id: string; existing: string; incoming: string }[] = [];
+  for (const row of cardRows) {
+    const existing = existingSetId.get(row.id);
+    if (existing == null || existing === row.set_id) {
+      upsertable.push(row);
+    } else {
+      reprints.push({ id: row.id, existing, incoming: row.set_id });
+    }
+  }
+
+  if (reprints.length > 0) {
+    console.log(`  (skipped ${reprints.length} reprint(s) already in DB under another set; original set_id preserved)`);
+    for (const r of reprints.slice(0, 3)) {
+      console.log(`    ${r.id}: kept set_id=${r.existing} (incoming wanted ${r.incoming})`);
+    }
+    if (reprints.length > 3) console.log(`    ...and ${reprints.length - 3} more`);
+  }
+
+  if (dryRun) {
+    console.log('(dry-run — no DB writes)');
+    return;
+  }
+
+  console.log(`Upserting ${setRows.length} card_sets...`);
+  await upsertInChunks('card_sets', setRows, 'id');
+
+  console.log(`Upserting ${upsertable.length} cards (${cardRows.length - upsertable.length} reprints skipped)...`);
+  await upsertInChunks('cards', upsertable, 'id');
+
+  console.log('Done.');
 }
 
-main().catch(console.error);
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});

@@ -1,8 +1,6 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Card, CardDatabase } from '../src/types/card';
+import type { Card, CardSet, CardDatabase, CardType, CardColor, Rarity, Attribute, ArtStyle } from '../src/types/card';
 import { SET_NAME_MAP } from '../src/lib/set-names';
 
 dotenv.config({ path: '.env.local' });
@@ -421,16 +419,67 @@ async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function main() {
-  const cardsPath = path.join(process.cwd(), 'data', 'cards.json');
+async function loadCardDatabaseFromSupabase(supabase: SupabaseClient): Promise<CardDatabase> {
+  // Pull all sets + all cards from the DB and reassemble the CardDatabase
+  // shape the rest of this script expects. Paginate cards to defeat the
+  // 1000-row default cap.
+  const { data: setRows, error: setErr } = await supabase
+    .from('card_sets')
+    .select('*')
+    .order('release_date', { ascending: false });
+  if (setErr) throw new Error(`card_sets fetch: ${setErr.message}`);
 
-  if (!fs.existsSync(cardsPath)) {
-    console.error('cards.json not found. Run the card scraper first.');
-    process.exit(1);
+  const cardRows: Record<string, unknown>[] = [];
+  const PAGE = 1000;
+  for (let f = 0; ; f += PAGE) {
+    const { data, error } = await supabase.from('cards').select('*').order('id').range(f, f + PAGE - 1);
+    if (error) throw new Error(`cards fetch (offset ${f}): ${error.message}`);
+    if (!data || data.length === 0) break;
+    cardRows.push(...data);
+    if (data.length < PAGE) break;
   }
 
-  const database: CardDatabase = JSON.parse(fs.readFileSync(cardsPath, 'utf-8'));
+  const cardsBySet = new Map<string, Card[]>();
+  for (const row of cardRows) {
+    const card: Card = {
+      id: row.id as string,
+      baseId: row.base_id as string,
+      name: row.name as string,
+      type: (row.type as CardType) ?? 'CHARACTER',
+      colors: (row.colors as CardColor[]) ?? [],
+      rarity: (row.rarity as Rarity) ?? 'C',
+      cost: (row.cost as number) ?? null,
+      power: (row.power as number) ?? null,
+      counter: (row.counter as number) ?? null,
+      life: (row.life as number) ?? null,
+      attribute: (row.attribute as Attribute) ?? null,
+      traits: (row.traits as string[]) ?? [],
+      effect: (row.effect as string) ?? '',
+      trigger: (row.trigger_text as string) ?? null,
+      imageUrl: (row.image_url as string) ?? '',
+      setId: row.set_id as string,
+      variant: (row.variant as string) ?? undefined,
+      isParallel: (row.is_parallel as boolean) ?? false,
+      artStyle: (row.art_style as ArtStyle) ?? 'standard',
+    };
+    const list = cardsBySet.get(card.setId);
+    if (list) list.push(card);
+    else cardsBySet.set(card.setId, [card]);
+  }
 
+  const sets: CardSet[] = (setRows ?? []).map((s: Record<string, unknown>) => ({
+    id: s.id as string,
+    name: s.name as string,
+    seriesId: (s.series_id as string) ?? '',
+    releaseDate: (s.release_date as string) ?? '',
+    cardCount: (s.card_count as number) ?? 0,
+    cards: cardsBySet.get(s.id as string) ?? [],
+  }));
+
+  return { sets, lastUpdated: new Date().toISOString() };
+}
+
+async function main() {
   // Connect to Supabase (required)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -443,22 +492,41 @@ async function main() {
   const supabase = createClient(supabaseUrl, supabaseKey);
   console.log('Connected to Supabase');
 
-  // Fetch manually-mapped cards from Supabase (their product IDs are protected)
-  const manualMappings = new Map<string, number>(); // card_id → tcgplayer_product_id
-  const { data: manualData, error: manualError } = await supabase
-    .from('card_prices')
-    .select('card_id, tcgplayer_product_id')
-    .eq('manually_mapped', true);
+  console.log('Loading card catalog from cards + card_sets tables...');
+  const database = await loadCardDatabaseFromSupabase(supabase);
+  console.log(`Loaded ${database.sets.length} sets, ${database.sets.reduce((s, set) => s + set.cards.length, 0)} cards.`);
 
-  if (manualError) {
-    console.error('Error fetching manual mappings:', manualError);
-  } else if (manualData) {
-    for (const row of manualData) {
+  // Fetch existing card_id → tcgplayer_product_id mappings from the new
+  // single-source-of-truth table. Previously this read card_prices with
+  // manually_mapped=true; now ALL mappings in card_tcgplayer_mapping are
+  // protected (the scraper never auto-changes them — that's auto-map-
+  // tcgplayer.ts's job). The `manually_mapped` flag below is kept for
+  // backwards-compat with the card_prices writes; will be removed once
+  // those columns are dropped.
+  const manualMappings = new Map<string, number>(); // card_id → tcgplayer_product_id
+  {
+    const PAGE = 1000;
+    const all: { card_id: string; tcgplayer_product_id: number | null; source: string }[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('card_tcgplayer_mapping')
+        .select('card_id, tcgplayer_product_id, source')
+        .order('card_id')
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error('Error fetching card_tcgplayer_mapping:', error);
+        break;
+      }
+      if (!data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < PAGE) break;
+    }
+    for (const row of all) {
       if (row.tcgplayer_product_id) {
         manualMappings.set(row.card_id, row.tcgplayer_product_id);
       }
     }
-    console.log(`Loaded ${manualMappings.size} manually-mapped cards (product IDs protected)`);
+    console.log(`Loaded ${manualMappings.size} card_tcgplayer_mapping rows (product IDs protected from scraper rewrite)`);
   }
 
   const args = process.argv.slice(2);
@@ -647,7 +715,7 @@ async function main() {
       for (let i = 0; i < setRows.length; i += BATCH_SIZE) {
         const batch = setRows.slice(i, i + BATCH_SIZE);
         const { error } = await supabase
-          .from('card_prices')
+          .from('tcgplayer_card_prices')
           .upsert(batch, {
             onConflict: 'card_id',
             // Don't overwrite manually_mapped=true with false
@@ -668,7 +736,7 @@ async function main() {
       for (let i = 0; i < uniqueHistory.length; i += HIST_BATCH) {
         const batch = uniqueHistory.slice(i, i + HIST_BATCH);
         const { error } = await supabase
-          .from('card_price_history')
+          .from('tcgplayer_card_price_history')
           .upsert(batch, { onConflict: 'tcgplayer_product_id,recorded_date', ignoreDuplicates: false });
         if (error) {
           console.error(`  History upsert error for ${set.id}:`, error.message);
@@ -690,7 +758,7 @@ async function main() {
     // Order by sales_scraped_at NULLS FIRST so unseen + stalest cards come first.
     const matchedIdSet = new Set(matchedProductIds.map(m => m.productId));
     const { data: staleness } = await supabase
-      .from('card_prices')
+      .from('tcgplayer_card_prices')
       .select('tcgplayer_product_id, sales_scraped_at')
       .in('tcgplayer_product_id', Array.from(matchedIdSet))
       .order('sales_scraped_at', { ascending: true, nullsFirst: true });
@@ -734,7 +802,7 @@ async function main() {
     async function flushPending() {
       if (pendingLastSold.length > 0) {
         const { error } = await supabase
-          .from('card_prices')
+          .from('tcgplayer_card_prices')
           .upsert(pendingLastSold, { onConflict: 'card_id' });
         if (error) console.error(`  Supabase last sold upsert error:`, error.message);
         pendingLastSold = [];
@@ -744,7 +812,7 @@ async function main() {
         const updates = await Promise.all(
           pendingSalesScraped.map(row =>
             supabase
-              .from('card_prices')
+              .from('tcgplayer_card_prices')
               .update({ sales_scraped_at: row.sales_scraped_at })
               .eq('tcgplayer_product_id', row.tcgplayer_product_id),
           ),

@@ -11,7 +11,7 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  const sets = getAllSets();
+  const sets = await getAllSets();
   return sets.flatMap((set) => {
     const noHyphen = set.id.replace('-', '');
     const params = [{ setId: set.id }];

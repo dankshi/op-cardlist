@@ -69,38 +69,30 @@ npm run scrape
 npm run scrape:op13
 
 # Scrape a specific set by series ID
-npx tsx scripts/scrape.ts 569113
+npx tsx scripts/scrape-bandai-cards.ts 569113
 ```
 
-Output is saved to `data/cards.json`.
+Output is UPSERTed into the Supabase `cards` + `card_sets` tables (incremental: existing cards keep their `set_id` if a "reprint collection" set re-lists them).
 
 ### Series IDs Reference
 
-| Set | Series ID | How to Find |
-|-----|-----------|-------------|
-| OP-01 | 569101 | URL parameter on official site |
-| OP-02 | 569102 | |
-| OP-03 | 569103 | |
-| OP-04 | 569104 | |
-| OP-05 | 569105 | |
-| OP-06 | 569106 | |
-| OP-07 | 569107 | |
-| OP-08 | 569108 | |
-| OP-09 | 569109 | |
-| OP-10 | 569110 | |
-| OP-11 | 569111 | |
-| OP-12 | 569112 | |
-| OP-13 | 569113 | |
+The canonical list lives in [scripts/scrape-bandai-cards.ts](scripts/scrape-bandai-cards.ts) `SETS`. Current English-released sets:
+
+| Set | Series ID |
+|-----|-----------|
+| OP-01 through OP-13 | `5691XX` (e.g. OP-13 → `569113`) |
+| OP-14 / OP-15 (combined with EB-04) | `569114` / `569115` |
+| EB-01, 02, 03 | `5692XX` |
+| PRB-01, 02 | `5693XX` |
 
 **Finding a new series ID:**
 1. Go to https://en.onepiece-cardgame.com/cardlist/
-2. Select the set from the dropdown
-3. Look at the URL: `?series=XXXXXX`
-4. The number after `series=` is the series ID
+2. View page source and search for `<select id="series">` — every option has the seriesId as its `value` attribute
+3. OP-XX sets follow the pattern `569100 + XX`; EB-XX is `569200 + XX`; PRB-XX is `569300 + XX`
 
 ### Adding New Sets
 
-Edit `scripts/scrape.ts` and add to the `SETS` object:
+Edit `scripts/scrape-bandai-cards.ts` and add to the `SETS` object:
 
 ```typescript
 const SETS: Record<string, { id: string; name: string }> = {
@@ -122,7 +114,7 @@ The scraper categorizes parallel cards into art styles:
 - **wanted** - Wanted poster style art
 - **manga** - Manga panel style art
 
-Since art styles can't be auto-detected from the website, they're identified by card ID in `scripts/scrape.ts`:
+Since art styles can't be auto-detected from the website, they're identified by card ID in `scripts/scrape-bandai-cards.ts`:
 
 ```typescript
 // Known wanted poster cards
@@ -142,7 +134,7 @@ const MANGA_CARDS = new Set<string>([
 
 **To add new special art cards:**
 1. Find the card ID (e.g., `OP09-011_p3`)
-2. Add it to `WANTED_CARDS` or `MANGA_CARDS` in `scripts/scrape.ts`
+2. Add it to `WANTED_CARDS` or `MANGA_CARDS` in `scripts/scrape-bandai-cards.ts`
 3. Run `npm run scrape` to update
 
 ### Troubleshooting
@@ -222,9 +214,9 @@ op-cardlist/
 │   └── types/
 │       └── card.ts               # TypeScript interfaces
 ├── scripts/
-│   └── scrape.ts                 # Card data scraper
+│   └── scrape-bandai-cards.ts    # Card data scraper (Bandai → cards + card_sets tables)
 ├── data/
-│   └── cards.json                # Scraped card data
+│   └── set-images.json           # Booster box images for set tiles
 └── public/
 ```
 

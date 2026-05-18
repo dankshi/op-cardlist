@@ -18,9 +18,8 @@ function formatPrice(n: number): string {
 }
 
 export default async function SetsPage() {
-  const sets = getAllSets();
+  const [sets, allCards] = await Promise.all([getAllSets(), getBrowsableCards()]);
   const setImages = getAllSetImages();
-  const allCards = await getBrowsableCards();
 
   // Top 10 value per set (sum of top 10 cards in each set by market_price).
   const top10BySet = new Map<string, number>();

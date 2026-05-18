@@ -30,8 +30,10 @@ export async function generateMetadata({
 
 export default async function SearchPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
-  const allCards = await getBrowsableCards();
-  const matchedSets = q ? searchSets(q) : [];
+  const [allCards, matchedSets] = await Promise.all([
+    getBrowsableCards(),
+    q ? searchSets(q) : Promise.resolve([]),
+  ]);
 
   return (
     <div>

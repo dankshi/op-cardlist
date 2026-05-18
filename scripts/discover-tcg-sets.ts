@@ -6,29 +6,26 @@ dotenv.config({ path: '.env.local' });
 
 const TCGPLAYER_SEARCH_URL = 'https://mp-search-api.tcgplayer.com/v1/search/request';
 
-// All Bandai sets we track (from scripts/scrape.ts SETS dictionary)
-const BANDAI_SETS: Record<string, string> = {
-  'op-01': 'OP-01 - Romance Dawn',
-  'op-02': 'OP-02 - Paramount War',
-  'op-03': 'OP-03 - Pillars of Strength',
-  'op-04': 'OP-04 - Kingdoms of Intrigue',
-  'op-05': 'OP-05 - Awakening of the New Era',
-  'op-06': 'OP-06 - Wings of the Captain',
-  'op-07': 'OP-07 - 500 Years in the Future',
-  'op-08': 'OP-08 - Two Legends',
-  'op-09': 'OP-09 - Emperors in the New World',
-  'op-10': 'OP-10 - Royal Blood',
-  'op-11': 'OP-11 - A Fist of Divine Speed',
-  'op-12': 'OP-12 - Legacy of the Master',
-  'op-13': 'OP-13 - Carrying On His Will',
-  'eb-01': 'EB-01 - Memorial Collection',
-  'eb-02': 'EB-02 - Anime 25th Collection',
-  'eb-03': 'EB-03 - One Piece Heroines Edition',
-  'op14-eb04': 'OP14-EB04 - The Azure Sea\'s Seven',
-  'prb-01': 'PRB-01 - One Piece Card The Best',
-  'promo': 'Promotion Cards',
-  'other-product': 'Other Product Cards',
-};
+// Bandai sets are now loaded from the `card_sets` table at runtime (was a
+// hardcoded dict; would drift every time a new set was added to the
+// scraper). Loaded once in main() and threaded through report/seed funcs.
+let BANDAI_SETS: Record<string, string> = {};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadBandaiSets(supabase: any): Promise<Record<string, string>> {
+  // Typed loosely — Supabase JS's generic typing fights with this; the
+  // shape is stable (id + name strings) so we cast through unknown.
+  const { data, error } = await (supabase.from('card_sets') as any).select('id, name');
+  if (error) {
+    console.error('Failed to load card_sets:', error.message);
+    return {};
+  }
+  const map: Record<string, string> = {};
+  for (const row of (data ?? []) as { id: string; name: string }[]) {
+    map[row.id] = row.name;
+  }
+  return map;
+}
 
 interface SetStats {
   displayName: string;
@@ -303,6 +300,11 @@ async function main() {
   const debug = args.includes('--debug');
   const seedOnly = args.includes('--seed-only');
   const reportOnly = args.includes('--report-only');
+
+  // Load Bandai sets from the DB (was a hardcoded dict; this keeps the
+  // report in sync as new sets are added to the Bandai scraper).
+  BANDAI_SETS = await loadBandaiSets(supabase);
+  console.log(`Loaded ${Object.keys(BANDAI_SETS).length} Bandai sets from card_sets table.`);
 
   if (reportOnly) {
     await printReport(supabase);

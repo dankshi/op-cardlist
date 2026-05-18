@@ -14,9 +14,16 @@ interface TCGPlayerProduct {
   totalListings: number | null;
   productUrlName: string;
   setName: string;
+  // TCGplayer puts card metadata under customAttributes. Rarity comes in
+  // two forms: top-level `rarityName` is the display form ("Common",
+  // "Secret Rare", "Special"); customAttributes.rarityDbName is the
+  // canonical short form ("C", "SEC", "SP"). We store the short form
+  // since it matches Bandai's rarity field on the cards table.
   customAttributes: {
     number?: string;
+    rarityDbName?: string;
   };
+  rarityName?: string;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -180,6 +187,7 @@ async function main() {
         product_name: p.productName,
         set_name: slug,
         card_number: p.customAttributes?.number?.toUpperCase() || null,
+        rarity: p.customAttributes?.rarityDbName ?? p.rarityName ?? null,
         product_url_name: p.productUrlName,
         market_price: p.marketPrice,
         lowest_price: p.lowestPrice,

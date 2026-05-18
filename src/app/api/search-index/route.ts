@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSearchIndex, getSetIndex } from '@/lib/cards';
 
 export async function GET() {
-  const cards = await getSearchIndex();
-  const sets = getSetIndex();
+  const [cards, sets] = await Promise.all([getSearchIndex(), getSetIndex()]);
   return NextResponse.json(
     { cards, sets },
     {

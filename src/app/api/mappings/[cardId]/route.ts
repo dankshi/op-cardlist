@@ -14,7 +14,7 @@ export async function DELETE(
     const { cardId } = await params;
 
     const { error } = await supabase
-      .from('card_mappings')
+      .from('card_mappings_legacy')
       .delete()
       .eq('card_id', cardId);
 

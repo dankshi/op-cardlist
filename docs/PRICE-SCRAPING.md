@@ -5,8 +5,8 @@ This document covers how price scraping works for the One Piece TCG card databas
 ## Overview
 
 Card data comes from two sources:
-1. **Bandai Official Website** (`scripts/scrape.ts`) - Card data, images, and variant IDs
-2. **TCGPlayer API** (`scripts/scrape-prices.ts`) - Market prices
+1. **Bandai Official Website** (`scripts/scrape-bandai-cards.ts`) - Card metadata, images, and variant IDs → UPSERT to `cards` + `card_sets` tables
+2. **TCGPlayer API** (`scripts/scrape-prices.ts`) - Market prices → UPSERT to `tcgplayer_card_prices` table
 
 The challenge is matching Bandai's variant naming (p1, p2, p3, p4) to TCGPlayer's art style naming (Parallel, Super Alternate Art, etc.).
 
@@ -20,8 +20,8 @@ Card data is scraped from two official Bandai sites:
 
 | Site | URL | Sets | Notes |
 |------|-----|------|-------|
-| English | `en.onepiece-cardgame.com` | OP-01 to OP-13 | Main booster sets |
-| Asia English | `asia-en.onepiece-cardgame.com` | EB-01 to EB-04, PRB-01, PRB-02 | Extra & Premium boosters |
+| English | `en.onepiece-cardgame.com` | OP-01 to OP-15, EB-01 to EB-03, PRB-01, PRB-02 | All currently-configured sets are on the English site |
+| Asia English | `asia-en.onepiece-cardgame.com` | (fallback for not-yet-English sets) | Set `site: 'asia'` + `englishImages: false` in `SETS` when a set hasn't released English yet |
 
 ### Japanese vs English Images
 
@@ -43,14 +43,7 @@ Card data is scraped from two official Bandai sites:
 
 ### Current Status (as of scraping)
 
-| Set | Card Data Source | Image Source | English Available |
-|-----|------------------|--------------|-------------------|
-| OP-01 to OP-13 | English site | English | ✅ |
-| EB-01 | Asia site | English | ✅ |
-| EB-02 | Asia site | English | ✅ |
-| EB-03 | Asia site | English | ✅ |
-| OP14-EB04 | Asia site | **Japanese** | ❌ (not yet) |
-| PRB-01 | Asia site | English | ✅ |
+All currently-configured sets pull from the English site with English images. See [scripts/scrape-bandai-cards.ts](../scripts/scrape-bandai-cards.ts) `SETS` for the canonical list. When a new set hasn't released English yet, set `site: 'asia'` + `englishImages: false` on its entry — that's the only branch in the scraper that uses the Asia site.
 
 ### Updating When English Becomes Available
 
@@ -61,7 +54,7 @@ When a new set's English version releases:
    curl -I https://en.onepiece-cardgame.com/images/cardlist/card/[SET_ID]-001.png
    ```
 
-2. If 200 response, update `scripts/scrape.ts`:
+2. If 200 response, update `scripts/scrape-bandai-cards.ts`:
    ```typescript
    // Change from:
    '556204': { id: 'op14-eb04', name: 'OP14-EB04...', site: 'asia', englishImages: false },
@@ -79,7 +72,7 @@ When a new set's English version releases:
 When a new set (e.g., EB-05) is announced:
 
 1. Find the series ID on the Asia site (check network tab or page source)
-2. Add to `SETS` in `scripts/scrape.ts`:
+2. Add to `SETS` in `scripts/scrape-bandai-cards.ts`:
    ```typescript
    '556205': { id: 'eb-05', name: 'EB-05 Extra Booster - [Name]', site: 'asia', englishImages: false },
    ```

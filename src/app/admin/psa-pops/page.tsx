@@ -18,6 +18,16 @@ interface PopsRow {
 // the description suffix; the linked card's TCGplayer name should agree.
 // If it doesn't, the underlying mapping changed since we last
 // auto-matched (or our original match was wrong).
+// TCGplayer doesn't expose stable per-product URLs we can construct from
+// just a name, but their search works. Pre-fill it with the spec
+// description + (when present) the PSA card number, scoped to One Piece.
+function tcgSearchUrl(row: PopsRow): string {
+  const parts = [row.description];
+  if (row.psa_card_number) parts.push(row.psa_card_number);
+  const q = encodeURIComponent(parts.join(' '));
+  return `https://www.tcgplayer.com/search/one-piece-card-game/product?productLineName=one-piece-card-game&q=${q}&view=grid`;
+}
+
 function staleReason(row: PopsRow): string | null {
   if (!row.card_id) return null
   if (!row.tcg_name) return 'Linked card_id no longer exists in card_prices.'
@@ -134,7 +144,14 @@ export default async function PSAPopsAdminPage() {
                     <td className="px-3 py-2">
                       <div className="font-medium">{r.description}</div>
                       <div className="text-xs text-zinc-500">
-                        spec {r.spec_id}{r.psa_card_number ? ` · PSA #${r.psa_card_number}` : ''}
+                        <a className="hover:underline" href={`https://www.psacard.com/spec/psa/${r.spec_id}`} target="_blank" rel="noreferrer">
+                          spec {r.spec_id} ↗
+                        </a>
+                        {r.psa_card_number ? ` · PSA #${r.psa_card_number}` : ''}
+                        {' · '}
+                        <a className="text-blue-600 hover:underline" href={tcgSearchUrl(r)} target="_blank" rel="noreferrer">
+                          search TCG
+                        </a>
                       </div>
                     </td>
                     <td className="px-3 py-2 font-mono text-xs">
@@ -144,7 +161,7 @@ export default async function PSAPopsAdminPage() {
                     </td>
                     <td className="px-3 py-2 text-zinc-700">
                       {r.tcg_url ? (
-                        <a className="hover:underline" href={r.tcg_url} target="_blank" rel="noreferrer">{r.tcg_name}</a>
+                        <a className="text-blue-600 hover:underline" href={r.tcg_url} target="_blank" rel="noreferrer">{r.tcg_name}</a>
                       ) : (
                         <span>{r.tcg_name ?? '—'}</span>
                       )}
@@ -170,14 +187,24 @@ export default async function PSAPopsAdminPage() {
             <tr>
               <th className="px-3 py-2">PSA spec</th>
               <th className="px-3 py-2">PSA card #</th>
+              <th className="px-3 py-2">Find on TCG</th>
               <th className="px-3 py-2 text-right">Pop</th>
             </tr>
           </thead>
           <tbody>
             {unmapped.slice(0, 50).map(r => (
               <tr key={r.spec_id} className="border-t border-zinc-100">
-                <td className="px-3 py-2">{r.description}</td>
+                <td className="px-3 py-2">
+                  <a className="hover:underline" href={`https://www.psacard.com/spec/psa/${r.spec_id}`} target="_blank" rel="noreferrer">
+                    {r.description} ↗
+                  </a>
+                </td>
                 <td className="px-3 py-2 font-mono text-xs text-zinc-700">{r.psa_card_number || '—'}</td>
+                <td className="px-3 py-2">
+                  <a className="text-blue-600 hover:underline text-xs" href={tcgSearchUrl(r)} target="_blank" rel="noreferrer">
+                    search →
+                  </a>
+                </td>
                 <td className="px-3 py-2 text-right tabular-nums">{r.total_pop?.toLocaleString() ?? '—'}</td>
               </tr>
             ))}

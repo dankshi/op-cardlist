@@ -4,8 +4,7 @@ import { getAllCharacterSlugs } from '@/lib/characters';
 import { SITE_URL } from '@/lib/seo';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const sets = getAllSets();
-  const cards = await getAllCards();
+  const [sets, cards] = await Promise.all([getAllSets(), getAllCards()]);
 
   // Homepage and key pages
   const staticPages: MetadataRoute.Sitemap = [
@@ -56,7 +55,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // Character pages
-  const characterSlugs = getAllCharacterSlugs();
+  const characterSlugs = await getAllCharacterSlugs();
   const characterPages: MetadataRoute.Sitemap = characterSlugs.map((slug) => ({
     url: `${SITE_URL}/character/${slug}`,
     lastModified: new Date(),
