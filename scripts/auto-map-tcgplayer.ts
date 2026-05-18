@@ -93,6 +93,25 @@ function matchesVariant(card: CardRow, product: TcgProductRow): boolean {
   const name = product.product_name.toLowerCase();
   const has = (s: string) => name.includes(s);
 
+  // PRB (Premium Booster) is hoisted to the top because its products
+  // don't follow the normal SP/TR/rarity conventions — a PRB SP card
+  // can be labeled (Alternate Art), an SR card can be labeled (Manga),
+  // and so on. The _p*/_r* suffix is the truth for these. Standard
+  // SP/TR/rarity rules apply to non-PRB cards below.
+  if (card.set_id?.startsWith('prb-')) {
+    const isPVariant = /_p\d+$/i.test(card.id);
+    const isRVariant = /_r\d+$/i.test(card.id);
+    if (isRVariant) return has('(reprint)');
+    if (isPVariant) {
+      const isAA = has('(parallel)') || has('(alternate art)') ||
+                   has('(manga)') || has('(pirate foil)') ||
+                   has('(sp)') || has('(super alternate art)');
+      const isReprint = has('(reprint)');
+      return isAA && !isReprint;
+    }
+    // base card (no suffix) falls through to standard logic below
+  }
+
   // SP / TR rarity is unreliable on TCGplayer's side — they typically
   // tag those products with the underlying card's rarity (e.g., a SP
   // Rebecca card with base rarity SR shows up as rarity='SR' on TCG).
@@ -112,39 +131,8 @@ function matchesVariant(card: CardRow, product: TcgProductRow): boolean {
   // Wanted Poster art style: name should have "(Wanted Poster)".
   if (card.art_style === 'wanted') return has('(wanted poster)');
 
-  // Alternate art has special handling for PRB (Premium Booster) reprint
-  // collections. PRB-XX sets re-issue cards from many older sets, and
-  // Bandai marks variants like `_p1`/`_r1` while TCGplayer labels each
-  // listing with its own suffix — `(Alternate Art)`, `(Pirate Foil)`,
-  // or `(Reprint)`. The convention:
-  //   `_r*` suffix → `(Reprint)` (always, all rarities)
-  //   `_p*` suffix on C/UC card → `(Pirate Foil)` (only common rarities get this treatment)
-  //   `_p*` suffix on R+ card → `(Alternate Art)` / `(Parallel)`
-  // For non-PRB sets, fall back to the standard Alt Art rule.
+  // Standard Alt Art rule (PRB _p*/_r* already handled at top of function).
   if (card.art_style === 'alternate') {
-    const isPRB = card.set_id?.startsWith('prb-') ?? false;
-
-    if (isPRB) {
-      const isPVariant = /_p\d+$/i.test(card.id);
-      const isRVariant = /_r\d+$/i.test(card.id);
-      const isCommonish = card.rarity === 'C' || card.rarity === 'UC';
-
-      if (isRVariant) return has('(reprint)');
-      if (isPVariant) {
-        if (isCommonish) {
-          // C/UC: only (Pirate Foil) is the right match. Reject Alt Art.
-          return has('(pirate foil)');
-        }
-        // R / SR / SEC / etc: match (Alternate Art) / (Parallel) only.
-        const isAA = has('(parallel)') || has('(alternate art)');
-        const isOther = has('(manga)') || has('(sp)') || has('(tr)') ||
-                        has('(super alternate art)') || has('(wanted poster)') ||
-                        has('(pirate foil)') || has('(reprint)');
-        return isAA && !isOther;
-      }
-      // No suffix on a PRB card (base) — fall through to standard rule.
-    }
-
     const isAA = has('(parallel)') || has('(alternate art)');
     const isSpecial = has('(manga)') || has('(sp)') || has('(tr)') ||
                       has('(super alternate art)') || has('(wanted poster)');
@@ -247,12 +235,27 @@ async function main() {
       continue;
     }
 
-    if (unclaimed.length > 1) {
-      stats.ambiguous++;
-      continue;
+    let winner: TcgProductRow;
+    if (unclaimed.length === 1) {
+      winner = unclaimed[0];
+    } else {
+      // Multi-candidate fallback for PRB _p* cards: TCGplayer lists
+      // multiple non-Reprint variants per card_number (Alt Art + Pirate
+      // Foil + Manga), and Bandai has matching _p1/_p2/_p3 variants in
+      // our DB. Sort both by natural order — TCGplayer products by
+      // product_id ascending, our cards by id (so _p1 comes before _p2).
+      // Combined with claim tracking, this pairs them positionally:
+      // lowest-numbered _p variant claims the lowest-product-id variant
+      // first, leaving higher-numbered variants for higher product_ids.
+      const isPRB = card.set_id?.startsWith('prb-') ?? false;
+      const isPVariant = /_p\d+$/i.test(card.id);
+      if (isPRB && isPVariant) {
+        winner = [...unclaimed].sort((a, b) => a.product_id - b.product_id)[0];
+      } else {
+        stats.ambiguous++;
+        continue;
+      }
     }
-
-    const winner = unclaimed[0];
     claimedProductIds.add(winner.product_id);
 
     const prior = existingMap.get(card.id);

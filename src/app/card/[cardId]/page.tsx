@@ -15,6 +15,20 @@ import { ListingsGrid } from "@/components/marketplace/ListingsGrid";
 
 export const dynamic = 'force-dynamic';
 
+// set_id → Bandai cardlist series ID. Mirrors the SETS dict in
+// scripts/scrape-bandai-cards.ts. Used for the debug "bandai_url" link
+// so we can sanity-check our scraped fields against Bandai's catalog.
+const BANDAI_SERIES_ID: Record<string, string> = {
+  'op-01': '569101', 'op-02': '569102', 'op-03': '569103', 'op-04': '569104',
+  'op-05': '569105', 'op-06': '569106', 'op-07': '569107', 'op-08': '569108',
+  'op-09': '569109', 'op-10': '569110', 'op-11': '569111', 'op-12': '569112',
+  'op-13': '569113',
+  'op14-eb04': '569114', 'op15-eb04': '569115',
+  'eb-01': '569201', 'eb-02': '569202', 'eb-03': '569203',
+  'prb-01': '569301', 'prb-02': '569302',
+  'promo': '569901', 'other-product': '569801',
+};
+
 interface PageProps {
   params: Promise<{ cardId: string }>;
 }
@@ -113,6 +127,15 @@ export default async function CardPage({ params }: PageProps) {
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
   const relatedCards = parallelCards.filter(c => c.id !== card.id);
 
+  // Bandai's official cardlist page. Each card on the page is an HTML
+  // element with id={cardId}, so the fragment jumps directly to the row.
+  // Useful in the debug block to verify our scraped rarity/stats match the
+  // source of truth.
+  const bandaiSeriesId = BANDAI_SERIES_ID[card.setId];
+  const bandaiUrl = bandaiSeriesId
+    ? `https://en.onepiece-cardgame.com/cardlist/?series=${bandaiSeriesId}#${card.id}`
+    : null;
+
   return (
     <div>
       {/* Breadcrumbs */}
@@ -155,6 +178,14 @@ export default async function CardPage({ params }: PageProps) {
             <span className="text-zinc-500">{'  rarity      '}</span><span className="text-orange-300">{card.rarity}</span>{'\n'}
             <span className="text-zinc-500">{'  type        '}</span><span className="text-orange-300">{card.type}</span>{'\n'}
             <span className="text-zinc-500">{'  art_style   '}</span><span className="text-orange-300">{card.artStyle ?? <span className="italic text-zinc-600">—</span>}</span>{'\n'}
+            <span className="text-zinc-500">{'  bandai_url  '}</span>
+            {bandaiUrl ? (
+              <a href={bandaiUrl} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline break-all">
+                {bandaiUrl}
+              </a>
+            ) : (
+              <span className="italic text-zinc-600">unknown set</span>
+            )}{'\n'}
             {'\n'}
             <span className="text-sky-400">card_prices</span>{'\n'}
             <span className="text-zinc-500">{'  tcg_name    '}</span><span className="text-orange-300">{card.price?.tcgplayerProductName ?? <span className="italic text-zinc-600">none</span>}</span>{'\n'}
