@@ -14,7 +14,7 @@ const ALLOWED_RARITIES = new Set(['C', 'UC', 'R', 'SR', 'SEC', 'L', 'P', 'SP', '
  *  Body: { art_style?: string, rarity?: string }
  *
  *  Admin-only inline edit for the cards row. Currently editable fields:
- *  - art_style: standard / alternate / manga / wanted
+ *  - art_style: standard / alternate / manga / wanted / textured
  *  - rarity: C / UC / R / SR / SEC / L / P / SP / TR */
 export async function PATCH(
   req: NextRequest,
@@ -77,6 +77,7 @@ export async function PATCH(
   revalidatePath('/admin/psa-pops')
   revalidatePath('/admin/visibility')
   revalidatePath('/admin/mappings')
+  revalidatePath('/admin/cards')
   revalidatePath(`/card/${cardId}`)
 
   return NextResponse.json({ success: true })

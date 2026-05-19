@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { HIDDEN_RARITIES } from '@/lib/cards'
+import { HIDDEN_RARITIES, isHiddenByFields } from '@/lib/cards'
 import { HoverThumb } from '@/components/admin/HoverThumb'
 
 export const dynamic = 'force-dynamic'
@@ -9,17 +9,10 @@ interface CardRow {
   id: string
   name: string
   set_id: string
+  type: string | null
   rarity: string | null
   art_style: string | null
   image_url: string | null
-}
-
-// Mirror of isHiddenCard() in src/lib/cards.ts. Re-implemented here against
-// the raw row shape (rarity + art_style strings) so we can run it without
-// the Card type conversion.
-function isHidden(rarity: string | null, artStyle: string | null): boolean {
-  if (!rarity) return false
-  return HIDDEN_RARITIES.has(rarity) && (artStyle ?? 'standard') === 'standard'
 }
 
 async function paginate<T>(
@@ -39,7 +32,7 @@ async function paginate<T>(
 export default async function VisibilityAuditPage() {
   const supabase = await createClient()
   const cards = await paginate<CardRow>((from, to) =>
-    supabase.from('cards').select('id, name, set_id, rarity, art_style, image_url').order('id').range(from, to),
+    supabase.from('cards').select('id, name, set_id, type, rarity, art_style, image_url').order('id').range(from, to),
   )
 
   // Split per set; within each set, split into hidden vs shown.
@@ -47,14 +40,14 @@ export default async function VisibilityAuditPage() {
   const bySet = new Map<string, Bucket>()
   for (const c of cards) {
     const b = bySet.get(c.set_id) ?? { hidden: [], shown: [] }
-    if (isHidden(c.rarity, c.art_style)) b.hidden.push(c)
+    if (isHiddenByFields(c.set_id, c.type, c.rarity, c.art_style)) b.hidden.push(c)
     else b.shown.push(c)
     bySet.set(c.set_id, b)
   }
   // Sort sets by hidden count desc so the largest audit targets surface first.
   const sections = Array.from(bySet.entries()).sort((a, b) => b[1].hidden.length - a[1].hidden.length)
 
-  const totalHidden = cards.filter(c => isHidden(c.rarity, c.art_style)).length
+  const totalHidden = cards.filter(c => isHiddenByFields(c.set_id, c.type, c.rarity, c.art_style)).length
   const totalShown = cards.length - totalHidden
 
   return (

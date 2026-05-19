@@ -244,13 +244,35 @@ export async function getSetBySlug(slug: string): Promise<CardSet | undefined> {
  *  parallel versions have collector value. */
 export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R', 'P', 'SR', 'L']);
 
-/** A card is hidden from browse/search/set surfaces if it's a low-rarity
- *  *standard* print. Alternate arts (Premium Booster AAs, manga variants,
- *  wanted-poster art) of the same base card stay visible — those are
- *  pull-rate variants with real market value even when the base rarity
- *  letter is R/UC/C. */
+/** Centralized visibility rule. Every surface (set pages, search,
+ *  admin/visibility, admin/mappings, admin/psa-pops, card "Other Versions")
+ *  routes through this so a rule change here propagates everywhere on the
+ *  next render.
+ *
+ *  String-based variant for admin pages that work with raw Supabase rows
+ *  (where the columns are `set_id`, `art_style`, etc., not the Card
+ *  type's setId / artStyle).
+ *
+ *  Current rules:
+ *  1. Low-rarity standard prints — base C/UC/R/P/SR/L cards with no
+ *     variant treatment. Their alt arts / manga / wanted / textured
+ *     variants stay visible.
+ *  2. PRB-01 Event/Stage cards (every variant) — the foil/Reprint
+ *     non-character reprints are noise, not worth listing. */
+export function isHiddenByFields(
+  setId: string | null,
+  type: string | null,
+  rarity: string | null,
+  artStyle: string | null,
+): boolean {
+  if (rarity && HIDDEN_RARITIES.has(rarity) && (artStyle ?? 'standard') === 'standard') return true;
+  if (setId === 'prb-01' && (type === 'EVENT' || type === 'STAGE')) return true;
+  return false;
+}
+
+/** Card-type variant — used everywhere the Card model is in hand. */
 export function isHiddenCard(card: Card): boolean {
-  return HIDDEN_RARITIES.has(card.rarity) && (card.artStyle ?? 'standard') === 'standard';
+  return isHiddenByFields(card.setId, card.type, card.rarity, card.artStyle ?? null);
 }
 
 export async function getAllCards(): Promise<Card[]> {

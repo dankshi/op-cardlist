@@ -14,22 +14,9 @@ import { CardPopulations } from "@/components/card/CardPopulations";
 import { PriceChangeBadge } from "@/components/PriceChangeBadge";
 import { ShareButtons } from "@/components/ShareButtons";
 import { ListingsGrid } from "@/components/marketplace/ListingsGrid";
+import { bandaiCardUrl } from "@/lib/bandai-sets";
 
 export const dynamic = 'force-dynamic';
-
-// set_id → Bandai cardlist series ID. Mirrors the SETS dict in
-// scripts/scrape-bandai-cards.ts. Used for the debug "bandai_url" link
-// so we can sanity-check our scraped fields against Bandai's catalog.
-const BANDAI_SERIES_ID: Record<string, string> = {
-  'op-01': '569101', 'op-02': '569102', 'op-03': '569103', 'op-04': '569104',
-  'op-05': '569105', 'op-06': '569106', 'op-07': '569107', 'op-08': '569108',
-  'op-09': '569109', 'op-10': '569110', 'op-11': '569111', 'op-12': '569112',
-  'op-13': '569113',
-  'op14-eb04': '569114', 'op15-eb04': '569115',
-  'eb-01': '569201', 'eb-02': '569202', 'eb-03': '569203',
-  'prb-01': '569301', 'prb-02': '569302',
-  'promo': '569901', 'other-product': '569801',
-};
 
 interface PageProps {
   params: Promise<{ cardId: string }>;
@@ -136,10 +123,7 @@ export default async function CardPage({ params }: PageProps) {
   // element with id={cardId}, so the fragment jumps directly to the row.
   // Useful in the debug block to verify our scraped rarity/stats match the
   // source of truth.
-  const bandaiSeriesId = BANDAI_SERIES_ID[card.setId];
-  const bandaiUrl = bandaiSeriesId
-    ? `https://en.onepiece-cardgame.com/cardlist/?series=${bandaiSeriesId}#${card.id}`
-    : null;
+  const bandaiUrl = bandaiCardUrl(card.setId, card.id);
 
   return (
     <div>

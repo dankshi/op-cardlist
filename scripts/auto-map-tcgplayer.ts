@@ -51,6 +51,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 interface CardRow {
   id: string;
   set_id: string;
+  type: string | null;
   name: string;
   rarity: string | null;
   art_style: string | null;
@@ -203,7 +204,7 @@ async function main() {
   // 1. Load all cards.
   console.log('Loading cards...');
   const cards = await paginated<CardRow>((from, to) =>
-    supabase.from('cards').select('id, set_id, name, rarity, art_style').order('id').range(from, to),
+    supabase.from('cards').select('id, set_id, type, name, rarity, art_style').order('id').range(from, to),
   );
   console.log(`  ${cards.length} cards`);
 
@@ -432,6 +433,38 @@ async function main() {
       fixed += chunk.length - fails.length;
     }
     console.log(`  Updated art_style on ${fixed} cards.`);
+  }
+
+  // Card-side rule (independent of TCG mapping): in PRB-01, Event-type
+  // cards with a _p3 suffix are always the Textured Foil variant. This
+  // catches cards that lack a TCG mapping or whose mapped product name
+  // doesn't carry the (Textured Foil) marker explicitly.
+  console.log('\nApplying card-side rules...');
+  const cardRuleUpdates: { id: string; art_style: string }[] = [];
+  for (const c of cards) {
+    if (
+      c.set_id === 'prb-01' &&
+      c.type === 'EVENT' &&
+      /_p3$/i.test(c.id) &&
+      c.art_style !== 'textured'
+    ) {
+      cardRuleUpdates.push({ id: c.id, art_style: 'textured' });
+    }
+  }
+  if (cardRuleUpdates.length === 0) {
+    console.log('  No card-side rule updates needed.');
+  } else {
+    let ruleFixed = 0;
+    for (let i = 0; i < cardRuleUpdates.length; i += 20) {
+      const chunk = cardRuleUpdates.slice(i, i + 20);
+      const results = await Promise.all(chunk.map(u =>
+        supabase.from('cards').update({ art_style: u.art_style }).eq('id', u.id),
+      ));
+      const fails = results.filter(r => r.error);
+      if (fails.length > 0) console.error(`  batch ${i}: ${fails.length} failed; first:`, fails[0].error?.message);
+      ruleFixed += chunk.length - fails.length;
+    }
+    console.log(`  Flipped ${ruleFixed} prb-01 Event _p3 cards to art_style='textured'.`);
   }
 }
 

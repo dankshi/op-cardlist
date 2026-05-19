@@ -1,19 +1,11 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { HIDDEN_RARITIES } from '@/lib/cards'
+import { isHiddenByFields } from '@/lib/cards'
 import { HoverThumb } from '@/components/admin/HoverThumb'
 import { CardAssignmentTile } from '@/components/admin/CardAssignmentTile'
 import { SET_NAME_MAP } from '@/lib/set-names'
 
 export const dynamic = 'force-dynamic'
-
-// Local mirror of isHiddenCard() in src/lib/cards.ts — same logic, but
-// operates on the raw row shape (string fields) instead of the Card type.
-// Mappings page only cares about cards we actually sell.
-function isHidden(rarity: string | null, artStyle: string | null): boolean {
-  if (!rarity) return false
-  return HIDDEN_RARITIES.has(rarity) && (artStyle ?? 'standard') === 'standard'
-}
 
 interface MappingRow {
   card_id: string
@@ -29,6 +21,7 @@ interface CardRow {
   id: string
   name: string
   set_id: string
+  type: string | null
   rarity: string | null
   art_style: string | null
   image_url: string | null
@@ -90,9 +83,9 @@ export default async function MappingsAdminPage() {
   // (skip hidden low-rarity standard prints — we don't list those on the
   // site, so we don't need a TCGplayer mapping for them either).
   const allCardsRaw = await paginate<CardRow>((from, to) =>
-    supabase.from('cards').select('id, name, set_id, rarity, art_style, image_url').order('id').range(from, to),
+    supabase.from('cards').select('id, name, set_id, type, rarity, art_style, image_url').order('id').range(from, to),
   )
-  const allCards = allCardsRaw.filter(c => !isHidden(c.rarity, c.art_style))
+  const allCards = allCardsRaw.filter(c => !isHiddenByFields(c.set_id, c.type, c.rarity, c.art_style))
   const allMappings = await paginate<MappingRow>((from, to) =>
     supabase.from('card_tcgplayer_mapping').select('*').range(from, to),
   )

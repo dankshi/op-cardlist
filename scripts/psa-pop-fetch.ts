@@ -183,12 +183,13 @@ interface CardEntry {
 }
 
 // Normalize a subject/product name for cross-DB substring matching.
-// Strips dots/apostrophes (so "Portgas.D.Ace" and "Portgas D. Ace" both
-// normalize to "portgas d ace") and collapses whitespace.
+// Strips dots/apostrophes/quotes (so "Portgas.D.Ace" and "Portgas D. Ace"
+// both normalize to "portgas d ace", and PSA's `Eustass "Captain" Kid`
+// matches our `Eustass"Captain"Kid`) and collapses whitespace.
 function normalizeName(s: string): string {
   return s
     .toLowerCase()
-    .replace(/[.'`]/g, ' ')
+    .replace(/[.'`"]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -240,7 +241,8 @@ function autoMatchSpec(
   // specific signal) rather than the generic Gold rule.
   if (variety === '' ) marker = '';
   else if (/manga/i.test(variety)) marker = '(manga)';
-  else if (variety === 'Alternate Art' || variety === 'Holofoil') marker = '(alternate art)';
+  else if (variety === 'Holofoil') marker = '(holofoil)';
+  else if (variety === 'Alternate Art') marker = '(alternate art)';
   else if (variety === 'Special Alternate Art') marker = '(sp)';
   else if (variety === 'Treasure Rare') marker = '(tr)';
   else if (variety === 'Wanted Alternate Art') marker = '(wanted poster)';
@@ -301,6 +303,20 @@ function autoMatchSpec(
         (marker === '(sp)' && c.name.includes('(super alternate art)')) ||
         (marker === '(tr)' && c.name.includes('(treasure rare)'));
       if (!rarityMatch && !nameMarker) return false;
+    } else if (marker === '(holofoil)') {
+      // PSA's "Holofoil" is a generic tag for any premium foil variant.
+      // In our DB that corresponds to (Alternate Art) / (Parallel) /
+      // (Full Art) / (Textured Foil) / (Manga) — basically anything
+      // that's not a plain base / JRF / Reprint / Pirate Foil. Accept
+      // any of those new-art-or-foil markers.
+      const isPremiumMarker =
+        c.name.includes('(alternate art)') || c.name.includes('(parallel)') ||
+        c.name.includes('(full art)') || c.name.includes('(textured foil)') ||
+        c.name.includes('(manga)') || c.name.includes('(super alternate art)');
+      const isExcluded =
+        c.name.includes('(jolly roger foil)') || c.name.includes('(pirate foil)') ||
+        c.name.includes('(reprint)') || c.name.includes('(sparkle foil)');
+      if (!isPremiumMarker || isExcluded) return false;
     } else if (marker === '(manga)' || marker === '(wanted poster)') {
       // Manga / Wanted: art_style is the truth in our DB. TCG name might
       // not carry the marker (e.g. OP13-119_p4 is a Wanted Ace whose
@@ -631,7 +647,113 @@ async function main() {
         supabase.from('pops_psa').update({ card_id: u.card_id }).eq('spec_id', u.spec_id),
       ));
     }
-    console.log(`\nMatched ${matched}, unmapped ${unmapped} (out of ${allSpecs.length}).`);
+    console.log(`\nSpec-centric pass: matched ${matched}, unmapped ${unmapped} (out of ${allSpecs.length}).`);
+
+    // -------------------------------------------------------------------
+    // Card-centric second pass. For every card that still has no PSA
+    // spec, look at unmapped specs at its (set_code, number) slot.
+    // After filtering out varieties we deliberately don't pursue (JRF,
+    // Sparkle Foil, Pre-Release, Anniversary/Tournament, etc.) and
+    // requiring subject-name overlap, if EXACTLY ONE candidate spec
+    // remains, link it. Catches cases the spec-centric pass missed
+    // because that pass returns null for unhandled varieties — but from
+    // the card side, the disambiguation is obvious once the ignored
+    // varieties are filtered out.
+    const IGNORED_VARIETIES = new Set([
+      'Pre-Release', 'Pre-Release ',
+      'Errata',
+      'Demo Deck', 'Demo Deck-Errata',
+      'Box Topper', 'Box Topper-Errata',
+      'Sparkle Foil',
+      'Jolly Roger Foil',
+      'Release Event',
+    ]);
+    function specIsIgnored(v: string | null): boolean {
+      const trimmed = (v ?? '').trim();
+      if (IGNORED_VARIETIES.has(trimmed)) return true;
+      if (/Tournament/i.test(trimmed)) return true;
+      return false;
+    }
+
+    // Index unmapped specs by (set_code, padded_number).
+    const specsBySetNum = new Map<string, typeof allSpecs[number][]>();
+    for (const r of allSpecs) {
+      const finalCardId = updates.find(u => u.spec_id === r.spec_id)?.card_id ?? r.card_id;
+      if (finalCardId) continue; // spec already linked after pass 1
+      if (specIsIgnored(r.variety)) continue;
+      if (!r.psa_card_number) continue;
+      const key = `${set_code(r)}::${r.psa_card_number.padStart(3, '0')}`;
+      const list = specsBySetNum.get(key);
+      if (list) list.push(r);
+      else specsBySetNum.set(key, [r]);
+    }
+    function set_code(r: typeof allSpecs[number]): string {
+      const set = psaSetById.get(r.psa_set_id);
+      return set?.setCode ?? '';
+    }
+
+    // Build a flat array of all card entries from the bandaiFamily index
+    // (which the spec-centric pass already populated). Each card_id
+    // appears exactly once across all family lists.
+    const allCardEntries: CardEntry[] = [];
+    const seenCardIds = new Set<string>();
+    for (const family of bandaiFamily.values()) {
+      for (const c of family) {
+        if (seenCardIds.has(c.card_id)) continue;
+        seenCardIds.add(c.card_id);
+        allCardEntries.push(c);
+      }
+    }
+
+    // Cards whose TCG product name carries an ignored marker (JRF, Pirate
+    // Foil, Sparkle Foil, Reprint) shouldn't get auto-linked to anything —
+    // we don't sell them. Skip in the card-centric pass to prevent the
+    // matcher from sending a PSA Holofoil/AA spec to the wrong variant
+    // just because it happens to be the only non-ignored option.
+    const CARD_NAME_EXCLUDE = ['(jolly roger foil)', '(pirate foil)', '(sparkle foil)', '(reprint)'];
+
+    // For each card not yet claimed, see if there's exactly 1 matching spec.
+    const cardUpdates: { spec_id: number; card_id: string }[] = [];
+    let cardPassMatched = 0;
+    for (const c of allCardEntries) {
+      if (claimedCardIds.has(c.card_id)) continue;
+      if (CARD_NAME_EXCLUDE.some(m => c.name.includes(m))) continue;
+      const numMatch = c.card_id.split('_')[0].match(/-(\d+)$/);
+      if (!numMatch) continue;
+      const key = `${c.set_id}::${numMatch[1]}`;
+      const pool = (specsBySetNum.get(key) ?? []).filter(r =>
+        !cardUpdates.some(u => u.spec_id === r.spec_id), // not claimed by this pass
+      );
+      const cardNameNorm = normalizeName(c.cardName);
+      // Subject-name filter — required so a Roger Wanted spec doesn't get
+      // pinned to a Luffy Wanted card just because they're the only two
+      // at the same slot.
+      const matches = pool.filter(r => {
+        const variety = (r.variety ?? '').trim();
+        const escapedV = variety.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const subj = normalizeName(
+          variety
+            ? r.description.replace(new RegExp(`\\s*\\(${escapedV}\\)\\s*$`), '').trim()
+            : r.description.trim(),
+        );
+        return cardNameNorm.includes(subj) || subj.includes(cardNameNorm);
+      });
+      if (matches.length === 1) {
+        cardUpdates.push({ spec_id: matches[0].spec_id, card_id: c.card_id });
+        claimedCardIds.add(c.card_id);
+        cardPassMatched++;
+      }
+    }
+
+    if (cardUpdates.length > 0) {
+      for (let i = 0; i < cardUpdates.length; i += CHUNK) {
+        const chunk = cardUpdates.slice(i, i + CHUNK);
+        await Promise.all(chunk.map(u =>
+          supabase.from('pops_psa').update({ card_id: u.card_id }).eq('spec_id', u.spec_id),
+        ));
+      }
+    }
+    console.log(`Card-centric pass: matched ${cardPassMatched} additional cards.`);
     return;
   }
 

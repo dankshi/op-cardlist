@@ -5,7 +5,7 @@ import { PsaCandidateGroup } from '@/components/admin/PsaCandidateGroup'
 import { PsaSpecLinkButton } from '@/components/admin/PsaSpecLinkButton'
 import { PsaSpecManualLink } from '@/components/admin/PsaSpecManualLink'
 import { InlineCardFieldEdit, ART_STYLE_OPTIONS, RARITY_OPTIONS } from '@/components/card/InlineCardFieldEdit'
-import { HIDDEN_RARITIES } from '@/lib/cards'
+import { isHiddenByFields } from '@/lib/cards'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,17 +37,20 @@ interface CardLite {
   name: string
   image_url: string | null
   set_id: string
+  type: string | null
   rarity: string | null
   art_style: string | null
 }
 
 /** Normalize for cross-DB name comparison: lowercase + strip punctuation
  *  that varies between PSA ('Boa Hancock'), Bandai ('Boa.Hancock') and
- *  TCGplayer ('Boa Hancock'). */
+ *  TCGplayer ('Boa Hancock'). Includes double-quotes so PSA's
+ *  `Eustass "Captain" Kid` (with spaces around quotes) matches our
+ *  `Eustass"Captain"Kid` (no spaces). */
 function normalizeName(s: string): string {
   return s
     .toLowerCase()
-    .replace(/[.'`-]/g, ' ')
+    .replace(/[.'`"-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -132,12 +135,20 @@ export default async function PSAPopsAdminPage({ searchParams }: PageProps) {
   // opts into the full list by clicking "All" (?all=1).
   const showOnlyUnlinked = !(allParam === '1' || allParam === 'true')
 
+  // Secondary sort by spec_id is mandatory: ordering by non-unique
+  // total_pop alone, paginated via .range(), causes ties at the 1000-row
+  // boundary to duplicate some rows and silently skip others
+  // (~4 rows lost out of 2871). Stable secondary key keeps pagination
+  // exhaustive and deterministic.
   const rows = (await paginate<PopsRow>((from, to) =>
-    supabase.from('pops_psa_with_tcg').select('*').order('total_pop', { ascending: false }).range(from, to),
+    supabase.from('pops_psa_with_tcg').select('*')
+      .order('total_pop', { ascending: false })
+      .order('spec_id', { ascending: true })
+      .range(from, to),
   )) as PopsRow[]
 
   const cards = await paginate<CardLite>((from, to) =>
-    supabase.from('cards').select('id, name, image_url, set_id, rarity, art_style').order('id').range(from, to),
+    supabase.from('cards').select('id, name, image_url, set_id, type, rarity, art_style').order('id').range(from, to),
   )
   const cardById = new Map<string, CardLite>()
   // Index by (set_id, number-portion-of-bandai) — handles cards reissued
@@ -191,11 +202,9 @@ export default async function PSAPopsAdminPage({ searchParams }: PageProps) {
       for (const c of cands) {
         if (seen.has(c.id)) continue
         seen.add(c.id)
-        // Hide low-rarity standard prints (mirror isHiddenCard from
-        // src/lib/cards.ts). We don't sell those, so suggesting them as
-        // PSA matches adds noise to the admin UI.
-        const isHidden = c.rarity != null && HIDDEN_RARITIES.has(c.rarity) && (c.art_style ?? 'standard') === 'standard'
-        if (isHidden) continue
+        // Hide cards the marketplace rule excludes. Same source of truth
+        // as the rest of the site — src/lib/cards.ts isHiddenByFields.
+        if (isHiddenByFields(c.set_id, c.type, c.rarity, c.art_style)) continue
         // Subject-name filter: only suggest cards whose name matches the
         // PSA spec subject. Prevents e.g. a Portgas D. Ace card at #013
         // showing up as a candidate for a Boa Hancock spec at the same #.
@@ -245,12 +254,23 @@ export default async function PSAPopsAdminPage({ searchParams }: PageProps) {
   ])
   function isIgnored(r: PopsRow): boolean {
     const v = (r.variety ?? '').trim()
-    // Empty variety on non-PRB sets is typically a C/UC base print (low
-    // volume worth chasing). On PRB sets it's usually the Reprint variant
-    // of an existing card — sellable, surface it in unmapped variants.
+    // Empty variety on non-PRB sets is typically a C/UC base print —
+    // noisy in the spec-centric unmapped list, so hide there. On PRB
+    // sets it's the Reprint variant — sellable, keep visible.
     if (v === '') return !(r.set_code ?? '').startsWith('prb-')
     if (IGNORED_EXACT.has(v)) return true
-    if (/Anniversary|Tournament/i.test(v)) return true
+    if (/Tournament/i.test(v)) return true
+    return false
+  }
+  // Card-centric variant of isIgnored: don't filter empty-variety specs,
+  // because the card-centric view already filters cards to sellable-only
+  // (see cardCentric below). A blank-variety spec on a non-PRB set IS a
+  // legitimate candidate for the SEC/L base print at that slot.
+  function isIgnoredForCard(r: PopsRow): boolean {
+    const v = (r.variety ?? '').trim()
+    if (v === '') return false
+    if (IGNORED_EXACT.has(v)) return true
+    if (/Tournament/i.test(v)) return true
     return false
   }
   const unmapped = unmappedAll.filter(r => !isIgnored(r))
@@ -315,8 +335,7 @@ export default async function PSAPopsAdminPage({ searchParams }: PageProps) {
 
   // Which cards count for the card-centric view: sellable + in a PSA-tracked set.
   const cardCentric = cards.filter(c => {
-    const isHidden = c.rarity != null && HIDDEN_RARITIES.has(c.rarity) && (c.art_style ?? 'standard') === 'standard'
-    if (isHidden) return false
+    if (isHiddenByFields(c.set_id, c.type, c.rarity, c.art_style)) return false
     return PSA_TRACKED_SETS.has(c.set_id)
   })
 
@@ -331,11 +350,24 @@ export default async function PSAPopsAdminPage({ searchParams }: PageProps) {
     const suggestions: PopsRow[] = []
     const fuzzy: PopsRow[] = []
     for (const r of pool) {
+      // Skip PSA specs we don't pursue (JRF, Sparkle Foil, Pre-Release,
+      // Tournament, etc.) UNLESS this card is already linked to that
+      // exact spec — in that case it's the current mapping and the
+      // admin should see it so they can unlink/swap if needed.
+      if (isIgnoredForCard(r) && r.card_id !== c.id) continue
+      // A spec already attached to this card is "linked" regardless of
+      // name strictness — this covers fuzzy-name links the admin made
+      // manually (e.g. "Kozuki Hiyori" PSA spec on our "Kouzuki Hiyori"
+      // card). Without this, fuzzy-linked specs fall into `fuzzy` and the
+      // page counts them as unlinked.
+      if (r.card_id === c.id) {
+        linked.push(r)
+        continue
+      }
       const subj = normalizeName(subjectName(r))
       const strictMatch = cardNorm.includes(subj) || subj.includes(cardNorm)
       if (strictMatch) {
-        if (r.card_id === c.id) linked.push(r)
-        else suggestions.push(r)
+        suggestions.push(r)
       } else if (nameTokenOverlap(cardNorm, subj)) {
         // PSA had a typo / partial name — at least one significant word
         // matches. Surface as a fuzzy candidate so admin can verify.
@@ -345,12 +377,21 @@ export default async function PSAPopsAdminPage({ searchParams }: PageProps) {
     return { linked, suggestions, fuzzy }
   }
 
-  // Group card-centric cards by set, sort sets alphabetically.
+  // Group card-centric cards by set, sort sets alphabetically. Within
+  // each set, sort cards by name then card_id so the admin can scan
+  // alphabetically (Ace before Buggy before Cracker, etc.).
   const cardsBySet = new Map<string, CardLite[]>()
   for (const c of cardCentric) {
     const list = cardsBySet.get(c.set_id)
     if (list) list.push(c)
     else cardsBySet.set(c.set_id, [c])
+  }
+  for (const list of cardsBySet.values()) {
+    list.sort((a, b) => {
+      const byName = a.name.localeCompare(b.name)
+      if (byName !== 0) return byName
+      return a.id.localeCompare(b.id)
+    })
   }
   const cardCentricSections = Array.from(cardsBySet.entries()).sort((a, b) => a[0].localeCompare(b[0]))
 
