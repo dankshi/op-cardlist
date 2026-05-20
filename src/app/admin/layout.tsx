@@ -19,7 +19,6 @@ const NAV_SECTIONS: { heading: string; items: { href: string; label: string }[] 
       { href: '/admin/mappings', label: 'TCGplayer Mappings' },
       { href: '/admin/psa-pops', label: 'PSA Pop Mappings' },
       { href: '/admin/promos', label: 'Promo Cards' },
-      { href: '/admin/visibility', label: 'Card Visibility' },
     ],
   },
 ]

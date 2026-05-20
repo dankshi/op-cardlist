@@ -201,8 +201,8 @@ export default async function MappingsAdminPage() {
         Auto-matcher results from <code className="bg-zinc-100 px-1 rounded">scripts/auto-map-tcgplayer.ts</code>.
         Each sellable card should map to one TCGplayer product; conflicts and unmapped cards are surfaced here
         for manual resolution. Hidden cards (low-rarity standard prints) are excluded from every count and grid —
-        see the <Link href="/admin/visibility" className="text-blue-600 hover:underline">Card Visibility</Link> page
-        for the full list. Click any thumbnail to open the full image.
+        see <Link href="/admin/cards" className="text-blue-600 hover:underline">Edit Cards</Link> (filter:
+        Hidden only) for the full list. Click any thumbnail to open the full image.
       </p>
 
       <div className="grid grid-cols-5 gap-3 mb-8">

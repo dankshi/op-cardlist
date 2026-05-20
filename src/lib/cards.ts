@@ -245,7 +245,7 @@ export async function getSetBySlug(slug: string): Promise<CardSet | undefined> {
 export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R', 'P', 'SR', 'L']);
 
 /** Centralized visibility rule. Every surface (set pages, search,
- *  admin/visibility, admin/mappings, admin/psa-pops, card "Other Versions")
+ *  admin/cards, admin/mappings, admin/psa-pops, card "Other Versions")
  *  routes through this so a rule change here propagates everywhere on the
  *  next render.
  *

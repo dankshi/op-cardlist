@@ -75,7 +75,6 @@ export async function PATCH(
   // works alongside the client's router.refresh() to defeat both
   // Next.js's data cache and the browser/render cache.
   revalidatePath('/admin/psa-pops')
-  revalidatePath('/admin/visibility')
   revalidatePath('/admin/mappings')
   revalidatePath('/admin/cards')
   revalidatePath(`/card/${cardId}`)
