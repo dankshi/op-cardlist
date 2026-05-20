@@ -379,8 +379,13 @@ interface CardRow {
   trigger_text: string | null;
   image_url: string | null;
   variant: string | null;
-  is_parallel: boolean;
-  art_style: string | null;
+  // is_parallel dropped from the schema; the suffix on `variant` is the
+  // source of truth ("p1" / "r1" → parallel, NULL → base). Readers
+  // derive it via `variant != null` (see src/lib/cards.ts rowToCard).
+  //
+  // art_style intentionally omitted — see cardToRow() comment. Curated
+  // via the admin editor; scraper only writes it for brand-new cards in
+  // a separate seed pass (seedArtStyles below).
 }
 
 function setToRow(s: CardSet, seriesId: string): CardSetRow {
@@ -393,6 +398,12 @@ function setToRow(s: CardSet, seriesId: string): CardSetRow {
   };
 }
 
+// art_style is intentionally NOT included here. It's a curated field
+// (admin editor + the 2026-05-17 _r* reprint backfill) and an upsert
+// would clobber existing values via ON CONFLICT DO UPDATE SET
+// art_style = EXCLUDED.art_style. Omitting it from the row drops it
+// from the SET clause, so existing rows keep their art_style; new rows
+// get NULL and are populated by seedArtStyles() in a follow-up pass.
 function cardToRow(c: Card): CardRow {
   return {
     id: c.id,
@@ -412,8 +423,6 @@ function cardToRow(c: Card): CardRow {
     trigger_text: c.trigger ?? null,
     image_url: c.imageUrl ?? null,
     variant: c.variant ?? null,
-    is_parallel: c.isParallel ?? false,
-    art_style: c.artStyle ?? null,
   };
 }
 
@@ -425,6 +434,38 @@ async function upsertInChunks<T>(table: string, rows: T[], onConflict: string, c
       throw new Error(`${table} upsert failed at chunk ${i}: ${error.message}`);
     }
   }
+}
+
+// Bootstrap art_style for brand-new cards only. After the main upsert
+// runs (which never touches art_style), we look up which of our scraped
+// IDs still have art_style IS NULL — those are the rows we just inserted
+// for the first time — and seed them with detectArtStyle()'s guess. Any
+// row that already had an art_style (curated by admin or seeded by an
+// earlier run) is left untouched, so manual corrections never get
+// overwritten on re-scrape.
+async function seedArtStyles(ids: string[], inferred: Map<string, string>): Promise<void> {
+  if (ids.length === 0) return;
+  // .in() with very large arrays bogs down PostgREST; chunk the lookup.
+  const nullIds: string[] = [];
+  const CHUNK = 500;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const batch = ids.slice(i, i + CHUNK);
+    const { data, error } = await supabase
+      .from('cards')
+      .select('id')
+      .in('id', batch)
+      .is('art_style', null);
+    if (error) throw new Error(`art_style null-scan failed: ${error.message}`);
+    for (const r of data ?? []) nullIds.push(r.id as string);
+  }
+  if (nullIds.length === 0) {
+    console.log('  (art_style already set on every scraped card — no seed needed)');
+    return;
+  }
+  const seedRows = nullIds
+    .map(id => ({ id, art_style: inferred.get(id) ?? 'standard' }));
+  await upsertInChunks('cards', seedRows, 'id');
+  console.log(`  seeded art_style on ${seedRows.length} brand-new card(s).`);
 }
 
 // --- main ---------------------------------------------------------------
@@ -460,12 +501,19 @@ async function main() {
   // (e.g. promo reprints listed under both "promo" and "other-product");
   // Postgres won't UPSERT two rows with the same conflict key in one batch.
   const cardMap = new Map<string, CardRow>();
+  // Parallel map of inferred art_styles. Kept separate from CardRow so
+  // the main upsert can't accidentally write them — only seedArtStyles
+  // below uses this, and only when the existing DB row has NULL.
+  const inferredArtStyle = new Map<string, string>();
   const dupes: string[] = [];
   for (const { set } of sets) {
     for (const c of set.cards) {
       const row = cardToRow(c);
       if (cardMap.has(row.id)) dupes.push(row.id);
-      else cardMap.set(row.id, row);
+      else {
+        cardMap.set(row.id, row);
+        if (c.artStyle) inferredArtStyle.set(row.id, c.artStyle);
+      }
     }
   }
   const setRows: CardSetRow[] = sets.map(({ set, seriesId }) => setToRow(set, seriesId));
@@ -521,6 +569,9 @@ async function main() {
 
   console.log(`Upserting ${upsertable.length} cards (${cardRows.length - upsertable.length} reprints skipped)...`);
   await upsertInChunks('cards', upsertable, 'id');
+
+  console.log('Seeding art_style on new cards (existing values preserved)...');
+  await seedArtStyles(upsertable.map(r => r.id), inferredArtStyle);
 
   console.log('Done.');
 }

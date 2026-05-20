@@ -29,7 +29,7 @@ export async function GET(
   const [cardRes, mappingRes, psaRes] = await Promise.all([
     supabase
       .from('cards')
-      .select('id, name, set_id, type, rarity, art_style, variant, is_parallel, image_url, base_id')
+      .select('id, name, set_id, type, rarity, art_style, variant, image_url, base_id')
       .eq('id', cardId)
       .maybeSingle(),
     supabase

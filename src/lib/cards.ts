@@ -15,6 +15,7 @@ try {
 // --- Row → app type mappers ---------------------------------------------
 
 function rowToCard(row: Record<string, unknown>): Card {
+  const variant = (row.variant as string | null) ?? null;
   return {
     id: row.id as string,
     baseId: row.base_id as string,
@@ -32,8 +33,11 @@ function rowToCard(row: Record<string, unknown>): Card {
     trigger: (row.trigger_text as string) ?? null,
     imageUrl: (row.image_url as string) ?? '',
     setId: row.set_id as string,
-    variant: (row.variant as string) ?? undefined,
-    isParallel: (row.is_parallel as boolean) ?? false,
+    variant: variant ?? undefined,
+    // Derived from variant — the scraper always sets these in lockstep
+    // (variant comes from the part of the ID after '_'). Computing here
+    // means we don't need to keep is_parallel in the DB schema.
+    isParallel: variant !== null,
     artStyle: (row.art_style as ArtStyle) ?? 'standard',
   };
 }

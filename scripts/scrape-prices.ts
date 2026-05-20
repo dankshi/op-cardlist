@@ -459,7 +459,9 @@ async function loadCardDatabaseFromSupabase(supabase: SupabaseClient): Promise<C
       imageUrl: (row.image_url as string) ?? '',
       setId: row.set_id as string,
       variant: (row.variant as string) ?? undefined,
-      isParallel: (row.is_parallel as boolean) ?? false,
+      // Derived from variant. The DB no longer carries a separate
+      // is_parallel column — variant suffix on the ID is the signal.
+      isParallel: row.variant != null,
       artStyle: (row.art_style as ArtStyle) ?? 'standard',
     };
     const list = cardsBySet.get(card.setId);

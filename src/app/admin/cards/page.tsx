@@ -12,7 +12,6 @@ interface CardRow {
   rarity: string | null
   art_style: string | null
   variant: string | null
-  is_parallel: boolean
   image_url: string | null
 }
 
@@ -53,16 +52,59 @@ function deriveHideInfo(row: CardRow): { isHidden: boolean; hideReason: string |
   }
 }
 
+/** Issues to flag with a warning icon on the tile. Only computed for
+ *  cards we actually expect to be in good shape — sellable cards in a
+ *  PSA-tracked set. Hidden cards and cards in untracked sets (e.g. promo)
+ *  are skipped so the warning doesn't false-positive on the long tail. */
+function deriveIssues(
+  row: CardRow,
+  isHidden: boolean,
+  psaTrackedSets: Set<string>,
+  mappedCardIds: Set<string>,
+): string[] {
+  const issues: string[] = []
+  // Only check cards we'd actually expect to have a PSA mapping.
+  if (!isHidden && psaTrackedSets.has(row.set_id) && !mappedCardIds.has(row.id)) {
+    issues.push('No PSA pop linked')
+  }
+  return issues
+}
+
 export default async function CardEditorPage() {
   const supabase = await createClient()
-  const rows = await paginate<CardRow>((from, to) =>
-    supabase
-      .from('cards')
-      .select('id, name, set_id, type, rarity, art_style, variant, is_parallel, image_url')
-      .order('id')
-      .range(from, to),
-  )
-  const cards: EditableCard[] = rows.map(r => ({ ...r, ...deriveHideInfo(r) }))
+  const [rows, pops] = await Promise.all([
+    paginate<CardRow>((from, to) =>
+      supabase
+        .from('cards')
+        .select('id, name, set_id, type, rarity, art_style, variant, image_url')
+        .order('id')
+        .range(from, to),
+    ),
+    // Just the two fields we need — set_code (for tracked-set lookup) and
+    // card_id (for linked-status lookup). Cuts payload vs select('*').
+    paginate<{ set_code: string | null; card_id: string | null }>((from, to) =>
+      supabase
+        .from('pops_psa')
+        .select('set_code, card_id')
+        .order('spec_id')
+        .range(from, to),
+    ),
+  ])
+
+  // Sets PSA tracks (presence of any spec implies tracking) + card_ids
+  // currently linked to a PSA spec. Both are sets for O(1) lookup.
+  const psaTrackedSets = new Set<string>()
+  const mappedCardIds = new Set<string>()
+  for (const r of pops) {
+    if (r.set_code) psaTrackedSets.add(r.set_code)
+    if (r.card_id) mappedCardIds.add(r.card_id)
+  }
+
+  const cards: EditableCard[] = rows.map(r => {
+    const hideInfo = deriveHideInfo(r)
+    const issues = deriveIssues(r, hideInfo.isHidden, psaTrackedSets, mappedCardIds)
+    return { ...r, ...hideInfo, issues }
+  })
 
   return (
     <div className="p-6 max-w-6xl">
