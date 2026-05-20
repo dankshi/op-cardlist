@@ -17,6 +17,12 @@ export interface EditableCard {
   variant: string | null
   is_parallel: boolean
   image_url: string | null
+  // Visibility info pre-computed server-side (mirrors isHiddenByFields()).
+  // Lets the client dim hidden tiles and the modal explain the reason
+  // without re-deriving the rule.
+  isHidden: boolean
+  hideReason: string | null
+  hideFix: string | null
 }
 
 interface CardDetail {
@@ -51,7 +57,7 @@ export function CardEditor({ cards }: Props) {
   const [query, setQuery] = useState('')
   const [setFilter, setSetFilter] = useState<string>('')
   const [artStyleFilter, setArtStyleFilter] = useState<string>('')
-  const [variantFilter, setVariantFilter] = useState<'all' | 'with' | 'without'>('all')
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all')
   const [selected, setSelected] = useState<EditableCard | null>(null)
 
   const setOptions = useMemo(() => {
@@ -66,26 +72,36 @@ export function CardEditor({ cards }: Props) {
     return cards.filter(c => {
       if (setFilter && c.set_id !== setFilter) return false
       if (artStyleFilter && (c.art_style ?? 'standard') !== artStyleFilter) return false
-      if (variantFilter === 'with' && !c.variant) return false
-      if (variantFilter === 'without' && c.variant) return false
+      if (visibilityFilter === 'visible' && c.isHidden) return false
+      if (visibilityFilter === 'hidden' && !c.isHidden) return false
       if (tokens.length === 0) return true
       // Every token must hit somewhere in id, name, or set_id.
       const haystack = `${c.id} ${c.name} ${c.set_id}`.toLowerCase()
       return tokens.every(t => haystack.includes(t))
     })
-  }, [cards, query, setFilter, artStyleFilter, variantFilter])
+  }, [cards, query, setFilter, artStyleFilter, visibilityFilter])
 
-  // Group filtered cards by set so the list mirrors the rest of the admin
-  // pages (PSA pops / mappings). Sets sort by id alphabetically.
+  // Group filtered cards by set. Within each set, visible cards come
+  // first (sorted by id), then a separator, then hidden cards. This
+  // makes hidden cards easy to skim for audit but keeps the visible
+  // worklist front-and-center.
   const sections = useMemo(() => {
-    const bySet = new Map<string, EditableCard[]>()
+    const bySet = new Map<string, { visible: EditableCard[]; hidden: EditableCard[] }>()
     for (const c of filtered) {
-      const list = bySet.get(c.set_id)
-      if (list) list.push(c)
-      else bySet.set(c.set_id, [c])
+      const bucket = bySet.get(c.set_id) ?? { visible: [], hidden: [] }
+      if (c.isHidden) bucket.hidden.push(c)
+      else bucket.visible.push(c)
+      bySet.set(c.set_id, bucket)
+    }
+    for (const b of bySet.values()) {
+      b.visible.sort((a, b) => a.id.localeCompare(b.id))
+      b.hidden.sort((a, b) => a.id.localeCompare(b.id))
     }
     return Array.from(bySet.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [filtered])
+
+  const visibleCount = filtered.filter(c => !c.isHidden).length
+  const hiddenCount = filtered.length - visibleCount
 
   return (
     <>
@@ -116,17 +132,17 @@ export function CardEditor({ cards }: Props) {
             {ART_STYLE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select
-            value={variantFilter}
-            onChange={e => setVariantFilter(e.target.value as typeof variantFilter)}
+            value={visibilityFilter}
+            onChange={e => setVisibilityFilter(e.target.value as typeof visibilityFilter)}
             className="px-2 py-2 rounded-lg border border-zinc-300 text-sm bg-white"
           >
-            <option value="all">Any variant</option>
-            <option value="with">With variant</option>
-            <option value="without">Base only</option>
+            <option value="all">All cards</option>
+            <option value="visible">Visible only</option>
+            <option value="hidden">Hidden only</option>
           </select>
-          {(query || setFilter || artStyleFilter || variantFilter !== 'all') && (
+          {(query || setFilter || artStyleFilter || visibilityFilter !== 'all') && (
             <button
-              onClick={() => { setQuery(''); setSetFilter(''); setArtStyleFilter(''); setVariantFilter('all') }}
+              onClick={() => { setQuery(''); setSetFilter(''); setArtStyleFilter(''); setVisibilityFilter('all') }}
               className="text-xs text-zinc-500 hover:text-zinc-900 px-2"
             >
               Clear
@@ -134,55 +150,48 @@ export function CardEditor({ cards }: Props) {
           )}
         </div>
         <p className="text-xs text-zinc-500 mt-2">
-          Showing {filtered.length.toLocaleString()} of {cards.length.toLocaleString()} cards. Click any row to edit.
+          Showing {filtered.length.toLocaleString()} of {cards.length.toLocaleString()} cards
+          {' '}({visibleCount.toLocaleString()} visible · {hiddenCount.toLocaleString()} hidden).
+          Click any tile to edit.
         </p>
       </div>
 
       {sections.length === 0 ? (
         <p className="text-sm text-zinc-500 italic py-8 text-center">No cards match.</p>
       ) : (
-        <div className="space-y-2">
-          {sections.map(([setId, setCards]) => (
-            <details key={setId} open={sections.length <= 5 || setCards.length <= 40} className="border border-zinc-200 rounded-lg">
-              <summary className="cursor-pointer px-4 py-2 bg-zinc-50 hover:bg-zinc-100 font-medium flex items-center gap-3 text-sm">
-                <span className="font-mono">{setId}</span>
-                <span className="text-zinc-500">— {setCards.length} card{setCards.length === 1 ? '' : 's'}</span>
-              </summary>
-              <ul className="divide-y divide-zinc-100">
-                {setCards.map(c => (
-                  <li key={c.id}>
-                    <button
-                      onClick={() => setSelected(c)}
-                      className="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none"
-                    >
-                      <div className="w-10 flex-shrink-0">
-                        {c.image_url ? (
-                          <img src={c.image_url} alt="" className="w-full rounded border border-zinc-200" loading="lazy" />
-                        ) : (
-                          <div className="w-full aspect-[5/7] bg-zinc-100 rounded border border-zinc-200" />
-                        )}
+        <div className="space-y-3">
+          {sections.map(([setId, { visible, hidden }]) => {
+            const total = visible.length + hidden.length
+            return (
+              <details key={setId} open={sections.length <= 5 || total <= 40} className="border border-zinc-200 rounded-lg">
+                <summary className="cursor-pointer px-4 py-2 bg-zinc-50 hover:bg-zinc-100 font-medium flex items-center gap-3 text-sm">
+                  <span className="font-mono">{setId}</span>
+                  <span className="text-zinc-500">— {total} card{total === 1 ? '' : 's'}</span>
+                  {hidden.length > 0 && (
+                    <span className="text-xs text-zinc-400 font-normal">
+                      ({visible.length} visible, {hidden.length} hidden)
+                    </span>
+                  )}
+                </summary>
+                <div className="p-4">
+                  {visible.length > 0 && (
+                    <CardGallery cards={visible} onSelect={setSelected} />
+                  )}
+                  {hidden.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2 mt-6 mb-3">
+                        <span className="text-xs uppercase tracking-wide font-medium text-zinc-500">
+                          Hidden ({hidden.length})
+                        </span>
+                        <div className="flex-1 h-px bg-zinc-200" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap text-xs">
-                          <span className="font-mono text-blue-600">{c.id}</span>
-                          <span className="font-semibold text-zinc-900 truncate">{c.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1 flex-wrap text-[11px] text-zinc-500 mt-0.5">
-                          <Chip>{c.type ?? '—'}</Chip>
-                          <Chip>{c.rarity ?? '—'}</Chip>
-                          <Chip variant={c.art_style && c.art_style !== 'standard' ? 'accent' : 'neutral'}>
-                            {c.art_style ?? 'standard'}
-                          </Chip>
-                          {c.variant && <Chip variant="accent">variant: {c.variant}</Chip>}
-                        </div>
-                      </div>
-                      <span className="text-zinc-400 text-xs">Edit ›</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ))}
+                      <CardGallery cards={hidden} onSelect={setSelected} dimmed />
+                    </>
+                  )}
+                </div>
+              </details>
+            )
+          })}
         </div>
       )}
 
@@ -201,6 +210,52 @@ function Chip({ children, variant = 'neutral' }: { children: React.ReactNode; va
     ? 'bg-blue-100 text-blue-700'
     : 'bg-zinc-100 text-zinc-600'
   return <span className={`px-1.5 py-0.5 rounded ${cls}`}>{children}</span>
+}
+
+/** Responsive image grid. Tile = full card art + id + name + rarity/art_style
+ *  chips below. Hidden cards render dimmed so they're still scannable but
+ *  visually deprioritized. */
+function CardGallery({ cards, onSelect, dimmed = false }: {
+  cards: EditableCard[]
+  onSelect: (c: EditableCard) => void
+  dimmed?: boolean
+}) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      {cards.map(c => (
+        <button
+          key={c.id}
+          onClick={() => onSelect(c)}
+          className={`group text-left rounded-lg border border-zinc-200 hover:border-orange-400 hover:shadow-md transition-all overflow-hidden bg-white focus:outline-none focus:border-orange-500 ${
+            dimmed ? 'opacity-50 hover:opacity-100' : ''
+          }`}
+        >
+          <div className="aspect-[5/7] bg-zinc-100 relative">
+            {c.image_url ? (
+              <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" loading="lazy" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs">no img</div>
+            )}
+            {c.isHidden && (
+              <span className="absolute top-1.5 right-1.5 text-[10px] bg-zinc-900/80 text-white px-1.5 py-0.5 rounded">
+                hidden
+              </span>
+            )}
+          </div>
+          <div className="p-2">
+            <div className="font-mono text-[11px] text-blue-600">{c.id}</div>
+            <div className="font-semibold text-xs text-zinc-900 truncate" title={c.name}>{c.name}</div>
+            <div className="flex items-center gap-1 flex-wrap text-[10px] text-zinc-500 mt-1">
+              <Chip>{c.rarity ?? '—'}</Chip>
+              <Chip variant={c.art_style && c.art_style !== 'standard' ? 'accent' : 'neutral'}>
+                {c.art_style ?? 'standard'}
+              </Chip>
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  )
 }
 
 /** "Card command center" modal — mirrors the dark debug block on the
@@ -289,7 +344,19 @@ function CardEditModal({ card, onClose }: { card: EditableCard; onClose: () => v
             )}
           </div>
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 space-y-3">
+            {card.isHidden && card.hideReason && (
+              <div className="border border-amber-200 bg-amber-50 rounded-md p-3 text-xs">
+                <div className="font-semibold text-amber-900 mb-1 flex items-center gap-1.5">
+                  <span>⚠</span>
+                  <span>Hidden from public site</span>
+                </div>
+                <p className="text-amber-800">{card.hideReason}</p>
+                {card.hideFix && (
+                  <p className="text-amber-700 mt-2"><span className="font-semibold">Fix:</span> {card.hideFix}</p>
+                )}
+              </div>
+            )}
             {loading && !detail ? (
               <div className="text-xs font-mono bg-[#1e1e1e] border border-zinc-800 rounded-md px-3 py-4 text-zinc-500">
                 loading detail…
