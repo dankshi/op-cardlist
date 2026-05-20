@@ -63,6 +63,19 @@ export function CardEditor({ cards }: Props) {
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'visible' | 'hidden'>('all')
   const [selected, setSelected] = useState<EditableCard | null>(null)
 
+  // When a modal-internal edit triggers router.refresh(), the parent
+  // re-renders with a fresh `cards` array but `selected` still points at
+  // the stale object captured when the tile was clicked. Re-sync so the
+  // modal's hide-reason callout, dropdown defaults, and issues list
+  // reflect the just-saved state. If the card no longer exists (e.g.
+  // deleted), close the modal.
+  useEffect(() => {
+    if (!selected) return
+    const fresh = cards.find(c => c.id === selected.id)
+    if (!fresh) setSelected(null)
+    else if (fresh !== selected) setSelected(fresh)
+  }, [cards, selected])
+
   const setOptions = useMemo(() => {
     const set = new Set<string>()
     for (const c of cards) set.add(c.set_id)
@@ -268,8 +281,8 @@ function CardGallery({ cards, onSelect, dimmed = false }: {
               <div className="font-semibold text-xs text-zinc-900 truncate mt-0.5" title={c.name}>{c.name}</div>
             </div>
           </button>
-          <div className="px-2 pb-2 flex items-center justify-between gap-2 text-[10px] text-zinc-500">
-            <span className="text-[10px] uppercase tracking-wide">art</span>
+          <div className="px-2 pb-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] text-zinc-500">art_style</span>
             <InlineCardFieldEdit
               cardId={c.id}
               field="art_style"
