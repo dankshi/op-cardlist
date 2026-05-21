@@ -1,12 +1,18 @@
 /**
  * Single source of truth for marketplace pricing.
- * Used by the home-page chart, the payout calculator, and any future
- * tier-aware backend fee calculation.
  *
- * NOTE: src/lib/stripe.ts still uses the simpler 9.5% + $5 model for actual
- * Stripe Connect application_fee_amount today. To respect tiers in real
- * charges, the payment flow needs to look up the seller's tier and the
- * listing's fulfillment method, then call calculatePayout() here.
+ * Used by:
+ *   - home-page pricing chart + payout calculator
+ *   - /sell flow (pricing step + review step)
+ *   - /api/stripe/checkout and /api/stripe/payment-intent — compute the
+ *     fee breakdown stored on each order at checkout
+ *   - /api/admin/orders/[id]/status — reads the stored breakdown to
+ *     credit the seller on authentication (legacy orders fall back to
+ *     the 9.5% + $5 model)
+ *
+ * The deprecated stubs in src/lib/stripe.ts (PLATFORM_FEE_PERCENT,
+ * calculatePlatformFee) have no remaining callers and exist only as a
+ * safety net if something reaches for the legacy model by accident.
  */
 
 export type FulfillmentId = 'ship' | 'drop' | 'p2p';

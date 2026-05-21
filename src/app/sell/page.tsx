@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { GRADING_SCALES, PHOTO_SLOTS, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap } from '@/types/database'
+import { calculatePayout, type TierId } from '@/lib/fees'
 import confetti from 'canvas-confetti'
 import Image from 'next/image'
 
@@ -417,6 +418,41 @@ function StepDetails({
 // Step: Pricing
 // ============================================
 
+/** Reference price for the price step. Returns the median of recent
+ *  same-company / same-grade slab sales from card_graded_sales for
+ *  graded listings. Raw cards use the parent's TCGplayer marketPrice
+ *  directly. Falls back to null when no relevant data exists — the UI
+ *  then hides the comparison entirely instead of pretending a raw price
+ *  is the right benchmark for a BGS 10. */
+async function fetchGradedMedian(
+  cardId: string,
+  gradingCompany: GradingCompany,
+  grade: string,
+): Promise<{ price: number; label: string; sample: number } | null> {
+  const supabase = createClient()
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - 90)
+  const { data, error } = await supabase
+    .from('card_graded_sales')
+    .select('price, grading_company, grade')
+    .eq('card_id', cardId)
+    .eq('grading_company', gradingCompany)
+    .eq('grade', grade)
+    .gte('sold_at', startDate.toISOString())
+  if (error || !data) return null
+  const prices = data
+    .map(r => Number(r.price))
+    .filter(p => Number.isFinite(p) && p > 0)
+    .sort((a, b) => a - b)
+  if (prices.length === 0) return null
+  const median = prices[Math.floor(prices.length / 2)]
+  return {
+    price: median,
+    label: `${gradingCompany} ${grade} median (last 90d)`,
+    sample: prices.length,
+  }
+}
+
 function StepPricing({
   selectedCard,
   price,
@@ -424,6 +460,10 @@ function StepPricing({
   quantity,
   setQuantity,
   marketPrice,
+  isGraded,
+  gradingCompany,
+  grade,
+  sellerTier,
 }: {
   selectedCard: CardResult
   price: string
@@ -431,8 +471,36 @@ function StepPricing({
   quantity: string
   setQuantity: (q: string) => void
   marketPrice: number | null
+  isGraded: boolean
+  gradingCompany: GradingCompany | null
+  grade: string
+  sellerTier: TierId
 }) {
   const priceNum = parseFloat(price) || 0
+
+  // Resolve the right reference price based on what's being listed.
+  // - Raw → TCGplayer market (already in marketPrice from parent)
+  // - Graded → median of recent same-company/same-grade slab sales
+  const [gradedRef, setGradedRef] = useState<{ price: number; label: string; sample: number } | null>(null)
+  useEffect(() => {
+    if (!isGraded || !gradingCompany || !grade) {
+      // Clear any stale band reference when the user flips back to raw
+      // or hasn't picked a grade yet — leaving the previous value would
+      // momentarily show e.g. PSA 10 sales while listing a BGS 9.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setGradedRef(null)
+      return
+    }
+    let cancelled = false
+    fetchGradedMedian(selectedCard.id, gradingCompany, grade).then(r => {
+      if (!cancelled) setGradedRef(r)
+    })
+    return () => { cancelled = true }
+  }, [selectedCard.id, isGraded, gradingCompany, grade])
+
+  const reference: { price: number; label: string; sample?: number } | null = isGraded
+    ? gradedRef
+    : (marketPrice != null ? { price: marketPrice, label: 'TCGPlayer market' } : null)
 
   return (
     <div>
@@ -459,23 +527,37 @@ function StepPricing({
         </div>
       </div>
 
-      {/* Market Price Reference */}
-      {marketPrice && (
+      {/* Reference price box — adapts to the band: raw market for ungraded,
+          recent slab-sale median for graded. Hidden entirely when we
+          don't have a defensible reference (e.g. a newly-graded card
+          with no prior sales). */}
+      {reference && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-blue-800">Market Price</p>
-              <p className="text-xs text-blue-600">TCGPlayer average</p>
+              <p className="text-sm font-medium text-blue-800">
+                {isGraded ? 'Recent slab sales' : 'Market Price'}
+              </p>
+              <p className="text-xs text-blue-600">
+                {reference.label}
+                {reference.sample != null && ` · ${reference.sample} sale${reference.sample === 1 ? '' : 's'}`}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-blue-900">${marketPrice.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-blue-900">${reference.price.toFixed(2)}</p>
           </div>
           <button
             type="button"
-            onClick={() => setPrice(marketPrice.toFixed(2))}
+            onClick={() => setPrice(reference.price.toFixed(2))}
             className="mt-3 w-full text-sm font-medium text-blue-700 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 py-2 rounded-lg transition-colors cursor-pointer"
           >
-            Match market price
+            Match {isGraded ? 'median' : 'market price'}
           </button>
+        </div>
+      )}
+
+      {isGraded && !gradedRef && gradingCompany && grade && (
+        <div className="mb-6 p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-500">
+          No recent {gradingCompany} {grade} sales on record for this card. You&apos;re setting the price — use eBay sold listings as a reference.
         </div>
       )}
 
@@ -496,75 +578,108 @@ function StepPricing({
               className="w-full pl-9 pr-4 py-4 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900 text-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
-          {marketPrice && priceNum > 0 && (
+          {reference && priceNum > 0 && (
             <p className={`text-xs mt-2 ${
-              priceNum < marketPrice ? 'text-green-600' : priceNum > marketPrice ? 'text-orange-600' : 'text-zinc-400'
+              priceNum < reference.price ? 'text-green-600' : priceNum > reference.price ? 'text-orange-600' : 'text-zinc-400'
             }`}>
-              {priceNum < marketPrice
-                ? `$${(marketPrice - priceNum).toFixed(2)} below market — great for a quick sale`
-                : priceNum > marketPrice
-                  ? `$${(priceNum - marketPrice).toFixed(2)} above market`
-                  : 'Matching market price'}
+              {priceNum < reference.price
+                ? `$${(reference.price - priceNum).toFixed(2)} below ${isGraded ? 'recent slab median' : 'market'} — great for a quick sale`
+                : priceNum > reference.price
+                  ? `$${(priceNum - reference.price).toFixed(2)} above ${isGraded ? 'recent slab median' : 'market'}`
+                  : `Matching ${isGraded ? 'recent slab median' : 'market price'}`}
             </p>
           )}
         </div>
 
-        {/* Quantity */}
-        <div>
-          <label className="block text-sm font-semibold text-zinc-700 mb-2">Quantity</label>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setQuantity(String(Math.max(1, parseInt(quantity) - 1)))}
-              disabled={parseInt(quantity) <= 1}
-              className="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center text-xl font-medium"
-            >
-              −
-            </button>
-            <input
-              type="number"
-              min="1"
-              max="99"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-20 text-center py-3 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900 text-xl font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-            <button
-              type="button"
-              onClick={() => setQuantity(String(Math.min(99, parseInt(quantity) + 1)))}
-              className="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-200 transition-colors cursor-pointer flex items-center justify-center text-xl font-medium"
-            >
-              +
-            </button>
-          </div>
-        </div>
-
-        {/* Payout estimate */}
-        {priceNum > 0 && parseInt(quantity) > 0 && (() => {
-          const total = priceNum * parseInt(quantity)
-          const fee = total * 0.095
-          const payout = total - 5 - fee
-          return (
-            <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Sale price</span>
-                <span className="text-zinc-900">${total.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Shipping</span>
-                <span className="text-zinc-900">-$5.00</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Platform fee (9.5%)</span>
-                <span className="text-zinc-900">-${fee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-bold pt-1 border-t border-zinc-200">
-                <span className="text-zinc-900">Your payout</span>
-                <span className="text-green-600">${payout.toFixed(2)}</span>
-              </div>
+        {/* Quantity — graded slabs are individually unique, so lock to 1.
+            Raw cards keep the selector since you can list multiple
+            identical NM copies under one row. */}
+        {!isGraded && (
+          <div>
+            <label className="block text-sm font-semibold text-zinc-700 mb-2">Quantity</label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setQuantity(String(Math.max(1, parseInt(quantity) - 1)))}
+                disabled={parseInt(quantity) <= 1}
+                className="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center text-xl font-medium"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min="1"
+                max="99"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-20 text-center py-3 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-900 text-xl font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+              <button
+                type="button"
+                onClick={() => setQuantity(String(Math.min(99, parseInt(quantity) + 1)))}
+                className="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-200 transition-colors cursor-pointer flex items-center justify-center text-xl font-medium"
+              >
+                +
+              </button>
             </div>
+            <p className="text-xs text-zinc-400 mt-2">Listing multiple identical NM copies under one row.</p>
+          </div>
+        )}
+
+        {/* Payout estimate — calculatePayout() applies the seller's tier
+            for graded cards (7-9%) and the flat raw rate (9.5%) for raw
+            cards. Single source of truth: src/lib/fees.ts. */}
+        {priceNum > 0 && parseInt(quantity) > 0 && (() => {
+          const qty = parseInt(quantity)
+          const total = priceNum * qty
+          const breakdown = calculatePayout({
+            salePrice: total,
+            // Sell flow today always assumes 'ship' (mailed to Nomi); the
+            // listings table defaults to 'ship' on insert. When a
+            // fulfillment picker is added, thread it through here.
+            fulfillment: 'ship',
+            tier: sellerTier,
+            isRaw: !isGraded,
+          })
+          return (
+            <PayoutBreakdownCard breakdown={breakdown} tier={sellerTier} />
           )
         })()}
+      </div>
+    </div>
+  )
+}
+
+/** Shared payout display used by both StepPricing and StepReview. Reads
+ *  every line off a single calculatePayout() result so the math can't
+ *  drift between the two screens. */
+function PayoutBreakdownCard({ breakdown, tier }: { breakdown: ReturnType<typeof calculatePayout>; tier: TierId }) {
+  return (
+    <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+      <div className="flex justify-between text-sm">
+        <span className="text-zinc-500">Sale price</span>
+        <span className="text-zinc-900">${breakdown.salePrice.toFixed(2)}</span>
+      </div>
+      {breakdown.sellerFee > 0 && (
+        <div className="flex justify-between text-sm">
+          <span className="text-zinc-500">Shipping</span>
+          <span className="text-zinc-900">-${breakdown.sellerFee.toFixed(2)}</span>
+        </div>
+      )}
+      <div className="flex justify-between text-sm">
+        <span className="text-zinc-500">
+          Platform fee ({breakdown.marketplacePercent.toFixed(1)}%)
+          <span className="text-zinc-400 ml-1 capitalize">· {tier}</span>
+        </span>
+        <span className="text-zinc-900">-${breakdown.marketplaceFee.toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between text-sm">
+        <span className="text-zinc-500">Processing ({breakdown.processingPercent.toFixed(1)}%)</span>
+        <span className="text-zinc-900">-${breakdown.processingFee.toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between text-sm font-bold pt-1 border-t border-zinc-200">
+        <span className="text-zinc-900">Your payout</span>
+        <span className="text-green-600">${breakdown.payout.toFixed(2)}</span>
       </div>
     </div>
   )
@@ -585,6 +700,7 @@ function StepReview({
   isGraded,
   gradingCompany,
   grade,
+  sellerTier,
 }: {
   selectedCard: CardResult
   language: string
@@ -596,9 +712,16 @@ function StepReview({
   isGraded: boolean
   gradingCompany: GradingCompany | null
   grade: string
+  sellerTier: TierId
 }) {
   const priceNum = parseFloat(price) || 0
   const qtyNum = parseInt(quantity) || 1
+  const breakdown = calculatePayout({
+    salePrice: priceNum * qtyNum,
+    fulfillment: 'ship',
+    tier: sellerTier,
+    isRaw: !isGraded,
+  })
 
   return (
     <div>
@@ -665,24 +788,11 @@ function StepReview({
         </div>
       </div>
 
-      {/* Payout breakdown */}
-      <div className="mt-4 p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
-        <div className="flex justify-between text-sm">
-          <span className="text-zinc-500">Sale price</span>
-          <span className="text-zinc-900">${(priceNum * qtyNum).toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-zinc-500">Shipping</span>
-          <span className="text-zinc-900">-$5.00</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-zinc-500">Platform fee (9.5%)</span>
-          <span className="text-zinc-900">-${(priceNum * qtyNum * 0.095).toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between text-sm font-bold pt-1 border-t border-zinc-200">
-          <span className="text-zinc-900">Your payout</span>
-          <span className="text-green-600">${(priceNum * qtyNum - 5 - priceNum * qtyNum * 0.095).toFixed(2)}</span>
-        </div>
+      {/* Payout breakdown — same calculatePayout() used on the pricing
+          step, so the math never diverges between Set-your-price and
+          Review screens. */}
+      <div className="mt-4">
+        <PayoutBreakdownCard breakdown={breakdown} tier={sellerTier} />
       </div>
 
       <button
@@ -800,6 +910,10 @@ function SellPageContent() {
   const [quantity, setQuantity] = useState('1')
   const [language, setLanguage] = useState('EN')
   const [marketPrice, setMarketPrice] = useState<number | null>(null)
+  // Seller's pricing tier — drives the marketplace % in the payout
+  // estimate. Defaults to 'basic' if the profile fetch hasn't completed
+  // yet; raw cards ignore this anyway (flat 9.5%).
+  const [sellerTier, setSellerTier] = useState<TierId>('basic')
   const emptyPhotos = Object.fromEntries(PHOTO_SLOTS.map(s => [s.key, null])) as PhotoSlotMap
   const [photos, setPhotos] = useState<PhotoSlotMap>(emptyPhotos)
   const [photoUploading, setPhotoUploading] = useState<Record<string, boolean>>({})
@@ -823,16 +937,26 @@ function SellPageContent() {
       }
       const { data: profile } = await supabase
         .from('profiles')
-        .select('is_seller, seller_approved')
+        .select('is_seller, seller_approved, seller_tier')
         .eq('id', user.id)
         .single()
 
       if (!profile?.is_seller || !profile?.seller_approved) {
         router.push('/seller/apply')
+        return
       }
+      // Hold onto the seller's tier for the payout estimate.
+      if (profile.seller_tier) setSellerTier(profile.seller_tier as TierId)
     }
     checkAuth()
   }, [supabase, router])
+
+  // Graded slabs are individually unique (each has a cert number) — you
+  // can't list "2x BGS 10" under one row meaningfully. Force qty to 1
+  // whenever the graded toggle flips on so the UI matches reality.
+  useEffect(() => {
+    if (isGraded) setQuantity('1')
+  }, [isGraded])
 
   // Pre-fill from query params (sell-into-bid flow)
   useEffect(() => {
@@ -990,7 +1114,7 @@ function SellPageContent() {
       <div className="max-w-5xl mx-auto">
         <SuccessScreen
           cardName={selectedCard.name}
-          onViewDashboard={() => router.push('/dashboard')}
+          onViewDashboard={() => router.push('/mystuff')}
           onListAnother={handleListAnother}
         />
       </div>
@@ -1099,6 +1223,10 @@ function SellPageContent() {
             quantity={quantity}
             setQuantity={setQuantity}
             marketPrice={marketPrice}
+            isGraded={isGraded}
+            gradingCompany={gradingCompany}
+            grade={grade}
+            sellerTier={sellerTier}
           />
         )}
 
@@ -1114,6 +1242,7 @@ function SellPageContent() {
             isGraded={isGraded}
             gradingCompany={gradingCompany}
             grade={grade}
+            sellerTier={sellerTier}
           />
         )}
 

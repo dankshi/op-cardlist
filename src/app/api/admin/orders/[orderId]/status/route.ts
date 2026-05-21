@@ -85,7 +85,21 @@ export async function POST(
 
     update.authenticated_at = now
 
-    // Credit seller balance now that card is authenticated
+    // Credit seller balance now that card is authenticated.
+    //
+    // Fee math has two eras:
+    //   - Legacy orders (pre-migration 20260538): only platform_fee was
+    //     stored, and it represented just the marketplace % — the $5
+    //     shipping label fee was subtracted separately here.
+    //   - Tier-aware orders (post-20260538): seller_fee (the $5 ship fee
+    //     for 'ship' fulfillment, $0 otherwise), marketplace_fee, and
+    //     processing_fee are all stored explicitly. platform_fee already
+    //     equals seller_fee + marketplace_fee. Subtracting another $5
+    //     would double-charge; not subtracting processing_fee would have
+    //     the seller pocket Stripe's 3% cut.
+    //
+    // seller_tier_at_sale is the discriminator — it's NULL for legacy
+    // orders and set for every new order.
     const { data: sellerProfile } = await supabase
       .from('profiles')
       .select('total_sales, balance')
@@ -93,12 +107,12 @@ export async function POST(
       .single()
 
     if (sellerProfile) {
-      // Net seller payout = subtotal − platform_fee − $5 shipping label fee.
-      // The $5 is deducted here (not at label generation) so the seller's
-      // wallet never goes negative between ship and authentication.
-      const SELLER_SHIPPING_FEE = 5
-      const sellerCredit =
-        Number(order.total) - Number(order.platform_fee) - SELLER_SHIPPING_FEE
+      const isLegacy = order.seller_tier_at_sale == null
+      const sellerCredit = isLegacy
+        ? Number(order.total) - Number(order.platform_fee) - 5
+        : Number(order.total)
+            - Number(order.platform_fee || 0)
+            - Number(order.processing_fee || 0)
       await supabase
         .from('profiles')
         .update({
@@ -112,7 +126,9 @@ export async function POST(
         amount: sellerCredit,
         type: 'sale_earned',
         order_id: orderId,
-        description: 'Sale credited on authentication (net of shipping + platform fee)',
+        description: isLegacy
+          ? 'Sale credited on authentication (net of shipping + platform fee)'
+          : 'Sale credited on authentication (net of platform fee + processing)',
       })
     }
   } else if (status === 'shipped_to_buyer') {
