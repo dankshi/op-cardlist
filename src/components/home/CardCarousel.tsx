@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import type { Card } from "@/types/card";
 import { CardThumbnail } from "../card/CardThumbnail";
-import { PriceChangeBadge } from "../PriceChangeBadge";
+import { PriceRow } from "../card/PriceRow";
 
 interface CardCarouselProps {
   title: string;
@@ -15,10 +15,6 @@ interface CardCarouselProps {
   showPrice?: boolean;
   priceChanges?: Record<string, number>;
   viewAllHref?: string;
-}
-
-function formatPrice(n: number): string {
-  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function CardCarousel({
@@ -125,33 +121,23 @@ export function CardCarousel({
               style={{ scrollSnapAlign: "start" }}
             >
               <CardThumbnail card={card} />
-              <div className="mt-2">
-                {showPrice && card.price?.marketPrice != null ? (
-                  // Price-only mode: art identifies the card, only the price shows.
-                  // Card name + id stay in the DOM for screen readers / SEO.
-                  <>
-                    <p className="text-base font-bold text-zinc-900 tabular-nums group-hover/card:text-orange-500 transition-colors">
-                      {formatPrice(card.price.marketPrice)}
-                    </p>
-                    <span className="sr-only">{card.name} ({card.id})</span>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium truncate group-hover/card:text-orange-500 transition-colors">
-                      {card.name}
-                    </p>
-                    <p className="text-xs text-zinc-500">{card.id}</p>
-                  </>
-                )}
-                {showPriceChange && priceChanges?.[card.id] != null && (
-                  <div className="mt-1">
-                    <PriceChangeBadge
-                      changePercent={priceChanges[card.id]}
-                      size="sm"
-                    />
-                  </div>
-                )}
-              </div>
+              {showPrice && card.price?.marketPrice != null ? (
+                <>
+                  <PriceRow
+                    price={card.price.marketPrice}
+                    changePercent={showPriceChange ? priceChanges?.[card.id] ?? null : null}
+                  />
+                  {/* Keep card identity in the DOM for screen readers / SEO. */}
+                  <span className="sr-only">{card.name} ({card.id})</span>
+                </>
+              ) : (
+                <div className="mt-2">
+                  <p className="text-sm font-medium truncate group-hover/card:text-orange-500 transition-colors">
+                    {card.name}
+                  </p>
+                  <p className="text-xs text-zinc-500">{card.id}</p>
+                </div>
+              )}
             </Link>
           ))}
         </div>

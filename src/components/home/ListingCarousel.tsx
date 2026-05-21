@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ConditionBadge } from "../marketplace/ConditionBadge";
+import { PriceRow } from "../card/PriceRow";
 import type { CardCondition } from "@/types/database";
 
 export interface EnrichedListing {
@@ -143,20 +144,19 @@ export function ListingCarousel({
                   unoptimized
                 />
               </div>
-              <div className="mt-2">
-                <p className="text-sm font-medium truncate group-hover/card:text-orange-500 transition-colors">
-                  {listing.cardName}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm font-bold text-zinc-900">
-                    ${Number(listing.price).toFixed(2)}
-                  </span>
-                  <ConditionBadge condition={listing.condition} gradingCompany={listing.grading_company} grade={listing.grade} />
-                </div>
-                <p className="text-xs text-zinc-400 mt-1">
-                  {timeAgo(listing.createdAt)}
-                </p>
-              </div>
+              <PriceRow
+                price={Number(listing.price)}
+                label={
+                  <ConditionBadge
+                    condition={listing.condition}
+                    gradingCompany={listing.grading_company}
+                    grade={listing.grade}
+                  />
+                }
+                footer={timeAgo(listing.createdAt)}
+              />
+              {/* Card name kept for screen readers / SEO. */}
+              <span className="sr-only">{listing.cardName}</span>
             </Link>
           ))}
         </div>

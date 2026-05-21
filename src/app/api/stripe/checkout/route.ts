@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getStripe, calculatePlatformFee } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
+import { calculatePayout, type FulfillmentId, type TierId } from '@/lib/fees'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -40,7 +41,25 @@ export async function POST(request: Request) {
   }
 
   const subtotal = quantity * Number(listing.price)
-  const platformFee = calculatePlatformFee(subtotal)
+
+  // Tier-aware fee calculation (mirrors payment-intent route). Falls back
+  // to safe defaults if the seller hasn't been tiered yet.
+  const { data: sellerProfile } = await supabase
+    .from('profiles')
+    .select('seller_tier')
+    .eq('id', listing.seller_id)
+    .single()
+  const sellerTier = (sellerProfile?.seller_tier as TierId | undefined) ?? 'basic'
+  const fulfillment = (listing.fulfillment_method as FulfillmentId | undefined) ?? 'ship'
+  const isRaw = !listing.grading_company
+
+  const breakdown = calculatePayout({
+    salePrice: subtotal,
+    fulfillment,
+    tier: sellerTier,
+    isRaw,
+  })
+  const platformFee = breakdown.sellerFee + breakdown.marketplaceFee
 
   // Create the order
   const { data: order, error: orderError } = await supabase
@@ -51,6 +70,10 @@ export async function POST(request: Request) {
       status: 'pending_payment',
       subtotal,
       platform_fee: platformFee,
+      seller_fee: breakdown.sellerFee,
+      marketplace_fee: breakdown.marketplaceFee,
+      processing_fee: breakdown.processingFee,
+      seller_tier_at_sale: sellerTier,
       total: subtotal,
     })
     .select()

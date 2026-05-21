@@ -9,8 +9,18 @@ import { SearchHero } from "@/components/home/SearchHero";
 import { CardCarousel } from "@/components/home/CardCarousel";
 import { ListingCarousel } from "@/components/home/ListingCarousel";
 import { SellCTA } from "@/components/home/SellCTA";
+import { TrustStrip } from "@/components/home/TrustStrip";
+import { MarketplacePulse } from "@/components/home/MarketplacePulse";
+import { HowItWorks } from "@/components/home/HowItWorks";
+import { FAQ } from "@/components/home/FAQ";
+import { RecentlyViewed } from "@/components/home/RecentlyViewed";
+import { PricingTable } from "@/components/home/PricingTable";
+import { PayoutCalculator } from "@/components/home/PayoutCalculator";
+import { ConsignmentBanner } from "@/components/home/ConsignmentBanner";
 import type { Card } from "@/types/card";
 import type { EnrichedListing } from "@/components/home/ListingCarousel";
+
+const SUGGESTED_SEARCHES = ['Luffy', 'Zoro', 'Nami', 'Ace', 'Shanks', 'OP-08'];
 
 export const metadata: Metadata = {
   title: { absolute: "nomi market — The Trusted TCG Marketplace" },
@@ -76,8 +86,47 @@ export default async function Home() {
   // here if it undercuts (or matches) every other active listing for that
   // same card, so buyers can act on real new lows.
   let enrichedListings: EnrichedListing[] = [];
+  let activeListingsCount = 0;
+  let listingsLast24h = 0;
+  let ordersShippedLast30d = 0;
+  let avgListingPrice: number | null = null;
   try {
     const supabase = await createClient();
+
+    // Pulse stats — run in parallel, all best-effort.
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const [activeCountRes, last24hRes, ordersRes, avgPriceRes] = await Promise.all([
+      supabase
+        .from('listings')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'active'),
+      supabase
+        .from('listings')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'active')
+        .gte('created_at', since24h),
+      supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['shipped', 'delivered'])
+        .gte('created_at', since30d),
+      supabase
+        .from('listings')
+        .select('price')
+        .eq('status', 'active')
+        .limit(500),
+    ]);
+    activeListingsCount = activeCountRes.count ?? 0;
+    listingsLast24h = last24hRes.count ?? 0;
+    ordersShippedLast30d = ordersRes.count ?? 0;
+    if (avgPriceRes.data && avgPriceRes.data.length > 0) {
+      const total = avgPriceRes.data.reduce(
+        (sum: number, row: { price: number | string }) => sum + Number(row.price),
+        0,
+      );
+      avgListingPrice = total / avgPriceRes.data.length;
+    }
 
     // Pull a wider batch than we'll display so filtering doesn't leave the
     // section empty on busy days.
@@ -160,20 +209,36 @@ export default async function Home() {
 
   return (
     <div>
-      {/* ===== HERO SECTION ===== */}
-      <section className="pt-12 pb-16 sm:pt-16 sm:pb-20 mb-12 sm:mb-16">
-        <div className="max-w-2xl mx-auto text-center">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-6">
+      {/* ===== HERO ===== */}
+      <section className="pt-12 pb-10 sm:pt-16 sm:pb-12 mb-8 sm:mb-10">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-700 text-xs font-semibold uppercase tracking-wider mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            Pokemon support — coming soon
+          </div>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-5 text-zinc-900">
             The trusted way to buy &amp; sell TCG cards.
           </h1>
-
-          <p className="text-lg text-zinc-500 mb-10 max-w-lg mx-auto leading-relaxed">
+          <p className="text-lg text-zinc-500 mb-8 max-w-lg mx-auto leading-relaxed">
             Every order authenticated. Every card verified before it ships.
           </p>
 
           <SearchHero />
 
-          <div className="flex items-center justify-center gap-3 mt-6">
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+            <span className="text-xs text-zinc-400 mr-1">Popular:</span>
+            {SUGGESTED_SEARCHES.map((term) => (
+              <Link
+                key={term}
+                href={`/search?q=${encodeURIComponent(term)}`}
+                className="px-3 py-1 rounded-full bg-white text-xs text-zinc-700 ring-1 ring-zinc-200 hover:ring-zinc-400 hover:text-zinc-900 transition-colors"
+              >
+                {term}
+              </Link>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-center gap-3 mt-8">
             <Link
               href="/search"
               className="px-6 py-2.5 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-800 transition-colors"
@@ -187,38 +252,34 @@ export default async function Home() {
               Start Selling
             </Link>
           </div>
-
-          <div className="flex items-center justify-center gap-3 mt-8 text-xs text-zinc-400">
-            <span>One Piece TCG</span>
-            <span className="text-zinc-300">&middot;</span>
-            <span>Pokemon TCG</span>
-          </div>
         </div>
       </section>
 
-      {/* ===== MOST VALUABLE ===== */}
-      {mostValuable.length > 0 && (
+      {/* ===== TRUST STRIP ===== */}
+      <TrustStrip
+        cardCount={totalCards}
+        setCount={sets.length}
+        activeListings={activeListingsCount}
+      />
+
+      {/* ===== RECENTLY VIEWED (returning users) ===== */}
+      <RecentlyViewed />
+
+      {/* ===== BEST DEALS (lead with savings) ===== */}
+      {dealCards.length > 0 && (
         <section className="mb-12 sm:mb-16">
           <CardCarousel
-            title="Most Valuable Cards"
-            subtitle="The highest-priced cards across all sets"
+            title="Today's Best Deals"
+            subtitle="Cards with the biggest price drops this week"
             icon={
-              <svg
-                className="w-6 h-6 text-yellow-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+              <svg className="w-6 h-6 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
               </svg>
             }
-            cards={mostValuable}
+            cards={dealCards}
             showPrice
+            showPriceChange
+            priceChanges={dealPriceChanges}
             viewAllHref="/hot"
           />
         </section>
@@ -231,18 +292,8 @@ export default async function Home() {
             title="Trending This Week"
             subtitle="Biggest price gainers in the last 7 days"
             icon={
-              <svg
-                className="w-6 h-6 text-green-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                />
+              <svg className="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             }
             cards={trendingCards}
@@ -254,61 +305,80 @@ export default async function Home() {
         </section>
       )}
 
-      {/* ===== BEST DEALS ===== */}
-      {dealCards.length > 0 && (
-        <section className="mb-12 sm:mb-16">
-          <CardCarousel
-            title="Best Deals"
-            subtitle="Cards with the biggest price drops this week"
-            icon={
-              <svg
-                className="w-6 h-6 text-orange-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
-                />
-              </svg>
-            }
-            cards={dealCards}
-            showPrice
-            showPriceChange
-            priceChanges={dealPriceChanges}
-            viewAllHref="/hot"
-          />
-        </section>
-      )}
-
-      {/* ===== NEWEST LISTINGS ===== */}
+      {/* ===== JUST LISTED (renamed from New Lows) ===== */}
       {enrichedListings.length > 0 && (
         <section className="mb-12 sm:mb-16">
           <ListingCarousel
-            title="New Lows"
-            subtitle="Just listed at the lowest active price — snipe before someone else does"
+            title="Just Listed"
+            subtitle="Fresh listings at the lowest active price — buy before someone else does"
             icon={
-              <svg
-                className="w-6 h-6 text-orange-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                />
+              <svg className="w-6 h-6 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
             }
             listings={enrichedListings}
           />
         </section>
       )}
+
+      {/* ===== BROWSE SETS (promoted up + bigger tiles) ===== */}
+      <section className="mb-12 sm:mb-16">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-xl font-bold text-zinc-900">Browse by Set</h2>
+            <p className="text-sm text-zinc-500 mt-1">
+              Newest releases — find what you&apos;re collecting
+            </p>
+          </div>
+          <Link
+            href="/sets"
+            className="text-sm text-orange-600 hover:text-orange-700 transition-colors shrink-0"
+          >
+            View all {sets.length} sets &rarr;
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {newestSets.map((set) => {
+            const setImage = setImages[set.id];
+            return (
+              <Link
+                key={set.id}
+                href={`/${set.id}`}
+                className="block bg-white rounded-xl border border-zinc-200 hover:border-zinc-400 hover:shadow-md transition-all group overflow-hidden"
+              >
+                {setImage?.boosterBoxImageUrl ? (
+                  <div className="relative w-full aspect-square bg-gradient-to-br from-zinc-50 to-white">
+                    <Image
+                      src={setImage.boosterBoxImageUrl}
+                      alt={`${set.name} Booster Box`}
+                      fill
+                      className="object-contain p-4 group-hover:scale-105 transition-transform duration-300"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="relative w-full aspect-square bg-zinc-50 flex items-center justify-center text-zinc-300">
+                    <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6z" />
+                    </svg>
+                  </div>
+                )}
+                <div className="p-4 border-t border-zinc-100">
+                  <h3 className="font-semibold text-base text-zinc-900 group-hover:text-orange-600 transition-colors">
+                    {set.id.toUpperCase()}
+                  </h3>
+                  <p className="text-zinc-500 text-xs mt-0.5 line-clamp-1">
+                    {getSetShortName(set.name)}
+                  </p>
+                  <p className="text-zinc-400 text-[11px] mt-1 tabular-nums">
+                    {set.cardCount} cards
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       {/* ===== NEW RELEASES ===== */}
       {newReleaseCards.length > 0 && newestSet && (
@@ -317,18 +387,8 @@ export default async function Home() {
             title={`New: ${getSetShortName(newestSet.name)}`}
             subtitle={`Top cards from the latest set, ${newestSet.id.toUpperCase()}`}
             icon={
-              <svg
-                className="w-6 h-6 text-orange-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                />
+              <svg className="w-6 h-6 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
               </svg>
             }
             cards={newReleaseCards}
@@ -338,60 +398,49 @@ export default async function Home() {
         </section>
       )}
 
-      <div className="section-divider mb-12 sm:mb-16" />
+      {/* ===== MOST VALUABLE (demoted to aspirational eye-candy) ===== */}
+      {mostValuable.length > 0 && (
+        <section className="mb-12 sm:mb-16">
+          <CardCarousel
+            title="Grails"
+            subtitle="The most valuable cards across every set"
+            icon={
+              <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            cards={mostValuable}
+            showPrice
+            viewAllHref="/hot"
+          />
+        </section>
+      )}
+
+      {/* ===== MARKETPLACE PULSE (live trust signal) ===== */}
+      <MarketplacePulse
+        activeListings={activeListingsCount}
+        listingsLast24h={listingsLast24h}
+        ordersShippedLast30d={ordersShippedLast30d}
+        avgListingPrice={avgListingPrice}
+      />
+
+      {/* ===== PRICING CHART (tier ladder + fulfillment matrix) ===== */}
+      <PricingTable />
+
+      {/* ===== PAYOUT CALCULATOR (interactive, full model) ===== */}
+      <PayoutCalculator />
+
+      {/* ===== CONSIGNMENT (power-seller path) ===== */}
+      <ConsignmentBanner />
 
       {/* ===== SELL CTA ===== */}
       <SellCTA />
 
-      {/* ===== BROWSE SETS ===== */}
-      <section className="mb-12 sm:mb-16">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-bold">Browse Sets</h2>
-            <p className="text-sm text-zinc-500 mt-1">
-              Explore the latest releases
-            </p>
-          </div>
-          <Link
-            href="/sets"
-            className="text-sm text-orange-500 hover:text-orange-600 transition-colors"
-          >
-            View all {sets.length} sets &rarr;
-          </Link>
-        </div>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-          {newestSets.map((set) => {
-            const setImage = setImages[set.id];
-            return (
-              <Link
-                key={set.id}
-                href={`/${set.id}`}
-                className="block bg-white rounded-lg border border-zinc-200 hover:border-zinc-300 hover:shadow-sm transition-all group overflow-hidden"
-              >
-                {setImage?.boosterBoxImageUrl && (
-                  <div className="relative w-full aspect-square bg-white">
-                    <Image
-                      src={setImage.boosterBoxImageUrl}
-                      alt={`${set.name} Booster Box`}
-                      fill
-                      className="object-contain p-2 group-hover:scale-105 transition-transform duration-300"
-                      unoptimized
-                    />
-                  </div>
-                )}
-                <div className="p-2 text-center">
-                  <h3 className="font-semibold text-sm group-hover:text-orange-500 transition-colors">
-                    {set.id.toUpperCase()}
-                  </h3>
-                  <p className="text-zinc-500 text-xs mt-0.5 line-clamp-1">
-                    {getSetShortName(set.name)}
-                  </p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      {/* ===== HOW IT WORKS ===== */}
+      <HowItWorks />
+
+      {/* ===== FAQ ===== */}
+      <FAQ />
 
       {/* Schema markup */}
       <script

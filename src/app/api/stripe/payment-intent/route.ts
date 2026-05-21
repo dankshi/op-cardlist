@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { getStripe, calculatePlatformFee } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
+import { calculatePayout, type FulfillmentId, type TierId } from '@/lib/fees'
 
 // Stripe requires a minimum charge of $0.50. We leave at least $1 on the card to be safe.
 const MIN_CARD_AMOUNT = 1
@@ -43,7 +44,27 @@ export async function POST(request: Request) {
   }
 
   const subtotal = quantity * Number(listing.price)
-  const platformFee = calculatePlatformFee(subtotal)
+
+  // Tier-aware fee calculation. Falls back to safe defaults if the seller
+  // hasn't been tiered yet or the listing predates the fulfillment column.
+  const { data: sellerProfile } = await supabase
+    .from('profiles')
+    .select('seller_tier')
+    .eq('id', listing.seller_id)
+    .single()
+  const sellerTier = (sellerProfile?.seller_tier as TierId | undefined) ?? 'basic'
+  const fulfillment = (listing.fulfillment_method as FulfillmentId | undefined) ?? 'ship'
+  const isRaw = !listing.grading_company
+
+  const breakdown = calculatePayout({
+    salePrice: subtotal,
+    fulfillment,
+    tier: sellerTier,
+    isRaw,
+  })
+  // platform_fee stays as what Nomi collects (seller_fee + marketplace_fee).
+  // Processing is paid to Stripe, not Nomi.
+  const platformFee = breakdown.sellerFee + breakdown.marketplaceFee
 
   // Validate & cap credits against current buyer balance and Stripe minimum
   const { data: buyerProfile } = await supabase
@@ -110,6 +131,10 @@ export async function POST(request: Request) {
       status: 'pending_payment',
       subtotal,
       platform_fee: platformFee,
+      seller_fee: breakdown.sellerFee,
+      marketplace_fee: breakdown.marketplaceFee,
+      processing_fee: breakdown.processingFee,
+      seller_tier_at_sale: sellerTier,
       total: subtotal,
       credits_applied: creditsApplied,
     })

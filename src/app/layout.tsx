@@ -79,7 +79,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased bg-zinc-50 text-zinc-900 min-h-screen`}>
+      <body className={`${inter.variable} font-sans antialiased bg-zinc-50 text-zinc-900 min-h-screen overflow-x-clip`}>
         {/* Organization Schema */}
         <script
           type="application/ld+json"
@@ -95,7 +95,7 @@ export default function RootLayout({
           }}
         />
           <header className="border-b border-orange-600 sticky top-0 bg-orange-500 z-50">
-            <nav className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <nav className="max-w-screen-2xl mx-auto px-4 py-4 flex items-center justify-between">
               <Link href="/" className="hover:opacity-90 transition-opacity">
                 <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto" />
               </Link>
@@ -116,11 +116,11 @@ export default function RootLayout({
               </div>
             </nav>
           </header>
-          <main className="max-w-7xl mx-auto px-4 py-8">
+          <main className="max-w-screen-2xl mx-auto px-4 py-8">
             {children}
           </main>
           <footer className="border-t border-zinc-200 mt-16">
-            <div className="max-w-7xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-3">
+            <div className="max-w-screen-2xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-3">
               <div className="flex items-center justify-center">
                 <Image src="/nomi-slab.png" alt="nomi" width={60} height={20} className="h-5 w-auto" />
               </div>

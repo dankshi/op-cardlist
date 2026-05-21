@@ -14,6 +14,7 @@ import { CardPopulations } from "@/components/card/CardPopulations";
 import { PriceChangeBadge } from "@/components/PriceChangeBadge";
 import { ShareButtons } from "@/components/ShareButtons";
 import { ListingsGrid } from "@/components/marketplace/ListingsGrid";
+import { RecordView } from "@/components/home/RecentlyViewed";
 import { bandaiCardUrl } from "@/lib/bandai-sets";
 
 export const dynamic = 'force-dynamic';
@@ -127,6 +128,7 @@ export default async function CardPage({ params }: PageProps) {
 
   return (
     <div>
+      <RecordView id={card.id} name={card.name} imageUrl={card.imageUrl} />
       {/* Breadcrumbs */}
       <nav className="text-sm text-zinc-500 mb-6">
         <Link href="/" className="hover:text-zinc-900 transition-colors">Home</Link>

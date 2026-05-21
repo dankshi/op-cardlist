@@ -14,8 +14,18 @@ export function getStripe(): Stripe {
   return _stripe
 }
 
-export const PLATFORM_FEE_PERCENT = Number(process.env.STRIPE_PLATFORM_FEE_PERCENT || 9)
+/**
+ * @deprecated Tier-aware fee calculation now lives in src/lib/fees.ts.
+ * These flat-rate fallbacks remain for any caller that doesn't yet pass
+ * seller tier / fulfillment / raw-vs-graded context. Prefer
+ * `calculatePayout({ ... })` from `@/lib/fees`.
+ */
+export const PLATFORM_FEE_PERCENT = Number(process.env.STRIPE_PLATFORM_FEE_PERCENT || 9.5)
+/** @deprecated See above. */
+export const PLATFORM_FEE_FLAT = Number(process.env.STRIPE_PLATFORM_FEE_FLAT || 5)
 
+/** @deprecated Use `calculatePayout` from `@/lib/fees` instead. */
 export function calculatePlatformFee(amount: number): number {
-  return Math.round(amount * (PLATFORM_FEE_PERCENT / 100) * 100) / 100
+  const pct = Math.round(amount * (PLATFORM_FEE_PERCENT / 100) * 100) / 100
+  return Math.round((pct + PLATFORM_FEE_FLAT) * 100) / 100
 }

@@ -2,9 +2,51 @@ import { NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { sendSellerNewOrderEmail, sendBuyerReceiptEmail } from '@/lib/email'
+import { tierForGmv } from '@/lib/fees'
 import type { ShippingAddress } from '@/types/database'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+
+/**
+ * Add this order's subtotal to the seller's lifetime GMV and auto-promote
+ * their tier if a threshold is crossed. P2P-only tiers (Elite) are never
+ * granted here — those require manual partner approval.
+ */
+async function bumpSellerGmvAndTier(
+  supabase: SupabaseClient,
+  sellerId: string,
+  subtotal: number,
+) {
+  if (subtotal <= 0) return
+
+  const { data: seller } = await supabase
+    .from('profiles')
+    .select('seller_gmv, seller_tier')
+    .eq('id', sellerId)
+    .single()
+
+  if (!seller) return
+
+  const currentGmv = Number(seller.seller_gmv) || 0
+  const currentTier = seller.seller_tier as string
+  const newGmv = Math.round((currentGmv + subtotal) * 100) / 100
+  const eligibleTier = tierForGmv(newGmv)
+
+  // Don't demote anyone who's been manually promoted (e.g. Elite). Only
+  // update tier if the GMV-derived tier is strictly better than current.
+  const tierOrder = ['basic', 'silver', 'pearl', 'gold', 'diamond']
+  const currentRank = tierOrder.indexOf(currentTier)
+  const eligibleRank = tierOrder.indexOf(eligibleTier)
+  const shouldPromote = currentRank >= 0 && eligibleRank > currentRank
+
+  await supabase
+    .from('profiles')
+    .update({
+      seller_gmv: newGmv,
+      ...(shouldPromote ? { seller_tier: eligibleTier } : {}),
+    })
+    .eq('id', sellerId)
+}
 
 async function processOrderPayment(
   supabase: SupabaseClient,
@@ -63,9 +105,19 @@ async function processOrderPayment(
   // Send email notifications
   const { data: order } = await supabase
     .from('orders')
-    .select('seller_id, total, platform_fee, shipping_address')
+    .select('seller_id, subtotal, total, platform_fee, shipping_address')
     .eq('id', orderId)
     .single()
+
+  // Bump the seller's lifetime GMV + auto-promote tier on every paid order.
+  if (order?.seller_id) {
+    try {
+      await bumpSellerGmvAndTier(supabase, order.seller_id, Number(order.subtotal))
+    } catch (gmvErr) {
+      // GMV is best-effort — don't break the payment flow if it fails.
+      console.error('Failed to bump seller GMV:', gmvErr)
+    }
+  }
 
   if (order) {
     try {
