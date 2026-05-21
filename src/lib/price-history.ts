@@ -68,9 +68,12 @@ export async function calculatePriceChange(
 ): Promise<PriceChange | null> {
   if (currentPrice == null || !supabase) return null;
 
-  // Look up tcgplayer_product_id
+  // Look up tcgplayer_product_id via card_tcgplayer_mapping. This used to
+  // read from tcgplayer_card_prices.tcgplayer_product_id but that column
+  // was dropped in migration 20260528; before this fix, calculatePriceChange
+  // returned null for every card.
   const { data: mapping } = await supabase
-    .from('tcgplayer_card_prices')
+    .from('card_tcgplayer_mapping')
     .select('tcgplayer_product_id')
     .eq('card_id', cardId)
     .single();
@@ -194,9 +197,10 @@ export async function getCardPriceHistory(
 ): Promise<{ date: string; price: number }[]> {
   if (!supabase) return [];
 
-  // Look up tcgplayer_product_id
+  // Look up tcgplayer_product_id via card_tcgplayer_mapping (see
+  // calculatePriceChange for the original migration story).
   const { data: mapping } = await supabase
-    .from('tcgplayer_card_prices')
+    .from('card_tcgplayer_mapping')
     .select('tcgplayer_product_id')
     .eq('card_id', cardId)
     .single();
@@ -257,7 +261,7 @@ export async function getCardSales(
   if (!supabase) return [];
 
   const { data: mapping } = await supabase
-    .from('tcgplayer_card_prices')
+    .from('card_tcgplayer_mapping')
     .select('tcgplayer_product_id')
     .eq('card_id', cardId)
     .single();

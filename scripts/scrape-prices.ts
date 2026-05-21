@@ -593,18 +593,12 @@ async function main() {
 
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD for history snapshots
 
-  // Collect rows per set for batch upsert to Supabase. Mapping columns
-  // moved out of tcgplayer_card_prices — they live in card_tcgplayer_mapping
-  // now and are written there separately when scrape-prices discovers a
-  // new card → product match.
-  interface CardPriceRow {
-    card_id: string;
-    market_price: number | null;
-    lowest_price: number | null;
-    median_price: number | null;
-    total_listings: number | null;
-  }
-
+  // After the 20260537 consolidation, scrape-prices no longer writes a
+  // per-card price row. Current prices live in tcgplayer_card_price_history
+  // (keyed by product_id + date) and readers go through the
+  // tcgplayer_current_prices view via card_tcgplayer_mapping. We still
+  // discover-and-write new mappings (the auto-mapper is canonical, but
+  // this is a fallback for sets it hasn't covered yet).
   interface MappingRow {
     card_id: string;
     tcgplayer_product_id: number;
@@ -633,7 +627,6 @@ async function main() {
       continue;
     }
 
-    const setRows: CardPriceRow[] = [];
     const newMappings: MappingRow[] = [];
     const historyRows: { tcgplayer_product_id: number; recorded_date: string; market_price: number | null; lowest_price: number | null; median_price: number | null; total_listings: number | null }[] = [];
 
@@ -657,18 +650,13 @@ async function main() {
         isManual = true;
 
         if (!product) {
-          // Manual product not in this set's products — likely a wrong-set mapping.
-          // Upsert with null prices so the missing price serves as a visible signal.
-          // Mapping isn't touched (it's already in card_tcgplayer_mapping).
-          setRows.push({
-            card_id: card.id,
-            market_price: null,
-            lowest_price: null,
-            median_price: null,
-            total_listings: null,
-          });
+          // Manual product not in this set's products — likely a wrong-set
+          // mapping. We don't write any history row (no price to record).
+          // The next set the scraper hits will see this same product if
+          // the mapping is correct after all; otherwise the gap is the
+          // visible signal that something needs fixing.
           matchedProductIds.push({ cardId: card.id, productId: manualProductId });
-          console.log('[manual, not in set] (prices cleared — check mapping)');
+          console.log('[manual, not in set] (skipped — check mapping)');
           totalManualPreserved++;
           totalProcessed++;
           continue;
@@ -681,14 +669,6 @@ async function main() {
       }
 
       if (product) {
-        setRows.push({
-          card_id: card.id,
-          market_price: product.marketPrice,
-          lowest_price: product.lowestPrice,
-          median_price: product.medianPrice,
-          total_listings: product.totalListings,
-        });
-
         // If this is a fresh discovery (not already in card_tcgplayer_mapping),
         // record the mapping. Existing entries (manual or earlier auto)
         // are left alone — the auto-mapper script is the canonical
@@ -725,22 +705,6 @@ async function main() {
       }
 
       totalProcessed++;
-    }
-
-    // Batch upsert price rows to tcgplayer_card_prices.
-    if (setRows.length > 0) {
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < setRows.length; i += BATCH_SIZE) {
-        const batch = setRows.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase
-          .from('tcgplayer_card_prices')
-          .upsert(batch, { onConflict: 'card_id', ignoreDuplicates: false });
-
-        if (error) {
-          console.error(`  Supabase upsert error for ${set.id}:`, error.message);
-        }
-      }
-      if (debug) console.log(`  Upserted ${setRows.length} price rows`);
     }
 
     // Persist any newly-discovered mappings to card_tcgplayer_mapping.
@@ -783,23 +747,24 @@ async function main() {
     : 300;
 
   if (matchedProductIds.length > 0) {
-    // Order by sales_scraped_at NULLS FIRST so unseen + stalest cards come
-    // first. tcgplayer_card_prices is now keyed by card_id only (product
-    // id moved to card_tcgplayer_mapping), so we sort by card_id staleness
-    // and map back to product_ids via matchedProductIds.
-    const matchedCardIds = Array.from(new Set(matchedProductIds.map(m => m.cardId)));
+    // Order by sales_scraped_at NULLS FIRST so unseen + stalest products
+    // come first. After the 20260537 consolidation, sales_scraped_at lives
+    // on tcgplayer_products (keyed by product_id) — the rotation is now
+    // product-side, which is the right grain (multiple cards mapped to
+    // the same product share one scrape).
+    const matchedProdIds = Array.from(new Set(matchedProductIds.map(m => m.productId)));
     const { data: staleness } = await supabase
-      .from('tcgplayer_card_prices')
-      .select('card_id, sales_scraped_at')
-      .in('card_id', matchedCardIds)
+      .from('tcgplayer_products')
+      .select('product_id, sales_scraped_at')
+      .in('product_id', matchedProdIds)
       .order('sales_scraped_at', { ascending: true, nullsFirst: true });
 
-    const orderedCards = new Map(
-      (staleness ?? []).map((r, i) => [r.card_id, i]),
+    const orderedProducts = new Map(
+      (staleness ?? []).map((r, i) => [r.product_id as number, i]),
     );
     matchedProductIds.sort((a, b) => {
-      const ia = orderedCards.get(a.cardId) ?? Number.MAX_SAFE_INTEGER;
-      const ib = orderedCards.get(b.cardId) ?? Number.MAX_SAFE_INTEGER;
+      const ia = orderedProducts.get(a.productId) ?? Number.MAX_SAFE_INTEGER;
+      const ib = orderedProducts.get(b.productId) ?? Number.MAX_SAFE_INTEGER;
       return ia - ib;
     });
 
@@ -811,10 +776,11 @@ async function main() {
 
     let lastSoldFound = 0;
     let totalSalesStored = 0;
-    let pendingLastSold: { card_id: string; last_sold_price: number; last_sold_date: string }[] = [];
-    // sales_scraped_at lives on tcgplayer_card_prices, which is keyed by
-    // card_id now. Track updates by card_id (was product_id).
-    let pendingSalesScraped: { card_id: string; sales_scraped_at: string }[] = [];
+    // last_sold_* and sales_scraped_at live on tcgplayer_products now
+    // (keyed by product_id). Multiple cards mapped to the same product
+    // share one product-level entry — dedupe on the way in.
+    let pendingLastSold: { product_id: number; last_sold_price: number; last_sold_date: string }[] = [];
+    let pendingSalesScraped: { product_id: number; sales_scraped_at: string }[] = [];
     let pendingSales: {
       tcgplayer_product_id: number;
       sold_at: string;
@@ -834,26 +800,31 @@ async function main() {
 
     async function flushPending() {
       if (pendingLastSold.length > 0) {
+        // Dedupe by product_id (multiple cards may map to the same
+        // product; we only want one product row updated per product).
+        const byProduct = new Map(pendingLastSold.map(r => [r.product_id, r]));
         const { error } = await supabase
-          .from('tcgplayer_card_prices')
-          .upsert(pendingLastSold, { onConflict: 'card_id' });
+          .from('tcgplayer_products')
+          .upsert(Array.from(byProduct.values()), { onConflict: 'product_id' });
         if (error) console.error(`  Supabase last sold upsert error:`, error.message);
         pendingLastSold = [];
       }
       if (pendingSalesScraped.length > 0) {
         // Update sales_scraped_at in parallel so rotation tracking is fast.
+        // Dedupe by product_id for the same reason as pendingLastSold.
+        const byProduct = new Map(pendingSalesScraped.map(r => [r.product_id, r]));
         const updates = await Promise.all(
-          pendingSalesScraped.map(row =>
+          Array.from(byProduct.values()).map(row =>
             supabase
-              .from('tcgplayer_card_prices')
+              .from('tcgplayer_products')
               .update({ sales_scraped_at: row.sales_scraped_at })
-              .eq('card_id', row.card_id),
+              .eq('product_id', row.product_id),
           ),
         );
         const failures = updates.filter(r => r.error);
         if (failures.length > 0) {
           console.error(
-            `  sales_scraped_at: ${failures.length}/${pendingSalesScraped.length} updates failed; first error: ${failures[0].error?.message}`,
+            `  sales_scraped_at: ${failures.length}/${byProduct.size} updates failed; first error: ${failures[0].error?.message}`,
           );
         }
         pendingSalesScraped = [];
@@ -881,16 +852,16 @@ async function main() {
       );
       const now = new Date().toISOString();
       for (let j = 0; j < batch.length; j++) {
-        const { cardId, productId } = batch[j];
+        const { productId } = batch[j];
         const sales = results[j];
         // Always mark as attempted so rotation moves on, even if no sales returned.
         pendingSalesScraped.push({
-          card_id: cardId,
+          product_id: productId,
           sales_scraped_at: now,
         });
         if (sales.length > 0) {
           pendingLastSold.push({
-            card_id: cardId,
+            product_id: productId,
             last_sold_price: sales[0].price,
             last_sold_date: sales[0].date,
           });

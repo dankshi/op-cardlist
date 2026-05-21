@@ -175,10 +175,17 @@ async function main() {
       continue;
     }
 
-    // Prepare rows for upsert — deduplicate by product_id (TCGPlayer can return dupes)
+    // Prepare rows for upsert — deduplicate by product_id (TCGPlayer can return dupes).
+    // After the 20260537 consolidation, tcgplayer_products is pure catalog
+    // metadata — prices live exclusively in tcgplayer_card_price_history.
+    // This script writes today's snapshot to history as well (see the
+    // historyRows block below) so unmatched TCG products still build up a
+    // long-running price trail.
     const slug = set.set_name;
     const seen = new Set<number>();
     const rows: any[] = [];
+    const today = new Date().toISOString().split('T')[0];
+    const historyRows: { tcgplayer_product_id: number; recorded_date: string; market_price: number | null; lowest_price: number | null; median_price: number | null; total_listings: number | null }[] = [];
     for (const p of products) {
       if (seen.has(p.productId)) continue;
       seen.add(p.productId);
@@ -189,14 +196,20 @@ async function main() {
         card_number: p.customAttributes?.number?.toUpperCase() || null,
         rarity: p.customAttributes?.rarityDbName ?? p.rarityName ?? null,
         product_url_name: p.productUrlName,
-        market_price: p.marketPrice,
-        lowest_price: p.lowestPrice,
-        median_price: p.medianPrice,
-        total_listings: p.totalListings,
       });
+      if (p.marketPrice != null || p.lowestPrice != null || p.medianPrice != null || p.totalListings != null) {
+        historyRows.push({
+          tcgplayer_product_id: p.productId,
+          recorded_date: today,
+          market_price: p.marketPrice ?? null,
+          lowest_price: p.lowestPrice ?? null,
+          median_price: p.medianPrice ?? null,
+          total_listings: p.totalListings ?? null,
+        });
+      }
     }
 
-    // Batch upsert
+    // Batch upsert catalog rows to tcgplayer_products (no prices).
     const BATCH_SIZE = 200;
     let upsertError = false;
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
@@ -209,6 +222,20 @@ async function main() {
         console.log(`ERROR: ${upsertErr.message}`);
         upsertError = true;
         break;
+      }
+    }
+
+    // Append today's prices to tcgplayer_card_price_history. ON CONFLICT
+    // DO NOTHING means we don't overwrite an earlier write on the same
+    // date (e.g. if scrape-prices.ts ran first and got the same product).
+    if (!upsertError && historyRows.length > 0) {
+      const HIST_BATCH = 500;
+      for (let i = 0; i < historyRows.length; i += HIST_BATCH) {
+        const batch = historyRows.slice(i, i + HIST_BATCH);
+        const { error } = await supabase
+          .from('tcgplayer_card_price_history')
+          .upsert(batch, { onConflict: 'tcgplayer_product_id,recorded_date', ignoreDuplicates: true });
+        if (error) console.log(`History upsert error: ${error.message}`);
       }
     }
 

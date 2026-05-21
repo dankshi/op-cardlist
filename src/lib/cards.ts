@@ -42,22 +42,28 @@ function rowToCard(row: Record<string, unknown>): Card {
   };
 }
 
-// Note: mapping fields (tcgplayerProductId, tcgplayerUrl, tcgplayerProductName)
-// are now sourced from card_tcgplayer_mapping in fetchPrices() below,
-// not from the price row. This function returns them as null; fetchPrices
-// overlays them from the mapping join.
-function rowToCardPrice(row: Record<string, unknown>): CardPrice {
+// Helper to construct a CardPrice from the joined data sources. After the
+// 20260535/20260536 consolidation, prices come from THREE places joined
+// via card_tcgplayer_mapping:
+//   - tcgplayer_current_prices (view): market/lowest/median/total_listings
+//   - tcgplayer_products: last_sold_price/date (eBay sales data)
+//   - card_tcgplayer_mapping: tcgplayer_product_id/url/name
+function buildCardPrice(
+  cur: { market_price?: number | null; lowest_price?: number | null; median_price?: number | null; total_listings?: number | null; recorded_date?: string | null } | null,
+  prod: { last_sold_price?: number | null; last_sold_date?: string | null } | null,
+  mapping: { product_id: number; url: string | null; name: string | null } | null,
+): CardPrice {
   return {
-    marketPrice: (row.market_price as number) ?? null,
-    lowestPrice: (row.lowest_price as number) ?? null,
-    medianPrice: (row.median_price as number) ?? null,
-    totalListings: (row.total_listings as number) ?? null,
-    lastSoldPrice: (row.last_sold_price as number) ?? null,
-    lastSoldDate: (row.last_sold_date as string) ?? null,
-    lastUpdated: (row.updated_at as string) ?? null,
-    tcgplayerUrl: null,
-    tcgplayerProductId: null,
-    tcgplayerProductName: null,
+    marketPrice: cur?.market_price ?? null,
+    lowestPrice: cur?.lowest_price ?? null,
+    medianPrice: cur?.median_price ?? null,
+    totalListings: cur?.total_listings ?? null,
+    lastSoldPrice: prod?.last_sold_price ?? null,
+    lastSoldDate: prod?.last_sold_date ?? null,
+    lastUpdated: cur?.recorded_date ?? null,
+    tcgplayerProductId: mapping?.product_id ?? null,
+    tcgplayerUrl: mapping?.url ?? null,
+    tcgplayerProductName: mapping?.name ?? null,
   };
 }
 
@@ -117,63 +123,50 @@ const fetchSetRows = cache(async (): Promise<SetMeta[]> => {
   }));
 });
 
-// Prices are joined with the new card_tcgplayer_mapping table at read
-// time. Once we strip the duplicate mapping cols from card_prices
-// (Migration D), this becomes the only source for the TCGplayer link.
-// Until then we prefer card_tcgplayer_mapping over the duplicated cols
-// on card_prices (same data; the mapping table wins for clarity).
+// Prices are looked up product-side, not card-side: card_tcgplayer_mapping
+// gives us product_id → tcgplayer_current_prices (latest history row) for
+// market/lowest/median + tcgplayer_products for last_sold_*. This means
+// fixing a mapping immediately changes which price a card shows — the old
+// denormalized tcgplayer_card_prices table (keyed by card_id) was the root
+// cause of stale-price bugs and is gone after migration 20260537.
 const fetchPrices = cache(async (): Promise<Record<string, CardPrice>> => {
   if (!supabase) return {};
-  const [priceRows, mappingRows] = await Promise.all([
+  const [mappingRows, curRows, prodRows] = await Promise.all([
     paginated<Record<string, unknown>>((from, to) =>
-      supabase!.from('tcgplayer_card_prices').select('*').range(from, to),
+      supabase!.from('card_tcgplayer_mapping')
+        .select('card_id, tcgplayer_product_id, tcgplayer_url, tcgplayer_name')
+        .range(from, to),
     ),
     paginated<Record<string, unknown>>((from, to) =>
-      supabase!.from('card_tcgplayer_mapping').select('card_id, tcgplayer_product_id, tcgplayer_url, tcgplayer_name').range(from, to),
+      supabase!.from('tcgplayer_current_prices')
+        .select('tcgplayer_product_id, recorded_date, market_price, lowest_price, median_price, total_listings')
+        .range(from, to),
+    ),
+    paginated<Record<string, unknown>>((from, to) =>
+      supabase!.from('tcgplayer_products')
+        .select('product_id, last_sold_price, last_sold_date')
+        .range(from, to),
     ),
   ]);
 
-  // Index mappings by card_id so we can attach them to each price row.
-  const mappingByCard = new Map<string, { product_id: number; url: string | null; name: string | null }>();
+  // Index current prices and products by product_id for O(1) joins.
+  const curByProduct = new Map<number, Record<string, unknown>>();
+  for (const c of curRows) curByProduct.set(c.tcgplayer_product_id as number, c);
+  const prodByProduct = new Map<number, Record<string, unknown>>();
+  for (const p of prodRows) prodByProduct.set(p.product_id as number, p);
+
+  const prices: Record<string, CardPrice> = {};
   for (const m of mappingRows) {
-    mappingByCard.set(m.card_id as string, {
-      product_id: (m.tcgplayer_product_id as number) ?? 0,
+    const cardId = m.card_id as string;
+    const productId = m.tcgplayer_product_id as number | null;
+    if (productId == null) continue;
+    const cur = curByProduct.get(productId) as { market_price: number | null; lowest_price: number | null; median_price: number | null; total_listings: number | null; recorded_date: string | null } | undefined;
+    const prod = prodByProduct.get(productId) as { last_sold_price: number | null; last_sold_date: string | null } | undefined;
+    prices[cardId] = buildCardPrice(cur ?? null, prod ?? null, {
+      product_id: productId,
       url: (m.tcgplayer_url as string) ?? null,
       name: (m.tcgplayer_name as string) ?? null,
     });
-  }
-
-  const prices: Record<string, CardPrice> = {};
-  for (const row of priceRows) {
-    const cardId = row.card_id as string;
-    const basePrice = rowToCardPrice(row);
-    const mapping = mappingByCard.get(cardId);
-    prices[cardId] = mapping
-      ? {
-          ...basePrice,
-          tcgplayerProductId: mapping.product_id,
-          tcgplayerUrl: mapping.url,
-          tcgplayerProductName: mapping.name,
-        }
-      : basePrice;
-  }
-
-  // Also surface cards that have a mapping but no price row yet (e.g.
-  // freshly-mapped via auto-map-tcgplayer.ts but scrape-prices hasn't run).
-  for (const [cardId, mapping] of mappingByCard) {
-    if (prices[cardId]) continue;
-    prices[cardId] = {
-      marketPrice: null,
-      lowestPrice: null,
-      medianPrice: null,
-      totalListings: null,
-      lastSoldPrice: null,
-      lastSoldDate: null,
-      lastUpdated: null,
-      tcgplayerProductId: mapping.product_id,
-      tcgplayerUrl: mapping.url,
-      tcgplayerProductName: mapping.name,
-    };
   }
 
   return prices;

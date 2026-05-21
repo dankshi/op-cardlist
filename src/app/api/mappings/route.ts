@@ -212,25 +212,7 @@ export async function POST(request: Request) {
       // Don't fail — card_mappings (legacy audit) already saved
     }
 
-    // 3. Stub a row in tcgplayer_card_prices with the submitted price so
-    //    the card has a price row before the next scrape runs. Mapping
-    //    cols moved to card_tcgplayer_mapping (written above); only the
-    //    price columns live here now.
-    const priceRows = submissions.map(sub => ({
-      card_id: sub.cardId,
-      market_price: sub.price ?? null,
-    }));
-
-    const { error: priceError } = await supabase
-      .from('tcgplayer_card_prices')
-      .upsert(priceRows, { onConflict: 'card_id' });
-
-    if (priceError) {
-      console.error('Supabase error (tcgplayer_card_prices):', priceError);
-      // Don't fail — card_tcgplayer_mapping already saved
-    }
-
-    // 4. Derive cards.art_style from the mapped product name. Mirrors the
+    // 3. Derive cards.art_style from the mapped product name. Mirrors the
     //    post-mapping correction step in scripts/auto-map-tcgplayer.ts so a
     //    manual assignment immediately reflects the right art_style (e.g.
     //    assigning a JRF/Pirate Foil/Reprint product flips a card to
