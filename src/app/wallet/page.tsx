@@ -66,8 +66,8 @@ export default function WalletPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
-        &larr; Back to Dashboard
+      <Link href="/mystuff" className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
+        &larr; Back to My Stuff
       </Link>
 
       <h1 className="text-3xl font-bold text-zinc-900 mb-8">Wallet</h1>

@@ -83,7 +83,7 @@ export default function EditListingPage() {
         .single()
 
       if (!data || data.seller_id !== user.id) {
-        router.push('/dashboard')
+        router.push('/mystuff')
         return
       }
 
@@ -188,7 +188,7 @@ export default function EditListingPage() {
   }
 
   async function delistListing() {
-    if (!listing || !confirm('Delist this card? It will no longer be visible to buyers.')) return
+    if (!listing || !confirm('Move this card to your collection? It will no longer be visible to buyers.')) return
 
     await supabase
       .from('listings')
@@ -222,7 +222,7 @@ export default function EditListingPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
-        &larr; Back to My Shop
+        &larr; Back to My Stuff
       </Link>
 
       <h1 className="text-3xl font-bold text-zinc-900 mb-2">Edit Listing</h1>
@@ -234,12 +234,12 @@ export default function EditListingPage() {
 
       {listing.status === 'delisted' && (
         <div className="p-4 bg-white border border-yellow-200 rounded-lg mb-6 flex items-center justify-between">
-          <p className="text-yellow-400 text-sm">This listing is delisted and not visible to buyers.</p>
+          <p className="text-yellow-700 text-sm">This card is in your collection and not visible to buyers.</p>
           <button
             onClick={relistListing}
-            className="px-3 py-1 rounded bg-orange-500 hover:bg-orange-500 text-white text-sm font-medium transition-colors cursor-pointer"
+            className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors cursor-pointer"
           >
-            Relist
+            List for sale
           </button>
         </div>
       )}
@@ -497,9 +497,9 @@ export default function EditListingPage() {
             <button
               type="button"
               onClick={delistListing}
-              className="px-6 py-3 rounded-lg border border-red-200 text-red-400 hover:bg-red-50 font-semibold transition-colors cursor-pointer"
+              className="px-6 py-3 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 font-semibold transition-colors cursor-pointer"
             >
-              Delist
+              Move to collection
             </button>
           )}
         </div>

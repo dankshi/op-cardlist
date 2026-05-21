@@ -56,10 +56,10 @@ function OnboardingCompleteContent() {
         <h1 className="text-3xl font-bold text-zinc-900 mb-3">You&apos;re all set!</h1>
         <p className="text-zinc-500 mb-8">Your Stripe account is connected. You can now receive payments.</p>
         <Link
-          href="/dashboard"
+          href="/mystuff"
           className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
         >
-          Go to My Shop
+          Go to My Stuff
         </Link>
       </div>
     )

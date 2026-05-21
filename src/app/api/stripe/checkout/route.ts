@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { getStripe } from '@/lib/stripe'
 import { calculatePayout, type FulfillmentId, type TierId } from '@/lib/fees'
+import { reserveListing, releaseReservation } from '@/lib/inventory'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -40,6 +42,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'You cannot buy your own listing' }, { status: 400 })
   }
 
+  // Reserve inventory atomically — same pattern as payment-intent.
+  const reservation = reserveListing(
+    { status: listing.status, quantity_available: listing.quantity_available },
+    quantity,
+  )
+  if (!reservation) {
+    return NextResponse.json({ error: 'Listing is no longer available' }, { status: 400 })
+  }
+  const admin = getSupabaseAdmin()
+  const { data: reservedRows, error: reserveError } = await admin
+    .from('listings')
+    .update({
+      quantity_available: reservation.nextQuantityAvailable,
+      status: reservation.nextStatus,
+    })
+    .eq('id', listing.id)
+    .eq('status', listing.status)
+    .gte('quantity_available', quantity)
+    .select('id')
+  if (reserveError || !reservedRows || reservedRows.length === 0) {
+    return NextResponse.json({ error: 'Listing was just bought by another shopper. Please try again.' }, { status: 409 })
+  }
+
   const subtotal = quantity * Number(listing.price)
 
   // Tier-aware fee calculation (mirrors payment-intent route). Falls back
@@ -75,11 +100,33 @@ export async function POST(request: Request) {
       processing_fee: breakdown.processingFee,
       seller_tier_at_sale: sellerTier,
       total: subtotal,
+      inventory_reserved: true,
     })
     .select()
     .single()
 
   if (orderError || !order) {
+    // Roll back the reservation so the listing doesn't get stuck.
+    const { data: cur } = await admin
+      .from('listings')
+      .select('status, quantity_available')
+      .eq('id', listing.id)
+      .single()
+    if (cur) {
+      const release = releaseReservation(
+        { status: cur.status, quantity_available: cur.quantity_available },
+        quantity,
+      )
+      if (release) {
+        await admin
+          .from('listings')
+          .update({
+            quantity_available: release.nextQuantityAvailable,
+            status: release.nextStatus,
+          })
+          .eq('id', listing.id)
+      }
+    }
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }
 

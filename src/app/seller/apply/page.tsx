@@ -50,7 +50,7 @@ export default function SellerApplyPage() {
       setError(error.message)
       setPending(false)
     } else {
-      router.push('/dashboard')
+      router.push('/mystuff')
       router.refresh()
     }
   }
@@ -77,10 +77,10 @@ export default function SellerApplyPage() {
             Head to your shop to manage listings and orders.
           </p>
           <Link
-            href="/dashboard"
+            href="/mystuff"
             className="inline-block mt-6 px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
           >
-            Go to My Shop
+            Go to My Stuff
           </Link>
         </div>
       </div>

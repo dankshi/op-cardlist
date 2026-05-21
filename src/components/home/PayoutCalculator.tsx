@@ -14,10 +14,14 @@ import {
 const PUBLIC_FULFILLMENT = FULFILLMENT.filter((f) => !f.requiresElite);
 const PUBLIC_TIERS = TIERS.filter((t) => !t.isP2POnly);
 
-const PRESETS = [25, 50, 100, 250, 500];
+const PRESETS = [500, 1_000, 5_000, 10_000, 25_000];
 
 function formatUSD(n: number, decimals: number = 2): string {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+}
+
+function formatPresetLabel(n: number): string {
+  return n >= 1000 ? `$${(n / 1000).toLocaleString('en-US')}k` : `$${n}`;
 }
 
 export function PayoutCalculator() {
@@ -78,13 +82,13 @@ export function PayoutCalculator() {
                     key={p}
                     type="button"
                     onClick={() => setRaw(String(p))}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    className={`px-3 py-1 rounded-full text-xs font-medium tabular-nums transition-colors ${
                       sale === p
                         ? 'bg-zinc-900 text-white'
                         : 'bg-white text-zinc-600 ring-1 ring-zinc-200 hover:ring-zinc-400'
                     }`}
                   >
-                    ${p}
+                    {formatPresetLabel(p)}
                   </button>
                 ))}
               </div>

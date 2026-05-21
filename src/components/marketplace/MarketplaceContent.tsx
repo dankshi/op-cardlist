@@ -5,27 +5,30 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ConditionBadge } from './ConditionBadge'
 import { BuyNowButton } from './BuyNowButton'
+import { PriceRow } from '../card/PriceRow'
 import { GRADING_SCALES } from '@/types/database'
 import type { GradingCompany } from '@/types/database'
 import type { EnrichedListing } from '@/components/home/ListingCarousel'
 
 const QUICK_FILTERS = [
-  { label: 'PSA 10', company: 'PSA', grade: '10' },
-  { label: 'PSA 9', company: 'PSA', grade: '9' },
-  { label: 'BGS 10', company: 'BGS', grade: '10' },
-  { label: 'BGS Black Label', company: 'BGS', grade: 'Black Label 10' },
-  { label: 'BGS 9.5', company: 'BGS', grade: '9.5' },
-  { label: 'CGC 10', company: 'CGC', grade: '10' },
-  { label: 'CGC 9.5', company: 'CGC', grade: '9.5' },
-  { label: 'Raw / Ungraded', company: 'raw', grade: null },
+  { label: 'PSA 10',         company: 'PSA', grade: '10' },
+  { label: 'PSA 9',          company: 'PSA', grade: '9' },
+  { label: 'BGS 10',         company: 'BGS', grade: '10' },
+  { label: 'BGS BL',         company: 'BGS', grade: 'Black Label 10' },
+  { label: 'BGS 9.5',        company: 'BGS', grade: '9.5' },
+  { label: 'CGC 10',         company: 'CGC', grade: '10' },
+  { label: 'CGC 9.5',        company: 'CGC', grade: '9.5' },
+  { label: 'Raw / Ungraded', company: 'raw', grade: null as string | null },
 ]
 
 const COMPANIES = ['all', 'PSA', 'CGC', 'BGS', 'TAG', 'raw'] as const
-const SORT_OPTIONS = [
-  { value: 'price_asc', label: 'Price: Low \u2192 High' },
-  { value: 'price_desc', label: 'Price: High \u2192 Low' },
-  { value: 'newest', label: 'Newest' },
+const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
+  { value: 'price_asc',  label: 'Price: Low → High' },
+  { value: 'price_desc', label: 'Price: High → Low' },
+  { value: 'newest',     label: 'Newest first' },
 ]
+
+type SortOption = 'price_asc' | 'price_desc' | 'newest'
 
 const PAGE_SIZE = 24
 
@@ -65,9 +68,9 @@ function groupListingsByCard(listings: EnrichedListing[]): GroupedCard[] {
   })
 }
 
-function sortGroupedCards(groups: GroupedCard[], sortBy: string): GroupedCard[] {
+function sortGroupedCards(groups: GroupedCard[], sortBy: SortOption): GroupedCard[] {
   return [...groups].sort((a, b) => {
-    if (sortBy === 'price_asc') return a.cheapestListing.price - b.cheapestListing.price
+    if (sortBy === 'price_asc')  return a.cheapestListing.price - b.cheapestListing.price
     if (sortBy === 'price_desc') return b.cheapestListing.price - a.cheapestListing.price
     return new Date(b.newestDate).getTime() - new Date(a.newestDate).getTime()
   })
@@ -82,6 +85,7 @@ export function MarketplaceContent({ initialListings, cardMap }: MarketplaceCont
   const [allListings, setAllListings] = useState(initialListings)
   const [loading, setLoading] = useState(false)
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   // Filters
   const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>(null)
@@ -89,10 +93,9 @@ export function MarketplaceContent({ initialListings, cardMap }: MarketplaceCont
   const [grade, setGrade] = useState('all')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
-  const [sort, setSort] = useState('price_asc')
+  const [sort, setSort] = useState<SortOption>('price_asc')
   const [search, setSearch] = useState('')
 
-  // Group and sort listings (recomputes when allListings or sort changes)
   const groupedCards = useMemo(() => {
     const groups = groupListingsByCard(allListings)
     return sortGroupedCards(groups, sort)
@@ -101,8 +104,10 @@ export function MarketplaceContent({ initialListings, cardMap }: MarketplaceCont
   const visibleCards = groupedCards.slice(0, displayCount)
   const totalCards = groupedCards.length
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const enrichListings = useCallback((rawListings: any[]): EnrichedListing[] => {
     return rawListings
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((listing: any) => {
         const card = cardMap[listing.card_id]
         if (!card) return null
@@ -173,11 +178,6 @@ export function MarketplaceContent({ initialListings, cardMap }: MarketplaceCont
     fetchFiltered(buildFilterParams(company, newGrade))
   }
 
-  function handleSortChange(newSort: string) {
-    setSort(newSort)
-    // Re-sorting happens client-side via useMemo — no refetch needed
-  }
-
   function applyPriceFilter() {
     fetchFiltered(buildFilterParams())
   }
@@ -201,73 +201,331 @@ export function MarketplaceContent({ initialListings, cardMap }: MarketplaceCont
     setDisplayCount(prev => prev + PAGE_SIZE)
   }
 
-  const hasFilters = company !== 'all' || grade !== 'all' || minPrice || maxPrice || search || activeQuickFilter
+  const hasFilters = company !== 'all' || grade !== 'all' || Boolean(minPrice) || Boolean(maxPrice) || Boolean(search) || activeQuickFilter !== null
   const gradeOptions = company !== 'all' && company !== 'raw' ? GRADING_SCALES[company as GradingCompany] : null
+  const activeFilterCount =
+    (company !== 'all' ? 1 : 0) +
+    (grade !== 'all' ? 1 : 0) +
+    ((minPrice || maxPrice) ? 1 : 0)
+
+  const filterPanelProps = {
+    company,
+    grade,
+    minPrice,
+    maxPrice,
+    gradeOptions,
+    onCompanyChange: handleCompanyChange,
+    onGradeChange: handleGradeChange,
+    onMinPriceChange: setMinPrice,
+    onMaxPriceChange: setMaxPrice,
+    onApplyPrice: applyPriceFilter,
+    onClear: clearFilters,
+    hasFilters,
+  }
 
   return (
     <div>
-      {/* Quick filter pills */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {QUICK_FILTERS.map(qf => (
+      {/* Search bar — full width */}
+      <div className="relative mb-6">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+        </svg>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSearchSubmit()}
+          placeholder="Search listings by card name…"
+          className="w-full pl-11 pr-10 py-3 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/5 transition-all"
+        />
+        {search && (
           <button
-            key={qf.label}
-            onClick={() => handleQuickFilter(qf.label, qf.company, qf.grade)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-              activeQuickFilter === qf.label
-                ? 'bg-orange-500 text-white'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-            }`}
+            onClick={() => { setSearch(''); fetchFiltered(buildFilterParams()) }}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
           >
-            {qf.label}
+            &times;
           </button>
-        ))}
+        )}
       </div>
 
-      {/* Filter bar */}
-      <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6 space-y-4">
-        {/* Search */}
-        <div>
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearchSubmit()}
-            placeholder="Search by card name..."
-            className="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm placeholder-zinc-400"
-          />
-        </div>
+      {/* Quick-filter chips */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {QUICK_FILTERS.map(qf => {
+          const active = activeQuickFilter === qf.label
+          return (
+            <button
+              key={qf.label}
+              onClick={() => handleQuickFilter(qf.label, qf.company, qf.grade)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer ${
+                active
+                  ? 'bg-zinc-900 text-white'
+                  : 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:ring-zinc-400'
+              }`}
+            >
+              {qf.label}
+            </button>
+          )
+        })}
+      </div>
 
-        {/* Company filter */}
-        <div>
-          <p className="text-xs text-zinc-500 mb-2 font-medium">Grading Company</p>
-          <div className="flex flex-wrap gap-1.5">
-            {COMPANIES.map(c => (
+      {/* Sidebar + Grid */}
+      <div className="flex gap-8">
+        {/* Desktop sidebar */}
+        <aside className="hidden md:block w-60 shrink-0">
+          <FilterPanel {...filterPanelProps} />
+        </aside>
+
+        {/* Main column */}
+        <div className="flex-1 min-w-0">
+          {/* Results header */}
+          <div className="flex items-center justify-between gap-3 mb-4 pb-4 border-b border-zinc-200">
+            <div className="flex items-center gap-3 min-w-0">
               <button
-                key={c}
-                onClick={() => handleCompanyChange(c)}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                  company === c
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                }`}
+                type="button"
+                onClick={() => setMobileFiltersOpen(true)}
+                className="md:hidden inline-flex items-center gap-2 px-3 py-2 rounded-md border border-zinc-200 bg-white text-sm font-medium text-zinc-900 hover:border-zinc-400 transition-colors"
               >
-                {c === 'all' ? 'All' : c === 'raw' ? 'Raw' : c}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h18M6 12h12M10 19h4" />
+                </svg>
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-zinc-900 text-white text-[11px] font-semibold">
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
-            ))}
+              <p className="text-sm text-zinc-500 truncate">
+                <span className="font-medium text-zinc-900 tabular-nums">{totalCards}</span>{' '}
+                {totalCards === 1 ? 'card' : 'cards'} available
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <label htmlFor="mp-sort" className="hidden sm:block text-xs uppercase tracking-wider text-zinc-500 font-medium">
+                Sort
+              </label>
+              <div className="relative">
+                <select
+                  id="mp-sort"
+                  value={sort}
+                  onChange={e => setSort(e.target.value as SortOption)}
+                  className="appearance-none pl-3 pr-8 py-2 rounded-md border border-zinc-200 bg-white text-sm font-medium text-zinc-900 hover:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/5 transition-colors cursor-pointer"
+                >
+                  {SORT_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Results */}
+          {loading ? (
+            <div className="py-20 text-center">
+              <div className="w-8 h-8 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : groupedCards.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-zinc-500 mb-2">No listings found</p>
+              {hasFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="text-orange-600 hover:text-orange-700 text-sm font-medium cursor-pointer"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6">
+                {visibleCards.map(group => (
+                  <div key={group.card_id} className="group block">
+                    <Link href={`/card/${group.card_id.toLowerCase()}`} className="block">
+                      <div className="aspect-[2.5/3.5] relative rounded-lg overflow-hidden bg-zinc-100 ring-1 ring-zinc-200 group-hover:ring-zinc-300 transition-all">
+                        {group.cardImageUrl ? (
+                          <Image
+                            src={group.cardImageUrl}
+                            alt={group.cardName}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-12 h-12 rounded-full bg-zinc-100" />
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                    <PriceRow
+                      price={Number(group.cheapestListing.price)}
+                      label={
+                        <ConditionBadge
+                          condition={group.cheapestListing.condition}
+                          gradingCompany={group.cheapestListing.grading_company}
+                          grade={group.cheapestListing.grade}
+                        />
+                      }
+                      trailing={
+                        <BuyNowButton
+                          listingId={group.cheapestListing.id}
+                          price={group.cheapestListing.price}
+                        />
+                      }
+                      footer={
+                        <Link
+                          href={`/card/${group.card_id.toLowerCase()}`}
+                          className="hover:text-zinc-700 transition-colors"
+                        >
+                          {group.cardName}
+                          {group.listingCount > 1 && (
+                            <span className="text-zinc-400">{' '}· {group.listingCount} listings</span>
+                          )}
+                        </Link>
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Load More */}
+              {visibleCards.length < totalCards && (
+                <div className="text-center mt-10">
+                  <button
+                    onClick={loadMore}
+                    className="px-6 py-2.5 rounded-lg bg-zinc-900 text-white font-medium hover:bg-zinc-800 transition-colors cursor-pointer"
+                  >
+                    Load more <span className="text-zinc-400 ml-1">({visibleCards.length} of {totalCards})</span>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile filter bottom-sheet */}
+      {mobileFiltersOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-zinc-900/50"
+            onClick={() => setMobileFiltersOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] bg-white rounded-t-2xl shadow-xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200">
+              <h3 className="text-base font-semibold text-zinc-900">Filters</h3>
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen(false)}
+                aria-label="Close filters"
+                className="w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-500 hover:bg-zinc-100"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <FilterPanel {...filterPanelProps} />
+            </div>
+            <div className="p-4 border-t border-zinc-200 bg-zinc-50">
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen(false)}
+                className="w-full py-3 rounded-md bg-zinc-900 text-white font-semibold text-sm hover:bg-zinc-800 transition-colors"
+              >
+                Show {totalCards} {totalCards === 1 ? 'card' : 'cards'}
+              </button>
+            </div>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
 
-        {/* Grade filter (dynamic) */}
-        {gradeOptions && (
-          <div>
-            <p className="text-xs text-zinc-500 mb-2 font-medium">Grade</p>
-            <div className="flex flex-wrap gap-1.5">
+interface FilterPanelProps {
+  company: string
+  grade: string
+  minPrice: string
+  maxPrice: string
+  gradeOptions: string[] | null
+  onCompanyChange: (c: string) => void
+  onGradeChange: (g: string) => void
+  onMinPriceChange: (v: string) => void
+  onMaxPriceChange: (v: string) => void
+  onApplyPrice: () => void
+  onClear: () => void
+  hasFilters: boolean
+}
+
+function FilterPanel({
+  company,
+  grade,
+  minPrice,
+  maxPrice,
+  gradeOptions,
+  onCompanyChange,
+  onGradeChange,
+  onMinPriceChange,
+  onMaxPriceChange,
+  onApplyPrice,
+  onClear,
+  hasFilters,
+}: FilterPanelProps) {
+  return (
+    <div className="space-y-6">
+      <section>
+        <h4 className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold mb-3">
+          Grading Company
+        </h4>
+        <div className="space-y-1">
+          {COMPANIES.map(c => {
+            const selected = company === c
+            const label = c === 'all' ? 'All companies' : c === 'raw' ? 'Raw / Ungraded' : c
+            return (
               <button
-                onClick={() => handleGradeChange('all')}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                key={c}
+                type="button"
+                onClick={() => onCompanyChange(c)}
+                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
+                  selected
+                    ? 'bg-zinc-900 text-white'
+                    : 'text-zinc-700 hover:bg-zinc-100'
+                }`}
+              >
+                <span>{label}</span>
+                {selected && (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      {gradeOptions && (
+        <>
+          <div className="border-t border-zinc-200" />
+          <section>
+            <h4 className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold mb-3">
+              Grade
+            </h4>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => onGradeChange('all')}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   grade === 'all'
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    ? 'bg-zinc-900 text-white'
+                    : 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:ring-zinc-400'
                 }`}
               >
                 All
@@ -275,166 +533,70 @@ export function MarketplaceContent({ initialListings, cardMap }: MarketplaceCont
               {gradeOptions.map(g => (
                 <button
                   key={g}
-                  onClick={() => handleGradeChange(g)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                  type="button"
+                  onClick={() => onGradeChange(g)}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     grade === g
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                      ? 'bg-zinc-900 text-white'
+                      : 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:ring-zinc-400'
                   }`}
                 >
                   {g}
                 </button>
               ))}
             </div>
-          </div>
-        )}
+          </section>
+        </>
+      )}
 
-        {/* Price range + Sort */}
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex items-center gap-2">
-            <div>
-              <p className="text-xs text-zinc-500 mb-1 font-medium">Min Price</p>
-              <input
-                type="number"
-                value={minPrice}
-                onChange={e => setMinPrice(e.target.value)}
-                placeholder="$0"
-                className="w-24 px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm"
-              />
-            </div>
-            <span className="text-zinc-400 mt-5">&mdash;</span>
-            <div>
-              <p className="text-xs text-zinc-500 mb-1 font-medium">Max Price</p>
-              <input
-                type="number"
-                value={maxPrice}
-                onChange={e => setMaxPrice(e.target.value)}
-                placeholder="$999"
-                className="w-24 px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm"
-              />
-            </div>
-            <button
-              onClick={applyPriceFilter}
-              className="mt-5 px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-colors cursor-pointer"
-            >
-              Apply
-            </button>
-          </div>
+      <div className="border-t border-zinc-200" />
 
-          <div className="ml-auto">
-            <p className="text-xs text-zinc-500 mb-1 font-medium">Sort</p>
-            <select
-              value={sort}
-              onChange={e => handleSortChange(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm cursor-pointer"
-            >
-              {SORT_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+      <section>
+        <h4 className="text-[11px] uppercase tracking-[0.14em] text-zinc-500 font-semibold mb-3">
+          Price range
+        </h4>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+            <input
+              type="number"
+              value={minPrice}
+              onChange={e => onMinPriceChange(e.target.value)}
+              placeholder="Min"
+              className="w-full pl-6 pr-2 py-2 rounded-md bg-white border border-zinc-200 text-zinc-900 text-sm focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/5"
+            />
+          </div>
+          <span className="text-zinc-400">&ndash;</span>
+          <div className="relative flex-1 min-w-0">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+            <input
+              type="number"
+              value={maxPrice}
+              onChange={e => onMaxPriceChange(e.target.value)}
+              placeholder="Max"
+              className="w-full pl-6 pr-2 py-2 rounded-md bg-white border border-zinc-200 text-zinc-900 text-sm focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/5"
+            />
           </div>
         </div>
+        <button
+          type="button"
+          onClick={onApplyPrice}
+          className="mt-3 w-full py-2 rounded-md bg-zinc-100 text-zinc-900 text-sm font-medium hover:bg-zinc-200 transition-colors"
+        >
+          Apply price range
+        </button>
+      </section>
 
-        {/* Active filters summary */}
-        {hasFilters && (
-          <div className="flex items-center gap-2 pt-2 border-t border-zinc-100">
-            <span className="text-xs text-zinc-500">{totalCards} card{totalCards !== 1 ? 's' : ''} found</span>
-            <button
-              onClick={clearFilters}
-              className="text-xs text-orange-500 hover:text-orange-600 font-medium cursor-pointer"
-            >
-              Clear all filters
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Results */}
-      {loading ? (
-        <div className="py-20 text-center">
-          <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
-        </div>
-      ) : groupedCards.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-zinc-500 mb-2">No listings found</p>
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              className="text-orange-500 hover:text-orange-600 text-sm font-medium cursor-pointer"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      ) : (
+      {hasFilters && (
         <>
-          {!hasFilters && (
-            <p className="text-sm text-zinc-500 mb-4">{totalCards} card{totalCards !== 1 ? 's' : ''} available</p>
-          )}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {visibleCards.map(group => (
-              <div
-                key={group.card_id}
-                className="bg-white border border-zinc-200 rounded-lg overflow-hidden hover:border-zinc-300 transition-colors"
-              >
-                <Link href={`/card/${group.card_id.toLowerCase()}`}>
-                  <div className="aspect-[5/7] bg-zinc-50 relative">
-                    {group.cardImageUrl ? (
-                      <Image
-                        src={group.cardImageUrl}
-                        alt={group.cardName}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-zinc-100" />
-                      </div>
-                    )}
-                  </div>
-                </Link>
-                <div className="p-3">
-                  <Link href={`/card/${group.card_id.toLowerCase()}`}>
-                    <p className="text-sm font-medium text-zinc-900 truncate hover:text-orange-500 transition-colors">
-                      {group.cardName}
-                    </p>
-                  </Link>
-                  <div className="mt-1 flex items-center gap-2">
-                    <ConditionBadge
-                      condition={group.cheapestListing.condition}
-                      gradingCompany={group.cheapestListing.grading_company}
-                      grade={group.cheapestListing.grade}
-                    />
-                    {group.listingCount > 1 && (
-                      <span className="text-xs text-zinc-400">{group.listingCount} listings</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <div>
-                      {group.listingCount > 1 && (
-                        <p className="text-[10px] text-zinc-400 leading-none mb-0.5">from</p>
-                      )}
-                      <p className="text-lg font-bold text-zinc-900">${Number(group.cheapestListing.price).toFixed(2)}</p>
-                    </div>
-                    <BuyNowButton listingId={group.cheapestListing.id} price={group.cheapestListing.price} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Load More */}
-          {visibleCards.length < totalCards && (
-            <div className="text-center mt-8">
-              <button
-                onClick={loadMore}
-                className="px-6 py-2.5 rounded-lg bg-zinc-900 text-white font-medium hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                Load More ({visibleCards.length} of {totalCards})
-              </button>
-            </div>
-          )}
+          <div className="border-t border-zinc-200" />
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+          >
+            Clear all filters
+          </button>
         </>
       )}
     </div>

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import tsx --test src/**/*.test.ts",
     "scrape": "tsx scripts/scrape-bandai-cards.ts",
     "scrape:op13": "tsx scripts/scrape-bandai-cards.ts 569113",
     "scrape:prices": "tsx scripts/scrape-prices.ts",

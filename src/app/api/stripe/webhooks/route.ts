@@ -3,6 +3,7 @@ import { getStripe } from '@/lib/stripe'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { sendSellerNewOrderEmail, sendBuyerReceiptEmail } from '@/lib/email'
 import { tierForGmv } from '@/lib/fees'
+import { finalizeSale } from '@/lib/inventory'
 import type { ShippingAddress } from '@/types/database'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
@@ -58,7 +59,7 @@ async function processOrderPayment(
   // Check idempotency — skip if already paid
   const { data: existingOrder } = await supabase
     .from('orders')
-    .select('status')
+    .select('status, inventory_reserved')
     .eq('id', orderId)
     .single()
 
@@ -75,7 +76,11 @@ async function processOrderPayment(
     })
     .eq('id', orderId)
 
-  // Update listing quantities
+  // Settle listing inventory + status. For orders created with the
+  // reserve-on-create flow, stock was already decremented up front — we
+  // just finalize the status here. Legacy orders (predating that flow)
+  // fall back to the old decrement-then-flip behavior so in-flight pre-
+  // refactor orders still land correctly.
   const { data: items } = await supabase
     .from('order_items')
     .select('listing_id, quantity')
@@ -85,11 +90,24 @@ async function processOrderPayment(
     for (const item of items) {
       const { data: listing } = await supabase
         .from('listings')
-        .select('quantity_available')
+        .select('status, quantity_available')
         .eq('id', item.listing_id)
         .single()
 
-      if (listing) {
+      if (!listing) continue
+
+      if (existingOrder.inventory_reserved) {
+        // New flow: stock already subtracted — just settle status.
+        const nextStatus = finalizeSale({
+          status: listing.status,
+          quantity_available: listing.quantity_available,
+        })
+        await supabase
+          .from('listings')
+          .update({ status: nextStatus })
+          .eq('id', item.listing_id)
+      } else {
+        // Legacy flow: decrement now and flip status the old way.
         const newQty = listing.quantity_available - item.quantity
         await supabase
           .from('listings')

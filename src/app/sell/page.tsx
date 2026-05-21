@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { GRADING_SCALES, PHOTO_SLOTS, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap } from '@/types/database'
 import { calculatePayout, type TierId } from '@/lib/fees'
+import { SellerAgreementGate } from '@/components/sell/SellerAgreementGate'
 import confetti from 'canvas-confetti'
 import Image from 'next/image'
 
@@ -914,6 +915,13 @@ function SellPageContent() {
   // estimate. Defaults to 'basic' if the profile fetch hasn't completed
   // yet; raw cards ignore this anyway (flat 9.5%).
   const [sellerTier, setSellerTier] = useState<TierId>('basic')
+  // Identity of the signed-in user — needed by the SellerAgreementGate so
+  // it can flip the right profile row when a first-time seller agrees.
+  const [userId, setUserId] = useState<string | null>(null)
+  // Show an in-flow agreement modal instead of bouncing first-time
+  // sellers to /seller/apply. Set by checkAuth() when profile flags are
+  // missing; cleared by the gate's onApproved callback.
+  const [needsAgreement, setNeedsAgreement] = useState(false)
   const emptyPhotos = Object.fromEntries(PHOTO_SLOTS.map(s => [s.key, null])) as PhotoSlotMap
   const [photos, setPhotos] = useState<PhotoSlotMap>(emptyPhotos)
   const [photoUploading, setPhotoUploading] = useState<Record<string, boolean>>({})
@@ -935,14 +943,19 @@ function SellPageContent() {
         router.push('/auth/sign-in')
         return
       }
+      setUserId(user.id)
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_seller, seller_approved, seller_tier')
         .eq('id', user.id)
         .single()
 
+      // Surface the agreement gate in place instead of redirecting away —
+      // the user clicked "Sell" expecting to sell; bouncing them off the
+      // page loses their flow.
       if (!profile?.is_seller || !profile?.seller_approved) {
-        router.push('/seller/apply')
+        setNeedsAgreement(true)
         return
       }
       // Hold onto the seller's tier for the payout estimate.
@@ -958,12 +971,25 @@ function SellPageContent() {
     if (isGraded) setQuantity('1')
   }, [isGraded])
 
-  // Pre-fill from query params (sell-into-bid flow)
+  // Pre-fill from query params (sell-into-bid flow).
+  // Raw offers: ?card=X&price=Y → land on Details (step 2) so the seller
+  // can confirm language + add photos.
+  // Graded offers: ?card=X&price=Y&grading_company=PSA&grade=10 →
+  // pre-select the slab variant and skip to Pricing (step 3) since the
+  // condition is already fully specified by the offer.
   useEffect(() => {
     const cardParam = searchParams.get('card')
     const priceParam = searchParams.get('price')
+    const companyParam = searchParams.get('grading_company') as GradingCompany | null
+    const gradeParam = searchParams.get('grade')
+    const hasGraded = !!companyParam && !!gradeParam
 
     if (priceParam) setPrice(priceParam)
+    if (hasGraded) {
+      setIsGraded(true)
+      setGradingCompany(companyParam)
+      setGrade(gradeParam!)
+    }
     if (cardParam) {
       fetch(`/api/cards?id=${encodeURIComponent(cardParam)}`)
         .then(res => res.json())
@@ -982,8 +1008,10 @@ function SellPageContent() {
             if (card.price?.marketPrice) {
               setMarketPrice(card.price.marketPrice)
             }
-            // Go to details — user needs to confirm condition
-            setStep(2)
+            // Graded offers carry the full variant in the URL → jump
+            // past Details straight to the pricing step. Raw offers
+            // still land on Details to confirm language + photos.
+            setStep(hasGraded ? 3 : 2)
           }
         })
         .catch(() => {})
@@ -1123,6 +1151,12 @@ function SellPageContent() {
 
   return (
     <div className="max-w-5xl mx-auto pb-16">
+      {needsAgreement && userId && (
+        <SellerAgreementGate
+          userId={userId}
+          onApproved={() => setNeedsAgreement(false)}
+        />
+      )}
       <div className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8">
         {/* Step Content */}
         {step === 1 && (

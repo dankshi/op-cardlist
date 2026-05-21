@@ -6,10 +6,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { StorefrontGrid } from '@/components/dashboard/StorefrontGrid'
-import type { Profile, Listing, Order } from '@/types/database'
+import { MyOffersGrid } from '@/components/dashboard/MyOffersGrid'
+import type { Profile, Listing, Order, Bid } from '@/types/database'
 import { US_STATES } from '@/lib/us-states'
 
-type Tab = 'listings' | 'orders' | 'settings'
+type Tab = 'selling' | 'collection' | 'offers' | 'orders' | 'settings'
 
 const STATUS_STYLES: Record<string, string> = {
   paid: 'bg-yellow-500/10 text-yellow-600',
@@ -31,11 +32,16 @@ const STATUS_LABELS: Record<string, string> = {
   delivered: 'Delivered',
 }
 
-export default function DashboardPage() {
+export default function MyStuffPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
   const [orders, setOrders] = useState<Order[]>([])
-  const [tab, setTab] = useState<Tab>('listings')
+  // User's own active offers (bids they've placed on other people's cards).
+  // Loaded alongside listings + orders so the tab badge is accurate even
+  // before the tab is opened.
+  const [offers, setOffers] = useState<Bid[]>([])
+  const [offerCardNames, setOfferCardNames] = useState<Record<string, string>>({})
+  const [tab, setTab] = useState<Tab>('selling')
   const [loading, setLoading] = useState(true)
   const [showBulkPrice, setShowBulkPrice] = useState(false)
   const [bulkAdjustment, setBulkAdjustment] = useState('-5')
@@ -57,12 +63,12 @@ export default function DashboardPage() {
     async function load() {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-        if (userError) console.error('[dashboard] getUser failed', userError)
+        if (userError) console.error('[mystuff] getUser failed', userError)
         if (!user) { router.push('/auth/sign-in'); return }
         setUserEmail(user.email || '')
 
         const { data: p, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-        if (profileError) console.error('[dashboard] profile fetch failed', profileError)
+        if (profileError) console.error('[mystuff] profile fetch failed', profileError)
         if (!p?.is_seller) { router.push('/seller/apply'); return }
         setProfile(p as Profile)
         if (p.shipping_street1) setAddrStreet(p.shipping_street1)
@@ -76,7 +82,7 @@ export default function DashboardPage() {
           .select('*')
           .eq('seller_id', user.id)
           .order('created_at', { ascending: false })
-        if (listingsError) console.error('[dashboard] listings fetch failed', listingsError)
+        if (listingsError) console.error('[mystuff] listings fetch failed', listingsError)
         const fetchedListings = (l as Listing[]) || []
         setListings(fetchedListings)
 
@@ -86,14 +92,30 @@ export default function DashboardPage() {
           .eq('seller_id', user.id)
           .not('status', 'in', '("pending_payment","cancelled")')
           .order('created_at', { ascending: false })
-        if (ordersError) console.error('[dashboard] orders fetch failed', ordersError)
+        if (ordersError) console.error('[mystuff] orders fetch failed', ordersError)
         const fetchedOrders = (o as Order[]) || []
         setOrders(fetchedOrders)
 
-        // Fetch card images for listings + order items
+        // User's own active offers — bids they've placed on cards. Fetched
+        // alongside listings so the offers tab badge is accurate without
+        // waiting for the tab to be opened.
+        const offerRes = await fetch(`/api/bids?user_id=${encodeURIComponent(user.id)}&limit=50`)
+        const offerData = await offerRes.json()
+        const fetchedOffers = (offerData.bids as Bid[]) || []
+        setOffers(fetchedOffers)
+
+        // Fetch card images for listings + order items + offers in a single
+        // batch. Offers also need a display name for the tile, so collect
+        // names too. /api/cards already returns both.
         const orderCardIds = fetchedOrders.flatMap(order => order.items?.map(i => i.card_id) || [])
-        const uniqueCardIds = [...new Set([...fetchedListings.map(li => li.card_id), ...orderCardIds])]
+        const offerCardIds = fetchedOffers.map(o => o.card_id)
+        const uniqueCardIds = [...new Set([
+          ...fetchedListings.map(li => li.card_id),
+          ...orderCardIds,
+          ...offerCardIds,
+        ])]
         const images: Record<string, string> = {}
+        const names: Record<string, string> = {}
         await Promise.all(
           uniqueCardIds.map(async (cardId) => {
             try {
@@ -102,12 +124,16 @@ export default function DashboardPage() {
               if (data.card?.imageUrl) {
                 images[cardId] = data.card.imageUrl
               }
+              if (data.card?.name) {
+                names[cardId] = data.card.name
+              }
             } catch { /* skip */ }
           })
         )
         setCardImages(images)
+        setOfferCardNames(names)
       } catch (err) {
-        console.error('[dashboard] init threw', err)
+        console.error('[mystuff] init threw', err)
       } finally {
         setLoading(false)
       }
@@ -134,7 +160,7 @@ export default function DashboardPage() {
     const pct = parseFloat(bulkAdjustment) / 100
     setBulkUpdating(true)
 
-    for (const listing of activeListings) {
+    for (const listing of sellingListings) {
       const market = marketPrices[listing.card_id]
       if (!market) continue
       const newPrice = Math.max(0.01, market * (1 + pct))
@@ -144,7 +170,6 @@ export default function DashboardPage() {
         .eq('id', listing.id)
     }
 
-    // Refresh listings
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: l } = await supabase
@@ -166,31 +191,34 @@ export default function DashboardPage() {
     )
   }
 
-  const activeListings = listings.filter(l => l.status === 'active')
+  const sellingListings = listings.filter(l => l.status === 'active')
+  const collectionListings = listings.filter(l => l.status === 'delisted')
   const pendingOrders = orders.filter(o => ['paid', 'seller_shipped', 'received', 'authenticated'].includes(o.status))
-  const revenue = orders
-    .filter(o => ['paid', 'seller_shipped', 'received', 'authenticated', 'shipped_to_buyer', 'shipped', 'delivered'].includes(o.status))
-    .reduce((sum, o) => sum + Number(o.subtotal) - Number(o.platform_fee), 0)
 
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-zinc-900">My Shop</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-zinc-900">My Stuff</h1>
+          <p className="text-sm text-zinc-500 mt-1">Your selling, your collection, all in one place.</p>
+        </div>
         <Link
           href="/sell"
           className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
         >
-          + List a Card
+          + Add a Card
         </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      {/* Stats — five tiles now that "Offers" is a thing. Five fits two
+          rows on mobile (2x2 + 1 wide) and a single row on md+. */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         {[
           { label: 'Balance', value: `$${Number(profile?.balance || 0).toFixed(2)}`, onClick: () => setTab('settings') },
-          { label: 'Active Listings', value: activeListings.length, onClick: () => setTab('listings') },
+          { label: 'Selling', value: sellingListings.length, onClick: () => setTab('selling') },
+          { label: 'Collection', value: collectionListings.length, onClick: () => setTab('collection') },
+          { label: 'My Offers', value: offers.length, onClick: () => setTab('offers') },
           { label: 'Pending Orders', value: pendingOrders.length, onClick: () => setTab('orders') },
-          { label: 'Total Sales', value: profile?.total_sales || 0 },
         ].map(stat => (
           <div
             key={stat.label}
@@ -206,41 +234,55 @@ export default function DashboardPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-zinc-200">
-        {(['listings', 'orders', 'settings'] as Tab[]).map(t => (
+      <div className="flex gap-1 mb-6 border-b border-zinc-200 overflow-x-auto scrollbar-hide">
+        {([
+          { v: 'selling',    label: 'Selling',    count: sellingListings.length },
+          { v: 'collection', label: 'Collection', count: collectionListings.length },
+          { v: 'offers',     label: 'My Offers',  count: offers.length },
+          { v: 'orders',     label: 'Orders',     count: pendingOrders.length || null },
+          { v: 'settings',   label: 'Settings',   count: null },
+        ] as { v: Tab; label: string; count: number | null }[]).map(t => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer capitalize ${
-              tab === t
-                ? 'text-orange-400 border-b-2 border-orange-400'
-                : 'text-zinc-500 hover:text-zinc-700'
+            key={t.v}
+            onClick={() => setTab(t.v)}
+            className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap inline-flex items-center gap-2 ${
+              tab === t.v
+                ? 'text-zinc-900 border-b-2 border-zinc-900'
+                : 'text-zinc-500 hover:text-zinc-700 border-b-2 border-transparent'
             }`}
           >
-            {t}
+            {t.label}
+            {t.count !== null && t.count > 0 && (
+              <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[11px] font-semibold ${
+                tab === t.v ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600'
+              }`}>
+                {t.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Content */}
-      {tab === 'listings' && (
+      {/* Selling tab */}
+      {tab === 'selling' && (
         <div>
-          {/* Bulk pricing controls */}
-          {activeListings.length > 0 && (
+          {sellingListings.length > 0 && (
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-zinc-500">{activeListings.length} active listing{activeListings.length !== 1 ? 's' : ''}</p>
+              <p className="text-sm text-zinc-500">
+                {sellingListings.length} active listing{sellingListings.length !== 1 ? 's' : ''}
+              </p>
               <button
                 onClick={() => { setShowBulkPrice(!showBulkPrice); if (!showBulkPrice) loadMarketPrices(); }}
                 className="text-sm text-orange-500 hover:text-orange-600 font-medium transition-colors cursor-pointer"
               >
-                {showBulkPrice ? 'Cancel' : 'Bulk Price Update'}
+                {showBulkPrice ? 'Cancel' : 'Bulk price update'}
               </button>
             </div>
           )}
 
           {showBulkPrice && (
             <div className="mb-6 p-4 bg-white border border-orange-200 rounded-lg">
-              <h3 className="font-medium text-zinc-900 mb-3">Bulk Price Update</h3>
+              <h3 className="font-medium text-zinc-900 mb-3">Bulk price update</h3>
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-sm text-zinc-600">Set all active listings to</span>
                 <input
@@ -261,19 +303,77 @@ export default function DashboardPage() {
                 disabled={bulkUpdating || Object.keys(marketPrices).length === 0}
                 className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors cursor-pointer"
               >
-                {bulkUpdating ? 'Updating...' : 'Apply to All Active Listings'}
+                {bulkUpdating ? 'Updating...' : 'Apply to all active listings'}
               </button>
             </div>
           )}
 
           <StorefrontGrid
             listings={listings}
+            kind="selling"
             cardImages={cardImages}
             onListingsChange={setListings}
           />
         </div>
       )}
 
+      {/* Collection tab */}
+      {tab === 'collection' && (
+        <div>
+          <div className="mb-4 rounded-lg bg-zinc-50 border border-zinc-200 p-4 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-zinc-100 text-zinc-700 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25A2.25 2.25 0 0113.5 8.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-zinc-900">Cards you own but aren&apos;t selling</h3>
+              <p className="text-sm text-zinc-500 mt-0.5">
+                Park inventory here when you&apos;re not ready to list. Tap <span className="font-medium text-emerald-700">List</span> on any card to push it back to the marketplace in one click.
+              </p>
+            </div>
+          </div>
+
+          <StorefrontGrid
+            listings={listings}
+            kind="collection"
+            cardImages={cardImages}
+            onListingsChange={setListings}
+          />
+        </div>
+      )}
+
+      {/* My Offers tab — bids the user has placed on other people's
+          cards. Distinct from the seller-side Selling/Collection tabs:
+          this is the buyer side of the marketplace. */}
+      {tab === 'offers' && (
+        <div>
+          <div className="mb-4 rounded-lg bg-zinc-50 border border-zinc-200 p-4 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811V8.69zM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061a1.125 1.125 0 01-1.683-.977V8.69z" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-zinc-900">Open offers you&apos;ve made</h3>
+              <p className="text-sm text-zinc-500 mt-0.5">
+                When a seller accepts your offer, the listing moves to your{' '}
+                <button onClick={() => setTab('orders')} className="text-emerald-700 underline-offset-2 hover:underline cursor-pointer">Orders</button>{' '}
+                tab. Cancel any time before then.
+              </p>
+            </div>
+          </div>
+
+          <MyOffersGrid
+            offers={offers}
+            cardImages={cardImages}
+            cardNames={offerCardNames}
+            onOffersChange={setOffers}
+          />
+        </div>
+      )}
+
+      {/* Orders tab */}
       {tab === 'orders' && (
         <div className="space-y-3">
           {orders.length === 0 ? (
@@ -324,6 +424,7 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Settings tab */}
       {tab === 'settings' && (
         <div className="space-y-6">
           <div className="bg-white border border-zinc-200 rounded-lg p-6 space-y-4">
@@ -338,18 +439,18 @@ export default function DashboardPage() {
               <p className="text-zinc-500 text-sm mt-1">Credits from sales (1:1 USD).</p>
             </div>
             <div>
-              <h3 className="font-medium text-zinc-900 mb-2">Platform Fee</h3>
+              <h3 className="font-medium text-zinc-900 mb-2">Platform fee</h3>
               <p className="text-zinc-500 text-sm">9.5% on each sale</p>
             </div>
           </div>
 
           <div className="bg-white border border-zinc-200 rounded-lg p-6">
-            <h3 className="font-medium text-zinc-900 mb-1">Shipping Address</h3>
+            <h3 className="font-medium text-zinc-900 mb-1">Shipping address</h3>
             <p className="text-sm text-zinc-500 mb-4">Used as the return address when generating shipping labels.</p>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-zinc-700 mb-1">Street Address</label>
+                <label className="block text-sm text-zinc-700 mb-1">Street address</label>
                 <input
                   type="text"
                   value={addrStreet}
@@ -394,7 +495,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-zinc-700 mb-1">Phone Number</label>
+                <label className="block text-sm text-zinc-700 mb-1">Phone number</label>
                 <input
                   type="tel"
                   value={addrPhone}
@@ -441,7 +542,7 @@ export default function DashboardPage() {
               disabled={addrSaving}
               className="mt-4 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
             >
-              {addrSaving ? 'Saving...' : 'Save Address'}
+              {addrSaving ? 'Saving...' : 'Save address'}
             </button>
           </div>
         </div>

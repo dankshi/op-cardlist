@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
         destination: "https://www.nomimarket.com/:path*",
         permanent: true,
       },
+      // /dashboard was renamed to /mystuff. Preserve existing links + bookmarks.
+      { source: "/dashboard", destination: "/mystuff", permanent: true },
     ];
   },
   images: {

@@ -25,8 +25,8 @@ export default function MyShopLink() {
   }, [])
 
   return (
-    <Link href="/dashboard" className="flex items-center gap-1.5 text-white/80 hover:text-white transition-colors text-sm font-medium">
-      My Shop
+    <Link href="/mystuff" className="flex items-center gap-1.5 text-white/80 hover:text-white transition-colors text-sm font-medium">
+      My Stuff
       {pendingCount > 0 && (
         <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-white text-orange-600 text-[10px] font-bold px-1">
           {pendingCount}

@@ -17,10 +17,22 @@ import { RecentlyViewed } from "@/components/home/RecentlyViewed";
 import { PricingTable } from "@/components/home/PricingTable";
 import { PayoutCalculator } from "@/components/home/PayoutCalculator";
 import { ConsignmentBanner } from "@/components/home/ConsignmentBanner";
+import { OfferCarousel } from "@/components/home/OfferCarousel";
 import type { Card } from "@/types/card";
 import type { EnrichedListing } from "@/components/home/ListingCarousel";
+import type { EnrichedOffer } from "@/components/home/OfferCarousel";
 
-const SUGGESTED_SEARCHES = ['Luffy', 'Zoro', 'Nami', 'Ace', 'Shanks', 'OP-08'];
+const SUGGESTED_SEARCHES: Array<{ label: string; href: string }> = [
+  { label: 'Luffy',  href: '/search?q=Luffy' },
+  { label: 'Zoro',   href: '/search?q=Zoro' },
+  { label: 'Nami',   href: '/search?q=Nami' },
+  { label: 'Ace',    href: '/search?q=Ace' },
+  { label: 'Shanks', href: '/search?q=Shanks' },
+  { label: 'OP-08',  href: '/search?q=OP-08' },
+  // BL surfaces actual graded listings, which live on /marketplace rather
+  // than /search (search indexes card metadata, not listing grades).
+  { label: 'BL',     href: '/marketplace' },
+];
 
 export const metadata: Metadata = {
   title: { absolute: "nomi market — The Trusted TCG Marketplace" },
@@ -86,6 +98,7 @@ export default async function Home() {
   // here if it undercuts (or matches) every other active listing for that
   // same card, so buyers can act on real new lows.
   let enrichedListings: EnrichedListing[] = [];
+  let topOffers: EnrichedOffer[] = [];
   let activeListingsCount = 0;
   let listingsLast24h = 0;
   let ordersShippedLast30d = 0;
@@ -187,6 +200,46 @@ export default async function Home() {
         } as EnrichedListing;
       });
     enrichedListings = mapped.filter((l: EnrichedListing | null): l is EnrichedListing => l !== null);
+
+    // Top active offers — highest bids on any card from the last 14 days
+    // that haven't been filled/cancelled/expired. Acts as a buyer-side
+    // discovery surface: "here's what people are willing to pay big
+    // money for right now — do you have one?" Mirrors "Just Listed" on
+    // the seller side.
+    const sinceOffers = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rawOffers } = await supabase
+      .from('bids')
+      .select('id, card_id, price, grading_company, grade, created_at, expires_at, status')
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .gte('created_at', sinceOffers)
+      .order('price', { ascending: false })
+      .limit(20);
+
+    topOffers = ((rawOffers || []) as Array<{
+      id: string;
+      card_id: string;
+      price: number | string;
+      grading_company: string | null;
+      grade: string | null;
+      created_at: string;
+    }>)
+      .map(o => {
+        const card = cardMap.get(o.card_id);
+        if (!card) return null;
+        return {
+          id: o.id,
+          card_id: o.card_id,
+          cardName: card.name,
+          cardImageUrl: card.imageUrl,
+          price: Number(o.price),
+          grading_company: o.grading_company,
+          grade: o.grade,
+          createdAt: o.created_at,
+        } as EnrichedOffer;
+      })
+      .filter((o): o is EnrichedOffer => o !== null)
+      .slice(0, 12);
   } catch {
     // Supabase unavailable — skip listings section
   }
@@ -229,21 +282,24 @@ export default async function Home() {
             <span className="text-xs text-zinc-400 mr-1">Popular:</span>
             {SUGGESTED_SEARCHES.map((term) => (
               <Link
-                key={term}
-                href={`/search?q=${encodeURIComponent(term)}`}
+                key={term.label}
+                href={term.href}
                 className="px-3 py-1 rounded-full bg-white text-xs text-zinc-700 ring-1 ring-zinc-200 hover:ring-zinc-400 hover:text-zinc-900 transition-colors"
               >
-                {term}
+                {term.label}
               </Link>
             ))}
           </div>
 
           <div className="flex items-center justify-center gap-3 mt-8">
             <Link
-              href="/search"
-              className="px-6 py-2.5 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-800 transition-colors"
+              href="/marketplace"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-800 transition-colors"
             >
-              Browse Cards
+              Shop Marketplace
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
             </Link>
             <Link
               href="/sell"
@@ -252,6 +308,14 @@ export default async function Home() {
               Start Selling
             </Link>
           </div>
+
+          <p className="mt-4 text-xs text-zinc-500">
+            Or{' '}
+            <Link href="/search" className="text-zinc-700 underline-offset-2 hover:underline">
+              browse the full card catalog
+            </Link>
+            {' '}for prices and references
+          </p>
         </div>
       </section>
 
@@ -317,6 +381,22 @@ export default async function Home() {
               </svg>
             }
             listings={enrichedListings}
+          />
+        </section>
+      )}
+
+      {/* ===== TOP OFFERS (buyer side — pairs with Just Listed) ===== */}
+      {topOffers.length > 0 && (
+        <section className="mb-12 sm:mb-16">
+          <OfferCarousel
+            title="Top Offers"
+            subtitle="The highest open offers right now — own one of these? Sell instantly."
+            icon={
+              <svg className="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811V8.69zM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061a1.125 1.125 0 01-1.683-.977V8.69z" />
+              </svg>
+            }
+            offers={topOffers}
           />
         </section>
       )}

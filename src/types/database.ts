@@ -297,6 +297,11 @@ export interface Bid {
   expires_at: string
   created_at: string
   updated_at: string
+  // Both NULL → bid is for the raw NM variant. Both set → bid is
+  // specifically for that slab (e.g. PSA 10). DB constraint guarantees
+  // the pair-consistent invariant (see migration 20260539).
+  grading_company: GradingCompany | null
+  grade: string | null
   // Joined fields
   user?: Profile
 }

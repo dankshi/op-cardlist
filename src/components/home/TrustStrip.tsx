@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 interface TrustStripProps {
   cardCount: number;
   setCount: number;
@@ -10,10 +12,16 @@ function formatCount(n: number): string {
 }
 
 export function TrustStrip({ cardCount, setCount, activeListings }: TrustStripProps) {
-  const items = [
+  const items: Array<{
+    label: string;
+    value: string;
+    icon: React.ReactNode;
+    href?: string;
+  }> = [
     {
       label: 'Cards catalogued',
       value: formatCount(cardCount),
+      href: '/search',
       icon: (
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.25V6a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 6v2.25m-18 0v10.5A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V8.25m-18 0h18" />
@@ -23,6 +31,7 @@ export function TrustStrip({ cardCount, setCount, activeListings }: TrustStripPr
     {
       label: 'Sets covered',
       value: formatCount(setCount),
+      href: '/sets',
       icon: (
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25A2.25 2.25 0 0113.5 8.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
@@ -32,6 +41,7 @@ export function TrustStrip({ cardCount, setCount, activeListings }: TrustStripPr
     {
       label: 'Live listings',
       value: formatCount(activeListings),
+      href: '/marketplace',
       icon: (
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-3.75zM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-8.25zM3.75 16.125c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-2.25z" />
@@ -52,21 +62,43 @@ export function TrustStrip({ cardCount, setCount, activeListings }: TrustStripPr
   return (
     <section className="mb-12 sm:mb-16">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-zinc-200 border border-zinc-200 rounded-2xl overflow-hidden">
-        {items.map((item) => (
-          <div key={item.label} className="bg-white px-5 py-5 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-zinc-100 text-zinc-700 flex items-center justify-center shrink-0">
-              <div className="w-5 h-5">{item.icon}</div>
-            </div>
-            <div className="min-w-0">
-              <div className="text-xl font-semibold text-zinc-900 tabular-nums leading-tight">
-                {item.value}
+        {items.map((item) => {
+          const inner = (
+            <>
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                item.href ? 'bg-zinc-100 text-zinc-700 group-hover:bg-zinc-900 group-hover:text-white' : 'bg-zinc-100 text-zinc-700'
+              }`}>
+                <div className="w-5 h-5">{item.icon}</div>
               </div>
-              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mt-0.5">
-                {item.label}
+              <div className="min-w-0">
+                <div className="text-xl font-semibold text-zinc-900 tabular-nums leading-tight">
+                  {item.value}
+                </div>
+                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mt-0.5">
+                  {item.label}
+                </div>
               </div>
+            </>
+          );
+
+          if (item.href) {
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="bg-white px-5 py-5 flex items-center gap-3 group transition-colors hover:bg-zinc-50"
+              >
+                {inner}
+              </Link>
+            );
+          }
+
+          return (
+            <div key={item.label} className="bg-white px-5 py-5 flex items-center gap-3">
+              {inner}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
