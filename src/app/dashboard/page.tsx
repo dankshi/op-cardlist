@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
+import { StorefrontGrid } from '@/components/dashboard/StorefrontGrid'
 import type { Profile, Listing, Order } from '@/types/database'
 import { US_STATES } from '@/lib/us-states'
 
@@ -266,53 +266,11 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="space-y-3">
-          {listings.filter(l => l.status !== 'sold').length === 0 ? (
-            <p className="text-zinc-500 text-center py-8">No listings yet. Create your first listing!</p>
-          ) : (
-            listings.filter(l => l.status !== 'sold').map(listing => (
-              <Link
-                key={listing.id}
-                href={`/sell/${listing.id}/edit`}
-                className="flex items-center justify-between p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  {(listing.photo_urls?.[0] || cardImages[listing.card_id]) ? (
-                    <Image
-                      src={listing.photo_urls?.[0] || cardImages[listing.card_id]}
-                      alt={listing.title}
-                      width={48}
-                      height={67}
-                      className="rounded object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-[48px] h-[67px] rounded bg-zinc-100 flex-shrink-0" />
-                  )}
-                  <div>
-                  <p className="font-medium text-zinc-900">{listing.title}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <ConditionBadge condition={listing.condition} gradingCompany={listing.grading_company} grade={listing.grade} />
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      listing.status === 'active' ? 'bg-green-500/10 text-green-400' :
-                      listing.status === 'sold' ? 'bg-zinc-200 text-zinc-500' :
-                      'bg-red-500/10 text-red-400'
-                    }`}>
-                      {listing.status}
-                    </span>
-                    <span className="text-xs text-zinc-500">{listing.quantity_available} avail</span>
-                  </div>
-                </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <p className="text-lg font-bold text-zinc-900">${Number(listing.price).toFixed(2)}</p>
-                  <svg className="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </Link>
-            ))
-          )}
-          </div>
+          <StorefrontGrid
+            listings={listings}
+            cardImages={cardImages}
+            onListingsChange={setListings}
+          />
         </div>
       )}
 
