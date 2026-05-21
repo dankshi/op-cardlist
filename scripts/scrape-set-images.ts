@@ -45,7 +45,9 @@ const SET_SEARCH_CONFIG: Record<string, { query: string; matchKeyword?: string }
   'eb-02': { query: 'Anime 25th Collection Booster Box', matchKeyword: 'anime 25th' },
   'eb-03': { query: 'Heroines Edition Booster Box', matchKeyword: 'heroines' },
   'op14-eb04': { query: 'Azure Sea Seven Booster Box' },
+  'op15-eb04': { query: "Adventure on Kami's Island Booster Box", matchKeyword: 'kami' },
   'prb-01': { query: 'Premium Booster One Piece Card The Best' },
+  'prb-02': { query: 'Premium Booster The Best Vol 2', matchKeyword: 'vol. 2' },
 };
 
 async function searchBoosterBox(setId: string, config: { query: string; matchKeyword?: string }, debug: boolean = false): Promise<SetImageData | null> {
