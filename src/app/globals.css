@@ -107,6 +107,38 @@ img[data-loaded="false"] {
   animation: float 4s ease-in-out infinite;
 }
 
+/* ===== GRAIL VIEW — page-wide dark theme =====
+ * Toggled via body.grail-view-active by the CardGrid useEffect. Targets
+ * the dark-text utilities used outside CardGrid (breadcrumb, set title,
+ * stats) so they stay legible on the near-black bg. The grail grid
+ * itself sets its own colors inline. */
+body.grail-view-active {
+  background-color: #09090b; /* zinc-950 */
+}
+body.grail-view-active .text-zinc-900 {
+  color: #fafafa; /* zinc-50 */
+}
+body.grail-view-active .text-zinc-700,
+body.grail-view-active .text-zinc-600 {
+  color: #e4e4e7; /* zinc-200 */
+}
+body.grail-view-active .text-zinc-500 {
+  color: #a1a1aa; /* zinc-400 */
+}
+/* Hover-to-dark text affordances become hover-to-light. */
+body.grail-view-active .hover\:text-zinc-900:hover {
+  color: #fafafa;
+}
+/* Re-tint section dividers / borders that were tuned for light bg. */
+body.grail-view-active .border-zinc-200 {
+  border-color: #27272a; /* zinc-800 */
+}
+/* Keep the orange site header untouched — it has its own color system. */
+body.grail-view-active header.bg-orange-500,
+body.grail-view-active header.bg-orange-500 * {
+  color: inherit;
+}
+
 /* Disable all 3D effects for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .holo-animated {
