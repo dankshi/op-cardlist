@@ -5,6 +5,7 @@ import { CardBuyPanel, type VariantData } from './CardBuyPanel'
 import { MarketTabs } from './MarketTabs'
 import { OfferModal } from './OfferModal'
 import { AcceptOfferModal } from './AcceptOfferModal'
+import { ListModal } from './ListModal'
 import type { CardCondition } from '@/types/database'
 
 interface AskInput {
@@ -16,6 +17,10 @@ interface AskInput {
   quantity_available: number
   created_at: string
   sellerName: string
+  /** Seller's user_id — used to flag "this is YOUR listing" warnings
+   *  in the ListModal so the user doesn't accidentally stack duplicate
+   *  listings of the same variant. */
+  sellerId: string
 }
 
 interface BidInput {
@@ -82,6 +87,11 @@ export function CardMainPanel({
   const [open, setOpen] = useState(false)
   const [offerOpen, setOfferOpen] = useState(false)
   const [acceptOpen, setAcceptOpen] = useState(false)
+  const [listOpen, setListOpen] = useState(false)
+  // Mirrors the buy/sell mode in CardBuyPanel so the inline market
+  // drawer can default to (and follow) the matching tab — buy → Listings,
+  // sell → Offers.
+  const [mode, setMode] = useState<'buy' | 'sell'>('buy')
 
   // Auto-open the drawer when the URL hash targets the market section so
   // the "View market data" / "Offer" links scroll the user straight in.
@@ -123,6 +133,19 @@ export function CardMainPanel({
     [sales, filter],
   )
 
+  // User's own existing state for the selected variant — drives the
+  // "Update your offer" mode in OfferModal and the duplicate-listing
+  // warning in ListModal. Computed off the already-filtered arrays so
+  // these naturally update when the chip selection changes.
+  const existingOwnOffer = useMemo(() => {
+    if (currentUserId == null) return null
+    return filteredBids.find(b => b.userId === currentUserId) ?? null
+  }, [filteredBids, currentUserId])
+  const existingOwnListings = useMemo(() => {
+    if (currentUserId == null) return []
+    return filteredAsks.filter(a => a.sellerId === currentUserId)
+  }, [filteredAsks, currentUserId])
+
   // Highest open offer for the currently-selected variant. Drives the
   // "Accept offer $X" CTA on the buy panel so a seller doesn't have to
   // dig into the Offers tab to find the matching bid. Track the bid id
@@ -154,6 +177,8 @@ export function CardMainPanel({
         onViewMarketData={() => setOpen(true)}
         onOfferClick={() => setOfferOpen(true)}
         onAcceptOfferClick={() => setAcceptOpen(true)}
+        onListClick={() => setListOpen(true)}
+        onModeChange={setMode}
         topOfferPrice={topOffer?.price ?? null}
       />
 
@@ -164,6 +189,7 @@ export function CardMainPanel({
         cardName={cardName}
         initialCompany={filter?.company ?? null}
         initialGrade={filter?.grade ?? null}
+        existingOffer={existingOwnOffer ? { id: existingOwnOffer.id, price: existingOwnOffer.price } : null}
       />
 
       {topOffer && (
@@ -176,6 +202,18 @@ export function CardMainPanel({
           cardName={cardName}
         />
       )}
+
+      <ListModal
+        open={listOpen}
+        onClose={() => setListOpen(false)}
+        cardId={cardId}
+        cardName={cardName}
+        company={filter?.company ?? null}
+        grade={filter?.grade ?? null}
+        topOfferPrice={topOffer?.price ?? null}
+        marketPrice={marketPrice}
+        existingOwnListings={existingOwnListings.map(l => ({ id: l.id, price: l.price }))}
+      />
 
       <div id="market" className="mt-4">
         <button
@@ -214,6 +252,7 @@ export function CardMainPanel({
               sales={filteredSales.map(s => ({ date: s.date, price: s.price, label: s.label, source: s.source }))}
               cardId={cardId}
               bidsVariantFilter={{ company: filter?.company ?? null, grade: filter?.grade ?? null }}
+              modeBias={mode}
               onCancelOffer={async (bidId: string) => {
                 const res = await fetch(`/api/bids?id=${bidId}`, { method: 'DELETE' })
                 if (!res.ok) {

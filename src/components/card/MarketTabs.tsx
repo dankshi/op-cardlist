@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
 import type { CardCondition } from '@/types/database'
@@ -48,6 +48,7 @@ export function MarketTabs({
   onUpdateOffer,
   lowestAskPrice,
   topOfferPrice,
+  modeBias,
 }: {
   asks: AskRow[]
   bids: BidRow[]
@@ -64,17 +65,43 @@ export function MarketTabs({
    *  "Match listing" = lowestAsk - $1. Hidden when unavailable. */
   lowestAskPrice?: number | null
   topOfferPrice?: number | null
+  /** When set, the drawer mirrors the buy panel's perspective —
+   *  'buy' lands on / follows the Listings tab, 'sell' the Offers tab.
+   *  URL hash takes precedence on first mount; later mode changes
+   *  override whatever tab was active. */
+  modeBias?: 'buy' | 'sell'
 }) {
+  // Initial tab: URL hash wins (covers deep-links from the buy panel's
+  // Offer button using #bids); fall back to whatever the buy panel's
+  // current mode implies; default to Listings.
+  const initialTab = ((): Tab => {
+    if (typeof window === 'undefined') return 'asks'
+    const hash = window.location.hash.replace('#', '')
+    if (hash === 'asks' || hash === 'bids' || hash === 'sales') return hash as Tab
+    if (modeBias === 'sell') return 'bids'
+    return 'asks'
+  })
   const [tab, setTab] = useState<Tab>('asks')
 
-  // Honor #bids / #asks / #sales in the URL so the main card-page "Offer"
-  // button can deep-link straight into the Bids tab.
+  // Set initial tab after mount (avoids hydration mismatch — server can't
+  // read window.location.hash).
+  const didInit = useRef(false)
   useEffect(() => {
-    const hash = window.location.hash.replace('#', '')
-    if (hash === 'asks' || hash === 'bids' || hash === 'sales') {
-      setTab(hash as Tab)
-    }
+    if (didInit.current) return
+    didInit.current = true
+    setTab(initialTab())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // When the buy panel mode flips while the drawer is open, follow it.
+  // Skip the first render so initial-tab logic above isn't overridden.
+  const lastMode = useRef(modeBias)
+  useEffect(() => {
+    if (lastMode.current === modeBias) return
+    lastMode.current = modeBias
+    if (modeBias === 'sell') setTab('bids')
+    else if (modeBias === 'buy') setTab('asks')
+  }, [modeBias])
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">

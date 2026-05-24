@@ -197,7 +197,7 @@ export default async function CardPage({ params }: PageProps) {
     // first match per variant is the cheapest.
     supabase
       .from("listings")
-      .select("id, price, condition, grading_company, grade, quantity_available, created_at, seller:profiles!listings_seller_id_fkey(display_name, username)")
+      .select("id, price, condition, grading_company, grade, quantity_available, created_at, seller_id, seller:profiles!listings_seller_id_fkey(display_name, username)")
       .eq("card_id", card.id)
       .eq("status", "active")
       .order("price", { ascending: true }),
@@ -235,6 +235,7 @@ export default async function CardPage({ params }: PageProps) {
     grade: string | null
     quantity_available: number
     created_at: string
+    seller_id: string
     seller: { display_name: string | null; username: string | null } | null
   }>;
   const allBids = (bidsAgg.data ?? []) as unknown as Array<{
@@ -280,6 +281,7 @@ export default async function CardPage({ params }: PageProps) {
     quantity_available: l.quantity_available,
     created_at: l.created_at,
     sellerName: l.seller?.display_name || l.seller?.username || 'Seller',
+    sellerId: l.seller_id,
   }));
   const bidsForPanel = allBids.map(b => ({
     id: b.id,

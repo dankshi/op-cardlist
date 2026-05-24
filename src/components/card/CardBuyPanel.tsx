@@ -76,6 +76,8 @@ export function CardBuyPanel({
   onViewMarketData,
   onOfferClick,
   onAcceptOfferClick,
+  onListClick,
+  onModeChange,
   topOfferPrice,
 }: {
   cardId: string
@@ -98,6 +100,14 @@ export function CardBuyPanel({
   /** Called when the user clicks "Accept" on the top-offer pill.
    *  Parent opens an AcceptOfferModal with the offer terms + payout. */
   onAcceptOfferClick?: () => void
+  /** Called when the user clicks "List for more" / "List your card".
+   *  Parent opens a price-input modal that POSTs to /api/listings
+   *  inline instead of redirecting to the multi-step /sell flow. */
+  onListClick?: () => void
+  /** Notified when the user toggles between Buy and Sell mode so the
+   *  parent can sync sibling UI (e.g. switching the market drawer to
+   *  the Listings or Offers tab to match the active perspective). */
+  onModeChange?: (mode: 'buy' | 'sell') => void
   /** Highest open offer price for the currently-selected variant.
    *  Surfaces an "Accept" CTA so sellers don't have to drill into the
    *  Offers tab to find the matching bid. */
@@ -163,7 +173,11 @@ export function CardBuyPanel({
   // Buy vs Sell perspective toggle (StockX pattern). Default to buy — most
   // users on a card page are shopping. They flip to sell via the contextual
   // footer link, which shows the top-offer price as a teaser.
-  const [mode, setMode] = useState<'buy' | 'sell'>('buy')
+  const [mode, setModeState] = useState<'buy' | 'sell'>('buy')
+  function setMode(next: 'buy' | 'sell') {
+    setModeState(next)
+    onModeChange?.(next)
+  }
   // Controlled when the parent passes `selectedKey`; uncontrolled when it
   // doesn't. Lets CardBuyPanel keep working standalone (e.g. on /market)
   // while also slotting into CardMainPanel where state lifts up.
@@ -261,16 +275,9 @@ export function CardBuyPanel({
               <p className="text-2xl font-semibold text-zinc-500 mb-3">No listings yet</p>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <OfferButton onClick={onOfferClick} cardId={cardId} />
-                <Link
-                  href={
-                    `/sell?card=${encodeURIComponent(cardId)}`
-                    + (selected.companyKey ? `&grading_company=${selected.companyKey}` : '')
-                    + (selected.grade ? `&grade=${encodeURIComponent(selected.grade)}` : '')
-                  }
-                  className="px-5 py-3 rounded-lg text-base font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-colors"
-                >
+                <ListButton onClick={onListClick} cardId={cardId} selected={selected} variant="primary">
                   List yours
-                </Link>
+                </ListButton>
               </div>
             </div>
           )}
@@ -285,16 +292,9 @@ export function CardBuyPanel({
                   ${topOfferPrice.toFixed(2)}
                 </p>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Link
-                    href={
-                      `/sell?card=${encodeURIComponent(cardId)}`
-                      + (selected.companyKey ? `&grading_company=${selected.companyKey}` : '')
-                      + (selected.grade ? `&grade=${encodeURIComponent(selected.grade)}` : '')
-                    }
-                    className="px-5 py-3 rounded-lg text-base font-semibold bg-white text-zinc-900 ring-2 ring-zinc-300 hover:ring-zinc-900 hover:bg-zinc-50 transition-colors"
-                  >
+                  <ListButton onClick={onListClick} cardId={cardId} selected={selected} variant="outline">
                     List for more
-                  </Link>
+                  </ListButton>
                   <button
                     type="button"
                     onClick={onAcceptOfferClick}
@@ -309,16 +309,9 @@ export function CardBuyPanel({
             <div className="mb-4">
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Sell now for</p>
               <p className="text-2xl font-semibold text-zinc-500 mb-3">No offers yet</p>
-              <Link
-                href={
-                  `/sell?card=${encodeURIComponent(cardId)}`
-                  + (selected.companyKey ? `&grading_company=${selected.companyKey}` : '')
-                  + (selected.grade ? `&grade=${encodeURIComponent(selected.grade)}` : '')
-                }
-                className="inline-flex px-5 py-3 rounded-lg text-base font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-colors"
-              >
+              <ListButton onClick={onListClick} cardId={cardId} selected={selected} variant="primary">
                 List your card
-              </Link>
+              </ListButton>
             </div>
           )}
         </>
@@ -467,6 +460,47 @@ function OfferButton({
   return (
     <Link href={`/card/${cardId.toLowerCase()}/market#bids`} className={cls}>
       {variant === 'inline' ? 'Offer' : 'Make Offer'}
+    </Link>
+  )
+}
+
+/** List CTA. Opens the inline ListModal when a click handler is wired
+ *  (parent has the modal); falls back to a Link into the full /sell
+ *  flow with the variant pre-filled when used standalone. */
+function ListButton({
+  onClick,
+  cardId,
+  selected,
+  variant,
+  children,
+}: {
+  onClick?: () => void
+  cardId: string
+  selected: ChipData
+  variant: 'primary' | 'outline'
+  children: React.ReactNode
+}) {
+  const cls =
+    variant === 'primary'
+      ? 'px-5 py-3 rounded-lg text-base font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-colors cursor-pointer'
+      : 'px-5 py-3 rounded-lg text-base font-semibold bg-white text-zinc-900 ring-2 ring-zinc-300 hover:ring-zinc-900 hover:bg-zinc-50 transition-colors cursor-pointer'
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cls}>
+        {children}
+      </button>
+    )
+  }
+  return (
+    <Link
+      href={
+        `/sell?card=${encodeURIComponent(cardId)}`
+        + (selected.companyKey ? `&grading_company=${selected.companyKey}` : '')
+        + (selected.grade ? `&grade=${encodeURIComponent(selected.grade)}` : '')
+      }
+      className={cls}
+    >
+      {children}
     </Link>
   )
 }
