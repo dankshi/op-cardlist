@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import AuthButton from "@/components/auth/AuthButton";
 import MyShopLink from "@/components/nav/MyShopLink";
+import { SearchHero } from "@/components/home/SearchHero";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, TWITTER_HANDLE, DEFAULT_OG_IMAGE, BASE_KEYWORDS, getOrganizationSchema, getWebSiteSchema } from "@/lib/seo";
 
 const inter = Inter({
@@ -95,18 +96,23 @@ export default function RootLayout({
           }}
         />
           <header className="border-b border-orange-600 sticky top-0 bg-orange-500 z-50">
-            <nav className="max-w-screen-2xl mx-auto px-4 py-4 flex items-center justify-between">
-              <Link href="/" className="hover:opacity-90 transition-opacity">
+            <nav className="w-full px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4 sm:gap-6">
+              <Link href="/" className="hover:opacity-90 transition-opacity flex-shrink-0">
                 <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto" />
               </Link>
-              <div className="flex items-center gap-4">
-                <Link href="/marketplace" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
+              <div className="flex-1 min-w-0">
+                <Suspense fallback={<div className="h-9 rounded-lg bg-white/20 animate-pulse" />}>
+                  <SearchHero variant="compact" />
+                </Suspense>
+              </div>
+              <div className="flex items-center gap-4 flex-shrink-0">
+                <Link href="/marketplace" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
                   Marketplace
                 </Link>
-                <Link href="/about" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
+                <Link href="/about" className="hidden lg:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
                   How It Works
                 </Link>
-                <Link href="/sell" className="text-white/80 hover:text-white transition-colors text-sm font-medium">
+                <Link href="/sell" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
                   Sell
                 </Link>
                 <MyShopLink />
@@ -116,11 +122,11 @@ export default function RootLayout({
               </div>
             </nav>
           </header>
-          <main className="max-w-screen-2xl mx-auto px-4 py-8">
+          <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </main>
           <footer className="border-t border-zinc-200 mt-16">
-            <div className="max-w-screen-2xl mx-auto px-4 py-8 text-center text-zinc-500 text-sm space-y-3">
+            <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-zinc-500 text-sm space-y-3">
               <div className="flex items-center justify-center">
                 <Image src="/nomi-slab.png" alt="nomi" width={60} height={20} className="h-5 w-auto" />
               </div>

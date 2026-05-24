@@ -45,6 +45,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'You cannot buy your own listing' }, { status: 400 })
   }
 
+  // If the buyer already has a non-cancelled, non-pending order for this
+  // listing (typically under_review), don't try to create a new one on top
+  // — return the existing order's state so the client can render a clear
+  // status screen. pending_payment orders are handled by the stale-order
+  // cancellation loop below; they're recoverable.
+  const earlyAdmin = getSupabaseAdmin()
+  const { data: blockingOrderRows } = await earlyAdmin
+    .from('orders')
+    .select('id, status, items:order_items!inner(listing_id)')
+    .eq('buyer_id', user.id)
+    .eq('items.listing_id', listing_id)
+    .not('status', 'in', '(cancelled,pending_payment)')
+    .order('created_at', { ascending: false })
+    .limit(1)
+  const blockingOrder = blockingOrderRows?.[0]
+  if (blockingOrder) {
+    return NextResponse.json({
+      orderStatus: blockingOrder.status,
+      orderId: blockingOrder.id,
+      listing: {
+        title: listing.title,
+        price: Number(listing.price),
+        photo_url: listing.photo_urls?.[0] || null,
+        condition: listing.condition,
+        grading_company: listing.grading_company || null,
+        grade: listing.grade || null,
+        quantity: 1,
+      },
+    })
+  }
+
   // Atomically reserve the inventory. The WHERE clause re-checks the
   // status + quantity that reserveListing() based its decision on, so
   // a concurrent buyer who got there first will leave us with 0 rows
@@ -270,6 +301,26 @@ export async function POST(request: Request) {
         review_reason: `marketplace_risk:${risk.reasons.join(',')}`,
       })
       .eq('id', order.id)
+
+    // Don't create a PaymentIntent — the order is being reviewed and the
+    // buyer can't proceed to payment yet. Return a structured status so
+    // the client shows a review-pending screen instead of attempting the
+    // payment flow and tripping the shipping-route's "cannot be modified"
+    // rejection downstream.
+    return NextResponse.json({
+      orderStatus: 'under_review',
+      orderId: order.id,
+      reasons: risk.reasons,
+      listing: {
+        title: listing.title,
+        price: Number(listing.price),
+        photo_url: listing.photo_urls?.[0] || null,
+        condition: listing.condition,
+        grading_company: listing.grading_company || null,
+        grade: listing.grade || null,
+        quantity,
+      },
+    })
   }
 
   const paymentIntent = await getStripe().paymentIntents.create({

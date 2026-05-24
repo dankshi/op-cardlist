@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -30,9 +30,12 @@ export default function NewDeckPage() {
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const didAuthCheck = useRef(false)
 
   useEffect(() => {
+    if (didAuthCheck.current) return
+    didAuthCheck.current = true
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) router.push('/auth/sign-in')

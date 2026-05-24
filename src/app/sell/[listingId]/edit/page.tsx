@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -69,9 +69,12 @@ export default function EditListingPage() {
   const router = useRouter()
   const params = useParams()
   const listingId = params.listingId as string
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const didLoad = useRef(false)
 
   useEffect(() => {
+    if (didLoad.current) return
+    didLoad.current = true
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/sign-in'); return }

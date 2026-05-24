@@ -9,6 +9,24 @@ import { GRADING_SCALES, type Bid, type GradingCompany } from '@/types/database'
 
 interface BidAskSpreadProps {
   cardId: string
+  /** When true, the offer-placement form opens on mount instead of the
+   *  buyer needing to click "Place Offer" first. Used by the modal entry
+   *  point from the buy panel — they clicked Offer, they want the form. */
+  initialFormOpen?: boolean
+  /** Pre-fill the form's variant picker so the user lands on the same
+   *  variant they had selected in the card-page chip row. They can still
+   *  change it inside the form. */
+  initialOfferType?: 'raw' | 'graded'
+  initialGradingCompany?: GradingCompany
+  initialGrade?: string
+  /** Hide the "existing bids stack" rendering — used in the modal where
+   *  the focus is just the offer form. Default false (show the stack on
+   *  the standalone /market view). */
+  hideExistingBids?: boolean
+  /** When set, the rendered bids list is filtered to this exact variant.
+   *  Lets the market-data drawer's Offers tab honor the chip selection
+   *  on the buy panel above. `{ company: null, grade: null }` = ungraded. */
+  variantFilter?: { company: string | null; grade: string | null }
 }
 
 // Match the eligibility rule used in /sell — offers can only target slab
@@ -22,9 +40,9 @@ function isGradeEligible(grade: string): boolean {
 
 type OfferType = 'raw' | 'graded'
 
-/** Compact label for a bid's variant: "Raw" or "PSA 10". */
+/** Compact label for a bid's variant: "Ungraded NM" or "PSA 10". */
 function variantLabel(bid: Pick<Bid, 'grading_company' | 'grade'>): string {
-  if (!bid.grading_company || !bid.grade) return 'Raw'
+  if (!bid.grading_company || !bid.grade) return 'Ungraded NM'
   return `${bid.grading_company} ${bid.grade}`
 }
 
@@ -35,15 +53,23 @@ function variantKey(bid: Pick<Bid, 'grading_company' | 'grade'>): string {
 
 const stripePromise = getStripeClient()
 
-export function BidAskSpread({ cardId }: BidAskSpreadProps) {
+export function BidAskSpread({
+  cardId,
+  initialFormOpen = false,
+  initialOfferType,
+  initialGradingCompany,
+  initialGrade,
+  hideExistingBids = false,
+  variantFilter,
+}: BidAskSpreadProps) {
   const router = useRouter()
   const [bids, setBids] = useState<Bid[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(initialFormOpen)
   const [bidPrice, setBidPrice] = useState('')
-  const [offerType, setOfferType] = useState<OfferType>('raw')
-  const [gradingCompany, setGradingCompany] = useState<GradingCompany>('PSA')
-  const [grade, setGrade] = useState<string>('')
+  const [offerType, setOfferType] = useState<OfferType>(initialOfferType ?? 'raw')
+  const [gradingCompany, setGradingCompany] = useState<GradingCompany>(initialGradingCompany ?? 'PSA')
+  const [grade, setGrade] = useState<string>(initialGrade ?? '')
   const [showAllGrades, setShowAllGrades] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -133,7 +159,16 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
 
   const groupedBids = useMemo(() => {
     const groups = new Map<string, { label: string; bids: Bid[] }>()
-    for (const b of bids) {
+    // Apply the external variant filter (from the buy-panel chip) before
+    // grouping so the rendered offers tab matches what the user sees in
+    // the chip row above.
+    const visibleBids = variantFilter
+      ? bids.filter(b =>
+          (b.grading_company ?? null) === (variantFilter.company ?? null)
+          && (b.grade ?? null) === (variantFilter.grade ?? null)
+        )
+      : bids
+    for (const b of visibleBids) {
       const key = variantKey(b)
       const label = variantLabel(b)
       const existing = groups.get(key)
@@ -151,7 +186,8 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
       label,
       bids: bids.sort((a, b) => Number(b.price) - Number(a.price)),
     }))
-  }, [bids])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bids, variantFilter?.company, variantFilter?.grade])
 
   /** Step 1: variant + price → create the PaymentIntent (capture_method=manual). */
   async function handleStartOffer(e: FormEvent) {
@@ -167,10 +203,10 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
       return
     }
     // If they're offering at-or-above the lowest matching listing, they
-    // probably picked the wrong variant (Raw NM when they meant PSA 10
+    // probably picked the wrong variant (Ungraded NM when they meant PSA 10
     // is the canonical mistake). Confirm before locking up a card hold.
     if (offerAtOrAboveAsk && currentLowestAsk != null) {
-      const variantName = offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Raw NM'
+      const variantName = offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Ungraded NM'
       const ok = window.confirm(
         `Heads up: there's already a ${variantName} listing for $${currentLowestAsk.toFixed(2)} ` +
         `— you can buy it right now instead of placing a $${priceNum.toFixed(2)} offer.\n\n` +
@@ -283,7 +319,12 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
     router.push(`/sell?${qs.toString()}`)
   }
 
-  if (loading) {
+  // When the offer modal mounts us with initialFormOpen, we want the
+  // form visible immediately — the bids+listings+user fetches are useful
+  // (for the "you can buy now for $X" nudge) but the form itself can
+  // render without them, and the buyer's blocked from submitting useful
+  // input behind a skeleton is worse than missing one inline hint.
+  if (loading && !initialFormOpen) {
     return <div className="h-8 rounded bg-zinc-50 animate-pulse" />
   }
 
@@ -325,7 +366,7 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
                     : 'bg-white border border-zinc-200 text-zinc-700 hover:border-zinc-300'
                 }`}
               >
-                {t === 'raw' ? 'Raw NM' : 'Graded slab'}
+                {t === 'raw' ? 'Ungraded NM' : 'Graded slab'}
               </button>
             ))}
           </div>
@@ -403,14 +444,14 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
             {currentLowestAsk != null && (
               offerAtOrAboveAsk ? (
                 <p className="mt-1.5 text-[11px] text-amber-700 leading-snug">
-                  ⚠ A {offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Raw NM'} listing
+                  ⚠ A {offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Ungraded NM'} listing
                   is already <strong>${currentLowestAsk.toFixed(2)}</strong>. You can{' '}
                   <a href="#listings" className="underline hover:no-underline">buy now</a>{' '}
                   instead — make sure you picked the right variant above.
                 </p>
               ) : (
                 <p className="mt-1.5 text-[11px] text-zinc-400 leading-snug">
-                  Lowest active {offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Raw NM'} listing: ${currentLowestAsk.toFixed(2)}
+                  Lowest active {offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Ungraded NM'} listing: ${currentLowestAsk.toFixed(2)}
                 </p>
               )
             )}
@@ -444,7 +485,7 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
         <div className="mb-3 p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-3">
           <div className="text-xs text-zinc-600">
             <strong className="text-zinc-900">${parseFloat(bidPrice).toFixed(2)}</strong>{' '}
-            offer for <strong className="text-zinc-900">{offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Raw NM'}</strong>.
+            offer for <strong className="text-zinc-900">{offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Ungraded NM'}</strong>.
             Your card will be reserved but <strong>not charged</strong> until a seller accepts.
           </div>
           <Elements
@@ -476,7 +517,7 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
         </div>
       )}
 
-      {groupedBids.length > 0 ? (
+      {hideExistingBids ? null : groupedBids.length > 0 ? (
         <div className="space-y-3">
           {groupedBids.map(group => (
             <div key={group.key}>
@@ -524,7 +565,7 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
           ))}
         </div>
       ) : (
-        !showForm && <p className="text-xs text-zinc-400 py-2">No offers yet. Be the first!</p>
+        !showForm && !hideExistingBids && <p className="text-xs text-zinc-400 py-2">No offers yet. Be the first!</p>
       )}
     </div>
   )

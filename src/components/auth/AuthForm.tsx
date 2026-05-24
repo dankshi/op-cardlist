@@ -1,9 +1,10 @@
 'use client'
 
+import { useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export function OAuthButtons({ redirectTo }: { redirectTo?: string }) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const handleOAuth = async (provider: 'google' | 'discord') => {
     await supabase.auth.signInWithOAuth({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -35,7 +35,7 @@ interface Props {
 export function SellerAgreementGate({ userId, onApproved }: Props) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   async function handleAgree() {
     setPending(true)

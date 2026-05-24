@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { FormInput, SubmitButton, AuthError } from '@/components/auth/AuthForm'
@@ -9,7 +9,7 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const [success, setSuccess] = useState(false)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

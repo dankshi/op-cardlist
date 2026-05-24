@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -9,9 +9,12 @@ function OnboardingCompleteContent() {
   const [status, setStatus] = useState<'checking' | 'complete' | 'incomplete'>('checking')
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const didCheck = useRef(false)
 
   useEffect(() => {
+    if (didCheck.current) return
+    didCheck.current = true
     async function check() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/sign-in'); return }

@@ -1,10 +1,24 @@
 import { NextResponse } from 'next/server';
-import { getAllCards, getCardById, searchCards } from '@/lib/cards';
+import { getAllCards, getCardById, getCardsByIds, getCardsByIdsBasic, searchCards } from '@/lib/cards';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
+  const ids = searchParams.get('ids');
   const search = searchParams.get('search');
+  const basic = searchParams.get('basic') === '1';
+
+  // Batched lookup. Pages that need many cards at once (mystuff, orders)
+  // hit this so they don't fan out N parallel single-card requests, which
+  // used to trigger N full catalog scans + browser auth-lock contention.
+  // `basic=1` skips the TCGplayer price join — use when callers only need
+  // name/image for tiles. Cuts ~1.3s off the response for ~25 IDs.
+  if (ids) {
+    const idList = ids.split(',').map(s => s.trim()).filter(Boolean);
+    if (idList.length === 0) return NextResponse.json({ cards: [] });
+    const cards = basic ? await getCardsByIdsBasic(idList) : await getCardsByIds(idList);
+    return NextResponse.json({ cards });
+  }
 
   // Support single card lookup for client components (e.g., card modal)
   if (id) {

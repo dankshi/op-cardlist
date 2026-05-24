@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -13,9 +13,12 @@ export default function SellerApplyPage() {
   const [pending, setPending] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const didLoad = useRef(false)
 
   useEffect(() => {
+    if (didLoad.current) return
+    didLoad.current = true
     async function loadProfile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {

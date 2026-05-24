@@ -64,11 +64,11 @@ export async function evaluateOrderRisk(
 
   const [buyerRes, sellerRes, listingRes] = await Promise.all([
     supabase.from('profiles')
-      .select('id, created_at, last_login_ip, last_seen_at')
+      .select('id, created_at, last_login_ip, last_seen_at, display_name')
       .eq('id', args.buyerId)
       .single(),
     supabase.from('profiles')
-      .select('id, created_at, last_login_ip, last_seen_at')
+      .select('id, created_at, last_login_ip, last_seen_at, display_name')
       .eq('id', args.sellerId)
       .single(),
     supabase.from('listings')
@@ -84,6 +84,15 @@ export async function evaluateOrderRisk(
     // Missing data — don't flag (don't block legit orders on a query miss),
     // but log so this surfaces in error monitoring.
     console.error('[risk] missing profile or listing for evaluation', args)
+    return { flag: false, reasons: [] }
+  }
+
+  // Dev-only test-account bypass. Seeded test accounts (display_name='test')
+  // are typically created in the same setup window and share an IP with the
+  // dev's buyer account, which trips every self-dealing signal and blocks
+  // every checkout in local testing. NODE_ENV gate makes this a no-op in
+  // production so a user can't pick display_name='test' to dodge the rules.
+  if (process.env.NODE_ENV !== 'production' && (buyer.display_name === 'test' || seller.display_name === 'test')) {
     return { flag: false, reasons: [] }
   }
 

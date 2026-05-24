@@ -1,13 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export function BuyNowButton({ listingId, price }: { listingId: string; price: number }) {
+type Size = 'sm' | 'lg'
+
+const SIZE_CLASSES: Record<Size, string> = {
+  sm: 'px-3 py-1.5 text-sm',
+  lg: 'px-6 py-3 text-base',
+}
+
+export function BuyNowButton({
+  listingId,
+  size = 'sm',
+}: {
+  listingId: string
+  price: number
+  size?: Size
+}) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   async function handleBuyNow() {
     setLoading(true)
@@ -25,9 +39,9 @@ export function BuyNowButton({ listingId, price }: { listingId: string; price: n
     <button
       onClick={handleBuyNow}
       disabled={loading}
-      className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer bg-orange-500 hover:bg-orange-600 text-white disabled:bg-orange-700 disabled:cursor-not-allowed"
+      className={`${SIZE_CLASSES[size]} rounded-lg font-semibold transition-colors cursor-pointer bg-orange-500 hover:bg-orange-600 text-white disabled:bg-orange-700 disabled:cursor-not-allowed`}
     >
-      {loading ? 'Processing...' : 'Buy Now'}
+      {loading ? 'Processing…' : 'Buy Now'}
     </button>
   )
 }

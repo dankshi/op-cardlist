@@ -5,7 +5,6 @@ import { getAllSets, getBrowsableCards, getAllSetImages } from "@/lib/cards";
 import { getTopPriceMovers, getPriceHistoryFiles } from "@/lib/price-history";
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, BASE_KEYWORDS } from "@/lib/seo";
-import { SearchHero } from "@/components/home/SearchHero";
 import { CardCarousel } from "@/components/home/CardCarousel";
 import { ListingCarousel } from "@/components/home/ListingCarousel";
 import { SellCTA } from "@/components/home/SellCTA";
@@ -21,18 +20,6 @@ import { OfferCarousel } from "@/components/home/OfferCarousel";
 import type { Card } from "@/types/card";
 import type { EnrichedListing } from "@/components/home/ListingCarousel";
 import type { EnrichedOffer } from "@/components/home/OfferCarousel";
-
-const SUGGESTED_SEARCHES: Array<{ label: string; href: string }> = [
-  { label: 'Luffy',  href: '/search?q=Luffy' },
-  { label: 'Zoro',   href: '/search?q=Zoro' },
-  { label: 'Nami',   href: '/search?q=Nami' },
-  { label: 'Ace',    href: '/search?q=Ace' },
-  { label: 'Shanks', href: '/search?q=Shanks' },
-  { label: 'OP-08',  href: '/search?q=OP-08' },
-  // BL surfaces actual graded listings, which live on /marketplace rather
-  // than /search (search indexes card metadata, not listing grades).
-  { label: 'BL',     href: '/marketplace' },
-];
 
 export const metadata: Metadata = {
   title: { absolute: "nomi market — The Trusted TCG Marketplace" },
@@ -262,63 +249,6 @@ export default async function Home() {
 
   return (
     <div>
-      {/* ===== HERO ===== */}
-      <section className="pt-12 pb-10 sm:pt-16 sm:pb-12 mb-8 sm:mb-10">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-700 text-xs font-semibold uppercase tracking-wider mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-            Pokemon support — coming soon
-          </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-5 text-zinc-900">
-            The trusted way to buy &amp; sell TCG cards.
-          </h1>
-          <p className="text-lg text-zinc-500 mb-8 max-w-lg mx-auto leading-relaxed">
-            Every order authenticated. Every card verified before it ships.
-          </p>
-
-          <SearchHero />
-
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-            <span className="text-xs text-zinc-400 mr-1">Popular:</span>
-            {SUGGESTED_SEARCHES.map((term) => (
-              <Link
-                key={term.label}
-                href={term.href}
-                className="px-3 py-1 rounded-full bg-white text-xs text-zinc-700 ring-1 ring-zinc-200 hover:ring-zinc-400 hover:text-zinc-900 transition-colors"
-              >
-                {term.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-center gap-3 mt-8">
-            <Link
-              href="/marketplace"
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-800 transition-colors"
-            >
-              Shop Marketplace
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </Link>
-            <Link
-              href="/sell"
-              className="px-6 py-2.5 border border-zinc-300 text-zinc-700 text-sm font-medium rounded-lg hover:bg-zinc-100 transition-colors"
-            >
-              Start Selling
-            </Link>
-          </div>
-
-          <p className="mt-4 text-xs text-zinc-500">
-            Or{' '}
-            <Link href="/search" className="text-zinc-700 underline-offset-2 hover:underline">
-              browse the full card catalog
-            </Link>
-            {' '}for prices and references
-          </p>
-        </div>
-      </section>
-
       {/* ===== TRUST STRIP ===== */}
       <TrustStrip
         cardCount={totalCards}

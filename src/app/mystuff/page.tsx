@@ -1,49 +1,52 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { StorefrontGrid } from '@/components/dashboard/StorefrontGrid'
 import { MyOffersGrid } from '@/components/dashboard/MyOffersGrid'
+import { OrdersGrid } from '@/components/dashboard/OrdersGrid'
 import type { Profile, Listing, Order, Bid } from '@/types/database'
 import { US_STATES } from '@/lib/us-states'
 
-type Tab = 'selling' | 'collection' | 'offers' | 'orders' | 'settings'
-
-const STATUS_STYLES: Record<string, string> = {
-  under_review: 'bg-amber-500/10 text-amber-700',
-  paid: 'bg-yellow-500/10 text-yellow-600',
-  seller_shipped: 'bg-blue-500/10 text-blue-600',
-  received: 'bg-purple-500/10 text-purple-600',
-  authenticated: 'bg-emerald-500/10 text-emerald-600',
-  shipped_to_buyer: 'bg-blue-500/10 text-blue-600',
-  shipped: 'bg-blue-500/10 text-blue-600',
-  delivered: 'bg-green-500/10 text-green-600',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  under_review: 'Under Review — Don’t Ship Yet',
-  paid: 'Action Required',
-  seller_shipped: 'Shipped to Platform',
-  received: 'Received by Platform',
-  authenticated: 'Authenticated',
-  shipped_to_buyer: 'Shipped to Buyer',
-  shipped: 'Shipped',
-  delivered: 'Delivered',
-}
+// Tab key glossary: 'sales' = orders where this user is the seller (formerly
+// labeled "Orders" — ambiguous with /orders). 'purchases' = orders where this
+// user is the buyer (mirrored from /orders so sellers have a single home).
+type Tab = 'selling' | 'collection' | 'offers' | 'sales' | 'purchases' | 'settings'
+const VALID_TABS: Tab[] = ['selling', 'collection', 'offers', 'sales', 'purchases', 'settings']
 
 export default function MyStuffPage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center"><div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" /></div>}>
+      <MyStuffPageInner />
+    </Suspense>
+  )
+}
+
+function MyStuffPageInner() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
-  const [orders, setOrders] = useState<Order[]>([])
+  // Seller-side orders: orders where this user is the seller (these are the
+  // "Sales" tab — historically called "Orders").
+  const [sales, setSales] = useState<Order[]>([])
+  // Buyer-side orders: orders where this user is the buyer (the "Purchases"
+  // tab — pulled from /api/orders?role=buyer, mirrors what /orders shows).
+  const [purchases, setPurchases] = useState<Order[]>([])
   // User's own active offers (bids they've placed on other people's cards).
-  // Loaded alongside listings + orders so the tab badge is accurate even
+  // Loaded alongside everything else so the tab badge is accurate even
   // before the tab is opened.
   const [offers, setOffers] = useState<Bid[]>([])
   const [offerCardNames, setOfferCardNames] = useState<Record<string, string>>({})
-  const [tab, setTab] = useState<Tab>('selling')
+  // Order IDs the user has already reviewed — used to compute the
+  // "delivered purchases that still need a review" action-banner count.
+  const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set())
+  const searchParams = useSearchParams()
+  const initialTab = ((): Tab => {
+    const t = searchParams.get('tab')
+    return t && (VALID_TABS as string[]).includes(t) ? (t as Tab) : 'selling'
+  })()
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [loading, setLoading] = useState(true)
   const [showBulkPrice, setShowBulkPrice] = useState(false)
   const [bulkAdjustment, setBulkAdjustment] = useState('-5')
@@ -59,9 +62,18 @@ export default function MyStuffPage() {
   const [addrSaving, setAddrSaving] = useState(false)
   const [addrMessage, setAddrMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  // Memoize the client so Strict-Mode re-renders don't spawn parallel
+  // instances that contend on the shared gotrue auth-token lock.
+  const supabase = useMemo(() => createClient(), [])
+  // Guard against Strict-Mode double-invocation. Without this, dev fires
+  // load() twice in parallel; the second batch fights the first for the
+  // navigator-locks-based auth-refresh mutex, every query waits 10s, and
+  // the spinner never finishes.
+  const didLoad = useRef(false)
 
   useEffect(() => {
+    if (didLoad.current) return
+    didLoad.current = true
     async function load() {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -71,7 +83,10 @@ export default function MyStuffPage() {
 
         const { data: p, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single()
         if (profileError) console.error('[mystuff] profile fetch failed', profileError)
-        if (!p?.is_seller) { router.push('/seller/apply'); return }
+        // Non-sellers see /mystuff too — just the buyer-side tabs
+        // (Purchases, Offers). Seller-only sections render conditionally
+        // on profile.is_seller below. The "+ Add a Card" header CTA flips
+        // to "Become a seller" for non-sellers.
         setProfile(p as Profile)
         if (p.shipping_street1) setAddrStreet(p.shipping_street1)
         if (p.shipping_city) setAddrCity(p.shipping_city)
@@ -95,8 +110,32 @@ export default function MyStuffPage() {
           .not('status', 'in', '("pending_payment","cancelled")')
           .order('created_at', { ascending: false })
         if (ordersError) console.error('[mystuff] orders fetch failed', ordersError)
-        const fetchedOrders = (o as Order[]) || []
-        setOrders(fetchedOrders)
+        const fetchedSales = (o as Order[]) || []
+        setSales(fetchedSales)
+
+        // Buyer-side orders (Purchases tab). Reuses the same /api/orders
+        // endpoint /orders historically pulled from so the data shape and
+        // status filtering stay consistent across both surfaces.
+        let fetchedPurchases: Order[] = []
+        try {
+          const purchasesRes = await fetch(`/api/orders?role=buyer`)
+          if (purchasesRes.ok) {
+            const purchasesData = await purchasesRes.json()
+            fetchedPurchases = ((purchasesData.orders as Order[]) || [])
+              .filter(o => o.status !== 'cancelled' && o.status !== 'pending_payment')
+            setPurchases(fetchedPurchases)
+          }
+        } catch (err) {
+          console.error('[mystuff] purchases fetch failed', err)
+        }
+
+        // Reviews already written by this user — drives the "needs review"
+        // count in the action banner. Single round-trip, no per-order N+1.
+        const { data: reviewRows } = await supabase
+          .from('reviews')
+          .select('order_id')
+          .eq('reviewer_id', user.id)
+        setReviewedOrderIds(new Set((reviewRows || []).map(r => r.order_id as string)))
 
         // User's own active offers — bids they've placed on cards. Fetched
         // alongside listings so the offers tab badge is accurate without
@@ -106,32 +145,35 @@ export default function MyStuffPage() {
         const fetchedOffers = (offerData.bids as Bid[]) || []
         setOffers(fetchedOffers)
 
-        // Fetch card images for listings + order items + offers in a single
-        // batch. Offers also need a display name for the tile, so collect
-        // names too. /api/cards already returns both.
-        const orderCardIds = fetchedOrders.flatMap(order => order.items?.map(i => i.card_id) || [])
+        // Fetch card images for listings + sales + purchases + offers in
+        // a single batch. Offers also need a display name for the tile, so
+        // collect names too. /api/cards already returns both.
+        const salesCardIds = fetchedSales.flatMap(order => order.items?.map(i => i.card_id) || [])
+        const purchasesCardIds = fetchedPurchases.flatMap(order => order.items?.filter(i => !i.snapshot_photo_url).map(i => i.card_id) || [])
         const offerCardIds = fetchedOffers.map(o => o.card_id)
         const uniqueCardIds = [...new Set([
           ...fetchedListings.map(li => li.card_id),
-          ...orderCardIds,
+          ...salesCardIds,
+          ...purchasesCardIds,
           ...offerCardIds,
         ])]
         const images: Record<string, string> = {}
         const names: Record<string, string> = {}
-        await Promise.all(
-          uniqueCardIds.map(async (cardId) => {
-            try {
-              const res = await fetch(`/api/cards?id=${encodeURIComponent(cardId)}`)
-              const data = await res.json()
-              if (data.card?.imageUrl) {
-                images[cardId] = data.card.imageUrl
-              }
-              if (data.card?.name) {
-                names[cardId] = data.card.name
-              }
-            } catch { /* skip */ }
-          })
-        )
+        if (uniqueCardIds.length > 0) {
+          try {
+            // basic=1: tiles only need name + imageUrl. Skipping the
+            // TCGplayer price join cuts response time ~4x for batches
+            // of ~25 IDs (1.7s → ~400ms). loadMarketPrices below uses
+            // the full endpoint for the bulk-price-update flow that
+            // actually needs prices.
+            const res = await fetch(`/api/cards?basic=1&ids=${encodeURIComponent(uniqueCardIds.join(','))}`)
+            const data = await res.json()
+            for (const card of data.cards || []) {
+              if (card.imageUrl) images[card.id] = card.imageUrl
+              if (card.name) names[card.id] = card.name
+            }
+          } catch { /* skip */ }
+        }
         setCardImages(images)
         setOfferCardNames(names)
       } catch (err) {
@@ -146,12 +188,12 @@ export default function MyStuffPage() {
   async function loadMarketPrices() {
     const cardIds = [...new Set(listings.filter(l => l.status === 'active').map(l => l.card_id))]
     const prices: Record<string, number> = {}
-    for (const cardId of cardIds) {
+    if (cardIds.length > 0) {
       try {
-        const res = await fetch(`/api/cards?id=${encodeURIComponent(cardId)}`)
+        const res = await fetch(`/api/cards?ids=${encodeURIComponent(cardIds.join(','))}`)
         const data = await res.json()
-        if (data.card?.price?.marketPrice) {
-          prices[cardId] = data.card.price.marketPrice
+        for (const card of data.cards || []) {
+          if (card.price?.marketPrice) prices[card.id] = card.price.marketPrice
         }
       } catch { /* skip */ }
     }
@@ -193,34 +235,128 @@ export default function MyStuffPage() {
     )
   }
 
+  const isSeller = !!profile?.is_seller
   const sellingListings = listings.filter(l => l.status === 'active')
   const collectionListings = listings.filter(l => l.status === 'delisted')
-  const pendingOrders = orders.filter(o => ['paid', 'seller_shipped', 'received', 'authenticated'].includes(o.status))
+  const pendingSales = sales.filter(o => ['paid', 'seller_shipped', 'received', 'authenticated'].includes(o.status))
+
+  // Action-banner data. Three categories, each linking to specific orders:
+  //   - salesNeedingLabel: as a seller, an order was paid but I haven't
+  //     printed the shipping label yet → I need to ship the card to Nomi.
+  //   - purchasesToConfirm: as a buyer, the card was shipped to me and
+  //     I haven't acknowledged receipt yet.
+  //   - purchasesToReview: as a buyer, the card was delivered and I
+  //     haven't left a review for that order yet.
+  const salesNeedingLabel = sales.filter(o => o.status === 'paid' && !o.seller_label_url)
+  const purchasesToConfirm = purchases.filter(o => o.status === 'shipped_to_buyer')
+  const purchasesToReview = purchases.filter(o => o.status === 'delivered' && !reviewedOrderIds.has(o.id))
+  const actionItems: { count: number; label: string; href: string; icon: string }[] = []
+  if (salesNeedingLabel.length > 0) {
+    actionItems.push({
+      count: salesNeedingLabel.length,
+      label: salesNeedingLabel.length === 1 ? 'sale needs a shipping label' : 'sales need shipping labels',
+      href: salesNeedingLabel.length === 1 ? `/orders/${salesNeedingLabel[0].id}` : '/mystuff?tab=sales',
+      icon: '🚚',
+    })
+  }
+  if (purchasesToConfirm.length > 0) {
+    actionItems.push({
+      count: purchasesToConfirm.length,
+      label: purchasesToConfirm.length === 1 ? 'delivery to confirm' : 'deliveries to confirm',
+      href: purchasesToConfirm.length === 1 ? `/orders/${purchasesToConfirm[0].id}` : '/mystuff?tab=purchases',
+      icon: '📦',
+    })
+  }
+  if (purchasesToReview.length > 0) {
+    actionItems.push({
+      count: purchasesToReview.length,
+      label: purchasesToReview.length === 1 ? 'review to leave' : 'reviews to leave',
+      href: purchasesToReview.length === 1 ? `/orders/${purchasesToReview[0].id}` : '/mystuff?tab=purchases',
+      icon: '⭐',
+    })
+  }
+
+  // Tabs visible to non-sellers: just the buyer-side stuff. Sellers see
+  // everything.
+  const visibleTabs: { v: Tab; label: string; count: number | null }[] = [
+    ...(isSeller ? [{ v: 'selling' as Tab, label: 'Selling', count: sellingListings.length }] : []),
+    ...(isSeller ? [{ v: 'sales' as Tab, label: 'Sales', count: pendingSales.length || null }] : []),
+    { v: 'purchases', label: 'Purchases', count: purchases.length || null },
+    { v: 'offers', label: 'My Offers', count: offers.length },
+    ...(isSeller ? [{ v: 'collection' as Tab, label: 'Collection', count: collectionListings.length }] : []),
+    ...(isSeller ? [{ v: 'settings' as Tab, label: 'Settings', count: null }] : []),
+  ]
 
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-zinc-900">My Stuff</h1>
-          <p className="text-sm text-zinc-500 mt-1">Your selling, your collection, all in one place.</p>
+          <p className="text-sm text-zinc-500 mt-1">
+            {isSeller
+              ? 'Your selling, your buying, all in one place.'
+              : 'Your purchases and offers.'}
+          </p>
         </div>
-        <Link
-          href="/sell"
-          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
-        >
-          + Add a Card
-        </Link>
+        {isSeller ? (
+          <Link
+            href="/sell"
+            className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
+          >
+            + Add a Card
+          </Link>
+        ) : (
+          <Link
+            href="/seller/apply"
+            className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors"
+          >
+            Become a Seller
+          </Link>
+        )}
       </div>
 
-      {/* Stats — five tiles now that "Offers" is a thing. Five fits two
-          rows on mobile (2x2 + 1 wide) and a single row on md+. */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      {/* Action banner — surfaces the user's blockers across all tabs.
+          Specifically catches the post-review-approval case: the moment a
+          flagged order transitions out of under_review, it shows up here
+          as a sale needing shipment. */}
+      {actionItems.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-amber-700 font-semibold text-sm">Action needed</span>
+            <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-amber-200 text-amber-800 text-xs font-bold">
+              {actionItems.reduce((sum, i) => sum + i.count, 0)}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {actionItems.map((item, idx) => (
+              <Link
+                key={idx}
+                href={item.href}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white border border-amber-100 hover:border-amber-300 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xl flex-shrink-0">{item.icon}</span>
+                  <p className="text-sm text-zinc-800 min-w-0">
+                    <span className="font-semibold text-zinc-900">{item.count}</span> {item.label}
+                  </p>
+                </div>
+                <span className="text-amber-700 font-semibold text-sm whitespace-nowrap">
+                  {item.count === 1 ? 'Open →' : 'View all →'}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Stats — tile set depends on whether the user is a seller. */}
+      <div className={`grid grid-cols-2 ${isSeller ? 'md:grid-cols-5' : 'md:grid-cols-2'} gap-4 mb-8`}>
         {[
-          { label: 'Balance', value: `$${Number(profile?.balance || 0).toFixed(2)}`, onClick: () => setTab('settings') },
-          { label: 'Selling', value: sellingListings.length, onClick: () => setTab('selling') },
-          { label: 'Collection', value: collectionListings.length, onClick: () => setTab('collection') },
-          { label: 'My Offers', value: offers.length, onClick: () => setTab('offers') },
-          { label: 'Pending Orders', value: pendingOrders.length, onClick: () => setTab('orders') },
+          ...(isSeller ? [{ label: 'Balance', value: `$${Number(profile?.balance || 0).toFixed(2)}`, onClick: () => setTab('settings' as Tab) }] : []),
+          ...(isSeller ? [{ label: 'Selling', value: sellingListings.length, onClick: () => setTab('selling' as Tab) }] : []),
+          ...(isSeller ? [{ label: 'Pending Sales', value: pendingSales.length, onClick: () => setTab('sales' as Tab) }] : []),
+          { label: 'Purchases', value: purchases.length, onClick: () => setTab('purchases' as Tab) },
+          { label: 'My Offers', value: offers.length, onClick: () => setTab('offers' as Tab) },
         ].map(stat => (
           <div
             key={stat.label}
@@ -237,13 +373,7 @@ export default function MyStuffPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-zinc-200 overflow-x-auto scrollbar-hide">
-        {([
-          { v: 'selling',    label: 'Selling',    count: sellingListings.length },
-          { v: 'collection', label: 'Collection', count: collectionListings.length },
-          { v: 'offers',     label: 'My Offers',  count: offers.length },
-          { v: 'orders',     label: 'Orders',     count: pendingOrders.length || null },
-          { v: 'settings',   label: 'Settings',   count: null },
-        ] as { v: Tab; label: string; count: number | null }[]).map(t => (
+        {visibleTabs.map(t => (
           <button
             key={t.v}
             onClick={() => setTab(t.v)}
@@ -360,7 +490,7 @@ export default function MyStuffPage() {
               <h3 className="text-sm font-semibold text-zinc-900">Open offers you&apos;ve made</h3>
               <p className="text-sm text-zinc-500 mt-0.5">
                 When a seller accepts your offer, the listing moves to your{' '}
-                <button onClick={() => setTab('orders')} className="text-emerald-700 underline-offset-2 hover:underline cursor-pointer">Orders</button>{' '}
+                <button onClick={() => setTab('purchases')} className="text-emerald-700 underline-offset-2 hover:underline cursor-pointer">Purchases</button>{' '}
                 tab. Cancel any time before then.
               </p>
             </div>
@@ -375,55 +505,19 @@ export default function MyStuffPage() {
         </div>
       )}
 
-      {/* Orders tab */}
-      {tab === 'orders' && (
-        <div className="space-y-3">
-          {orders.length === 0 ? (
-            <p className="text-zinc-500 text-center py-8">No orders yet.</p>
-          ) : (
-            orders.map(order => {
-              const firstItem = order.items?.[0]
-              return (
-                <Link
-                  key={order.id}
-                  href={`/orders/${order.id}`}
-                  className="block p-4 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    {(firstItem?.snapshot_photo_url || (firstItem?.card_id && cardImages[firstItem.card_id])) ? (
-                      <Image
-                        src={firstItem?.snapshot_photo_url || (firstItem?.card_id ? cardImages[firstItem.card_id] : '')}
-                        alt={firstItem?.card_name || ''}
-                        width={64}
-                        height={89}
-                        className="w-16 h-[89px] rounded object-cover flex-shrink-0"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="w-16 h-[89px] rounded bg-zinc-100 flex-shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-zinc-900 truncate">
-                        {firstItem?.card_name || `Order #${order.id.slice(0, 8)}`}
-                      </p>
-                      <p className="text-sm text-zinc-500">
-                        Buyer: {(order.buyer as { display_name: string })?.display_name || 'Unknown'}
-                      </p>
-                      <span className={`inline-block text-xs px-2 py-0.5 rounded mt-1 font-medium ${
-                        STATUS_STYLES[order.status] || 'bg-zinc-200 text-zinc-500'
-                      }`}>
-                        {STATUS_LABELS[order.status] || order.status.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="font-bold text-lg text-zinc-900">${Number(order.total).toFixed(2)}</p>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })
-          )}
-        </div>
+      {/* Sales tab (orders where this user is the seller) */}
+      {tab === 'sales' && (
+        <OrdersGrid orders={sales} kind="sales" cardImages={cardImages} />
+      )}
+
+      {/* Purchases tab (orders where this user is the buyer) */}
+      {tab === 'purchases' && (
+        <OrdersGrid
+          orders={purchases}
+          kind="purchases"
+          cardImages={cardImages}
+          reviewedOrderIds={reviewedOrderIds}
+        />
       )}
 
       {/* Settings tab */}

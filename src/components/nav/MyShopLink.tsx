@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function MyShopLink() {
   const [pendingCount, setPendingCount] = useState(0)
+  const supabase = useMemo(() => createClient(), [])
+  const didCheck = useRef(false)
 
   useEffect(() => {
+    if (didCheck.current) return
+    didCheck.current = true
     async function check() {
-      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -22,7 +25,7 @@ export default function MyShopLink() {
       setPendingCount(count || 0)
     }
     check()
-  }, [])
+  }, [supabase])
 
   return (
     <Link href="/mystuff" className="flex items-center gap-1.5 text-white/80 hover:text-white transition-colors text-sm font-medium">

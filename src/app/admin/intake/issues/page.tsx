@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -50,7 +50,8 @@ export default function IssuesDashboard() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [resolutionData, setResolutionData] = useState<Record<string, { type: IntakeResolutionType; notes: string }>>({})
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const didInit = useRef(false)
 
   const fetchIssues = useCallback(async () => {
     const params = new URLSearchParams()
@@ -65,6 +66,11 @@ export default function IssuesDashboard() {
   }, [statusFilter, typeFilter, router])
 
   useEffect(() => {
+    // Init runs once. fetchIssues isn't in deps because it changes with
+    // filter state — re-running it here would re-do the auth check on
+    // every filter change. The separate filter effect below handles that.
+    if (didInit.current) return
+    didInit.current = true
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/sign-in'); return }
@@ -78,7 +84,8 @@ export default function IssuesDashboard() {
       setLoading(false)
     }
     init()
-  }, [supabase, router, fetchIssues])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, router])
 
   useEffect(() => {
     if (!loading) fetchIssues()

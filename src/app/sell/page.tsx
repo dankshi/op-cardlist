@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { GRADING_SCALES, PHOTO_SLOTS, type GradingCompany, type PhotoSlotKey, type PhotoSlotMap } from '@/types/database'
@@ -928,7 +928,9 @@ function SellPageContent() {
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const didAuthCheck = useRef(false)
+  const didPreload = useRef(false)
 
   // Steps: 1=Card, 2=Details, 3=Pricing, 4=Review
   const pricingStep = 3
@@ -937,6 +939,8 @@ function SellPageContent() {
 
   // Check auth
   useEffect(() => {
+    if (didAuthCheck.current) return
+    didAuthCheck.current = true
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -978,6 +982,10 @@ function SellPageContent() {
   // pre-select the slab variant and skip to Pricing (step 3) since the
   // condition is already fully specified by the offer.
   useEffect(() => {
+    // Query-param preload runs at most once. Strict-Mode would otherwise
+    // double-fire the /api/cards lookup on every mount in dev.
+    if (didPreload.current) return
+    didPreload.current = true
     const cardParam = searchParams.get('card')
     const priceParam = searchParams.get('price')
     const companyParam = searchParams.get('grading_company') as GradingCompany | null

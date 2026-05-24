@@ -6,6 +6,41 @@ When a seller ships cards to our platform, the **intake team** receives, inspect
 
 ---
 
+## Design Philosophy & Scope — Receiving Flow (Ship-to-Authenticate Model)
+
+This system implements the **Receiving Flow** under the **Ship-to-Authenticate Model**: sellers ship items to nomi, we receive and authenticate, then forward to the buyer. The flow here is deliberately simpler than the StockX-style reference spec. That reference is built for a warehouse with multiple operators, dozens of unreliable sellers per day, and physical sneaker boxes. nomi today is solo-operator volume with TCG cards, so most of the spec's exception branches don't earn their complexity.
+
+### What we ship
+
+A single happy path with one unified exception queue:
+
+- **STP (happy path):** Scan tracking → if exactly one open order matches, auto-receive and print Product QR labels for every item. One scan, done.
+- **Anything else** (no tracking match, re-used label, ambiguous match, no PON, mismatch) → drop into a triage package and resolve later from `/admin/intake` or `/admin/intake/issues`. The operator makes the call with notes + photos, instead of the system branching through 5 distinct flows.
+- **Damaged items:** captured as a checkbox + free-text note on the item, surfaced in the activity log.
+
+### What we intentionally don't build (yet)
+
+| Spec item | Why deferred | When to reconsider |
+|---|---|---|
+| Separate PON input field | One scan box is enough at our volume; tracking alone identifies the order unambiguously | When we have >1 operator at the same station or daily intake >50 packages |
+| Bypass-PON sentinel barcode | The red "No Packing Slip — Send to Triage" button covers the same case | Same as above |
+| Station ID column | We have one station | When we run >1 receiving station and need to debug printer issues per location |
+| Structured `damage_attribution` enum (`courier` / `seller_packaging` / `internal_handling`) | Free-text damage notes capture the same info without schema work | When someone actually asks "what % of damage is courier-caused?" — then backfill from notes |
+| "Previously Received" history panel on scan page | Same data lives on `/admin` orders list | When operators need to confirm receipts mid-shift without context-switching |
+
+The cost of adding these later is small (schema columns + UI). The cost of building and maintaining them now is real. We chose to defer until a concrete pain point appears.
+
+### Active scope (small changes in flight)
+
+- **Bug fix:** Scenario "PON already received" silently succeeds on a second scan. Should route to a `user_id` triage package instead. See [`PonScanStep.handlePonScan`](../src/app/admin/intake/page.tsx#L777-L808).
+- **Damage capture:** Per-item "Damaged" checkbox + notes field on the order details step. Writes to a new `order_items.damage_notes TEXT` column (no enum, no separate table).
+
+### Vocabulary we lock in now
+
+Even though we're deferring the structured implementations, the operator-facing terminology matches the eventual fuller flow so muscle memory transfers if we expand later: **PON**, **Triage**, **Damaged**, **Bypass**.
+
+---
+
 ## Order Lifecycle (Where Intake Fits)
 
 ```

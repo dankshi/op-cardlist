@@ -10,7 +10,12 @@ type DropdownItem =
   | { type: "set"; data: SetIndexEntry }
   | { type: "card"; data: SearchIndexEntry };
 
-export function SearchHero() {
+type SearchHeroProps = {
+  variant?: "hero" | "compact";
+};
+
+export function SearchHero({ variant = "hero" }: SearchHeroProps = {}) {
+  const isCompact = variant === "compact";
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,8 +140,11 @@ export function SearchHero() {
     setSelectedIndex(-1);
   }, [query, cardIndex, setIndex]);
 
-  // Global Ctrl+K / Cmd+K shortcut
+  // Global Ctrl+K / Cmd+K shortcut — only the compact (header) instance binds
+  // it, so when both a header search and a homepage hero search are mounted,
+  // the shortcut deterministically focuses the persistent header search.
   useEffect(() => {
+    if (!isCompact) return;
     const handleGlobalKeydown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
@@ -146,7 +154,7 @@ export function SearchHero() {
     };
     document.addEventListener("keydown", handleGlobalKeydown);
     return () => document.removeEventListener("keydown", handleGlobalKeydown);
-  }, [loadIndex]);
+  }, [loadIndex, isCompact]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -194,12 +202,32 @@ export function SearchHero() {
   const showDropdown =
     isOpen && (query.trim().length > 0 || isLoading);
 
+  const containerClass = isCompact
+    ? "relative w-full"
+    : "relative w-full max-w-2xl mx-auto";
+  const iconClass = isCompact
+    ? "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
+    : "absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500";
+  const inputClass = isCompact
+    ? "w-full pl-9 pr-16 py-2 text-sm bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 shadow-sm transition-all"
+    : "w-full pl-14 pr-20 py-4 text-lg bg-white border border-zinc-200 rounded-2xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 shadow-sm transition-all";
+  const kbdClass = isCompact
+    ? "absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-zinc-400 bg-zinc-100 rounded border border-zinc-200 font-mono"
+    : "absolute right-5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 bg-zinc-100 rounded border border-zinc-200 font-mono";
+  const clearClass = isCompact
+    ? "absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-900 transition-colors"
+    : "absolute right-5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-900 transition-colors";
+  const clearIconSize = isCompact ? "w-4 h-4" : "w-5 h-5";
+  const placeholder = isCompact
+    ? "Search cards, sets, traits…"
+    : "Search by name, ID, set, or trait...";
+
   return (
-    <div ref={containerRef} className="relative w-full max-w-2xl mx-auto">
+    <div ref={containerRef} className={containerClass}>
       <div className="relative">
         {/* Search icon */}
         <svg
-          className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500"
+          className={iconClass}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -215,7 +243,7 @@ export function SearchHero() {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Search by name, ID, set, or trait..."
+          placeholder={placeholder}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -226,12 +254,12 @@ export function SearchHero() {
             loadIndex();
           }}
           onKeyDown={handleKeyDown}
-          className="w-full pl-14 pr-20 py-4 text-lg bg-white border border-zinc-200 rounded-2xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 shadow-sm transition-all"
+          className={inputClass}
         />
 
         {/* Keyboard shortcut hint */}
         {!query && (
-          <kbd className="absolute right-5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 bg-zinc-100 rounded border border-zinc-200 font-mono">
+          <kbd className={kbdClass}>
             <span className="text-[10px]">Ctrl</span>
             <span>K</span>
           </kbd>
@@ -245,9 +273,9 @@ export function SearchHero() {
               setItems([]);
               inputRef.current?.focus();
             }}
-            className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-900 transition-colors"
+            className={clearClass}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className={clearIconSize} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

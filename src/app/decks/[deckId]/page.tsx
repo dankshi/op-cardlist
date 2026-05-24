@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -19,9 +19,12 @@ export default function DeckViewPage() {
   const [isOwner, setIsOwner] = useState(false)
   const params = useParams()
   const deckId = params.deckId as string
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const didLoad = useRef(false)
 
   useEffect(() => {
+    if (didLoad.current) return
+    didLoad.current = true
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
 

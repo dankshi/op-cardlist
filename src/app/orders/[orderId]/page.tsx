@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -111,66 +111,80 @@ export default function OrderDetailPage() {
   const router = useRouter()
   const params = useParams()
   const orderId = params.orderId as string
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+  const didLoad = useRef(false)
 
   useEffect(() => {
+    if (didLoad.current) return
+    didLoad.current = true
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/sign-in'); return }
       setUserId(user.id)
       setUserEmail(user.email || '')
 
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('*, buyer:profiles!orders_buyer_id_fkey(display_name, username, avatar_url), seller:profiles!orders_seller_id_fkey(display_name, username, avatar_url)')
-        .eq('id', orderId)
-        .single()
-
-      if (!orderData || (orderData.buyer_id !== user.id && orderData.seller_id !== user.id)) {
-        router.push('/orders')
-        return
-      }
-
-      const { data: items } = await supabase
-        .from('order_items')
-        .select('*')
-        .eq('order_id', orderId)
-
-      const fullOrder = { ...orderData, items: items || [] } as Order
-      setOrder(fullOrder)
-
-      // Check if seller has a shipping address set
-      if (orderData.seller_id === user.id) {
-        const { data: sellerProfile } = await supabase
+      // Order, items, review, and the seller's shipping profile are all
+      // independent — fire in parallel instead of sequentially. Cuts ~3
+      // round-trips of latency off the page-load critical path.
+      const [orderRes, itemsRes, reviewRes, sellerProfileRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('*, buyer:profiles!orders_buyer_id_fkey(display_name, username, avatar_url), seller:profiles!orders_seller_id_fkey(display_name, username, avatar_url)')
+          .eq('id', orderId)
+          .single(),
+        supabase
+          .from('order_items')
+          .select('*')
+          .eq('order_id', orderId),
+        supabase
+          .from('reviews')
+          .select('*')
+          .eq('order_id', orderId)
+          .maybeSingle(),
+        supabase
           .from('profiles')
           .select('shipping_street1, shipping_city, shipping_state, shipping_zip, shipping_email, shipping_phone')
           .eq('id', user.id)
-          .single()
+          .single(),
+      ])
+
+      const orderData = orderRes.data
+      const items = itemsRes.data
+      const reviewData = reviewRes.data
+      const sellerProfile = sellerProfileRes.data
+
+      if (!orderData || (orderData.buyer_id !== user.id && orderData.seller_id !== user.id)) {
+        router.push('/mystuff?tab=purchases')
+        return
+      }
+
+      setOrder({ ...orderData, items: items || [] } as Order)
+
+      // sellerProfile is the *current user's* profile — only relevant for
+      // the shipping-address gate when this user is the seller on the order.
+      if (orderData.seller_id === user.id) {
         const hasAddr = !!(sellerProfile?.shipping_street1 && sellerProfile?.shipping_city && sellerProfile?.shipping_state && sellerProfile?.shipping_zip && sellerProfile?.shipping_phone)
         setSellerHasAddress(hasAddr)
       }
 
-      // Fetch card images for items without snapshots
-      const cardIds = [...new Set((items || []).filter(i => !i.snapshot_photo_url).map(i => i.card_id))]
-      const imgs: Record<string, string> = {}
-      await Promise.all(
-        cardIds.map(async (cardId: string) => {
-          try {
-            const r = await fetch(`/api/cards?id=${encodeURIComponent(cardId)}`)
-            const d = await r.json()
-            if (d.card?.imageUrl) imgs[cardId] = d.card.imageUrl
-          } catch { /* skip */ }
-        })
-      )
-      setCardImages(imgs)
-
-      const { data: reviewData } = await supabase
-        .from('reviews')
-        .select('*')
-        .eq('order_id', orderId)
-        .single()
-
       if (reviewData) setReview(reviewData as Review)
+
+      // Card images come from a different system (R2 + tcgplayer); fetch
+      // after items resolve so we have the card_ids to look up.
+      const cardIds = [...new Set((items || []).filter(i => !i.snapshot_photo_url).map(i => i.card_id))]
+      if (cardIds.length > 0) {
+        try {
+          // basic=1: only need imageUrl for thumbnails; skip the price join.
+          const r = await fetch(`/api/cards?basic=1&ids=${encodeURIComponent(cardIds.join(','))}`)
+          const d = await r.json()
+          const imgs: Record<string, string> = {}
+          for (const card of d.cards || []) {
+            if (card.imageUrl) imgs[card.id] = card.imageUrl
+          }
+          setCardImages(imgs)
+        } catch { /* skip */ }
+      }
+
       setLoading(false)
     }
     load()

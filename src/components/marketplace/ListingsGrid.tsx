@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ListingCard } from './ListingCard'
 import { BidAskSpread } from './BidAskSpread'
+import { BuyNowButton } from './BuyNowButton'
+import { ConditionBadge } from './ConditionBadge'
 import type { Listing, GradingCompany } from '@/types/database'
 
 type TypeFilter = 'all' | 'raw' | 'graded'
@@ -21,11 +23,13 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [companyFilter, setCompanyFilter] = useState<GradingCompany | 'all'>('all')
+  // Public-table query; no auth-lock risk, but hoisting createClient out
+  // of the effect avoids allocating a fresh client per filter change.
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     async function fetchListings() {
       setLoading(true)
-      const supabase = createClient()
       let query = supabase
         .from('listings')
         .select('*')
@@ -47,7 +51,7 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
       setLoading(false)
     }
     fetchListings()
-  }, [cardId, typeFilter, companyFilter])
+  }, [cardId, typeFilter, companyFilter, supabase])
 
   return (
     <div>
@@ -103,11 +107,25 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
           <p className="text-sm mt-1">Be the first to list it!</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {listings.map(listing => (
-            <ListingCard key={listing.id} listing={listing} />
-          ))}
-        </div>
+        <>
+          {/* Hero: the cheapest listing is the only one the buyer can act on.
+              The rest become a passive price ladder underneath — context for
+              "is this a good deal?" without a confusing wall of Buy buttons. */}
+          <LowestListingCta listing={listings[0]} totalCount={listings.length} />
+
+          {listings.length > 1 && (
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+                Other listings
+              </p>
+              <div className="space-y-2">
+                {listings.slice(1).map(listing => (
+                  <ListingCard key={listing.id} listing={listing} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Offers — hidden when graded filter is active */}
@@ -116,6 +134,34 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
           <BidAskSpread cardId={cardId} />
         </div>
       )}
+    </div>
+  )
+}
+
+function LowestListingCta({ listing, totalCount }: { listing: Listing; totalCount: number }) {
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 p-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-orange-700">
+          Lowest price{totalCount > 1 ? ` · ${totalCount} listings` : ''}
+        </span>
+        <ConditionBadge
+          condition={listing.condition}
+          gradingCompany={listing.grading_company}
+          grade={listing.grade}
+        />
+      </div>
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-3xl font-bold text-zinc-900 tabular-nums leading-none">
+            ${Number(listing.price).toFixed(2)}
+          </p>
+          {listing.quantity_available > 1 && (
+            <p className="text-xs text-zinc-500 mt-1">{listing.quantity_available} available</p>
+          )}
+        </div>
+        <BuyNowButton listingId={listing.id} price={Number(listing.price)} size="lg" />
+      </div>
     </div>
   )
 }

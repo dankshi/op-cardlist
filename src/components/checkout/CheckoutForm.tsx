@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -29,6 +30,17 @@ interface PaymentIntentData {
   total: number
 }
 
+/** Server can also return a "not actionable" state for this listing —
+ *  either the buyer already has a non-cancelled order for it (typically
+ *  under_review), or the new order was auto-flagged at creation time and
+ *  no PaymentIntent was created. The response has no `clientSecret`. */
+interface NonActionableState {
+  orderStatus: 'under_review' | 'paid' | 'received' | 'authenticated' | string
+  orderId: string
+  listing: ListingInfo
+  reasons?: string[]
+}
+
 const stripePromise = getStripeClient()
 
 async function createPaymentIntent(listingId: string, creditsApplied: number) {
@@ -45,11 +57,20 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
   const router = useRouter()
   const supabase = createClient()
   const [data, setData] = useState<PaymentIntentData | null>(null)
+  const [nonActionable, setNonActionable] = useState<NonActionableState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [creditsLoading, setCreditsLoading] = useState(false)
+  const didInit = useRef(false)
 
   useEffect(() => {
+    // Strict Mode double-fires effects in dev; without this guard we'd
+    // POST /api/stripe/payment-intent twice, the second call would race
+    // the first's reservation, and the buyer sees a 409 even on the
+    // very first click.
+    if (didInit.current) return
+    didInit.current = true
+
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -60,6 +81,15 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
       const { ok, json } = await createPaymentIntent(listingId, 0)
       if (!ok) {
         setError(json.error || 'Failed to initialize checkout')
+        setLoading(false)
+        return
+      }
+
+      // Server returns no clientSecret when the order is already in (or
+      // was just flagged into) a non-payable state — render the status
+      // screen instead of the payment form.
+      if (!json.clientSecret && json.orderStatus) {
+        setNonActionable(json as NonActionableState)
         setLoading(false)
         return
       }
@@ -117,6 +147,10 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
     )
   }
 
+  if (nonActionable) {
+    return <NonActionableScreen state={nonActionable} />
+  }
+
   if (!data) return null
 
   // Buyer's full available credit balance for this checkout session = current available + already applied
@@ -152,6 +186,64 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
         onApplyCredits={applyCredits}
       />
     </Elements>
+  )
+}
+
+function NonActionableScreen({ state }: { state: NonActionableState }) {
+  const isUnderReview = state.orderStatus === 'under_review'
+  const isCompleted = ['paid', 'received', 'authenticated'].includes(state.orderStatus)
+  const shortId = state.orderId.slice(0, 8).toUpperCase()
+
+  const { heading, body, badgeClass, badgeLabel } = isUnderReview
+    ? {
+        heading: 'Order under review',
+        body: 'Our team is reviewing this order before payment can be collected. You\'ll get an email once it\'s approved — usually within a few hours. No action needed from you right now.',
+        badgeClass: 'bg-amber-100 text-amber-700',
+        badgeLabel: 'Pending review',
+      }
+    : isCompleted
+    ? {
+        heading: 'You already have an order for this listing',
+        body: 'Looks like you\'ve already purchased this item. You can view its status from your orders page.',
+        badgeClass: 'bg-green-100 text-green-700',
+        badgeLabel: state.orderStatus,
+      }
+    : {
+        heading: 'Order in progress',
+        body: 'You already have an active order for this listing. Check its status from your orders page.',
+        badgeClass: 'bg-zinc-100 text-zinc-700',
+        badgeLabel: state.orderStatus,
+      }
+
+  return (
+    <div className="max-w-lg mx-auto text-center py-20">
+      <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <h1 className="text-xl font-bold text-zinc-900 mb-2">{heading}</h1>
+      <p className="text-zinc-500 mb-4">{body}</p>
+      <div className="inline-flex items-center gap-2 mb-6 text-sm">
+        <span className="text-zinc-400">Order</span>
+        <span className="font-mono font-semibold text-zinc-700">#{shortId}</span>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badgeClass}`}>{badgeLabel}</span>
+      </div>
+      <div className="flex items-center justify-center gap-3">
+        <Link
+          href={`/orders/${state.orderId}`}
+          className="px-6 py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors"
+        >
+          View Order
+        </Link>
+        <Link
+          href="/"
+          className="px-6 py-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold transition-colors"
+        >
+          Back to Home
+        </Link>
+      </div>
+    </div>
   )
 }
 

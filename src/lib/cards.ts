@@ -321,11 +321,99 @@ export async function getBrowsableCards(): Promise<Card[]> {
 }
 
 export async function getCardById(cardId: string): Promise<Card | undefined> {
-  const normalized = cardId.toUpperCase();
-  const [cards, prices] = await Promise.all([fetchCardRows(), fetchPrices()]);
-  const card = cards.find(c => c.id.toUpperCase() === normalized);
-  if (!card) return undefined;
-  return mergePrice(card, prices);
+  const results = await getCardsByIds([cardId]);
+  return results[0];
+}
+
+/** Canonical card-id casing for this app: the part before the underscore
+ *  (e.g. "OP11-001") is uppercase, the variant suffix after it (e.g. "_p1",
+ *  "_r2") is lowercase. URLs come in mixed case from users typing them or
+ *  from linked routes that lower-case the slug, so we always normalize
+ *  before hitting the DB instead of relying on case-insensitive matching. */
+function normalizeCardId(id: string): string {
+  const idx = id.indexOf('_');
+  if (idx < 0) return id.toUpperCase();
+  return id.slice(0, idx).toUpperCase() + '_' + id.slice(idx + 1).toLowerCase();
+}
+
+/** Lightweight variant — returns card metadata only (no TCGplayer prices).
+ *  One round-trip instead of two, ~4x faster. Use when callers just need
+ *  `name` / `imageUrl` for tiles (e.g. the /mystuff tab grids), where
+ *  price data is unused and the extra joins are pure waste. */
+export async function getCardsByIdsBasic(cardIds: string[]): Promise<Card[]> {
+  if (!supabase || cardIds.length === 0) return [];
+  const normalized = Array.from(new Set(cardIds.map(normalizeCardId)));
+  const { data: cardRows, error } = await supabase
+    .from('cards')
+    .select('*')
+    .in('id', normalized);
+  if (error || !cardRows) {
+    if (error) console.error('getCardsByIdsBasic error:', error);
+    return [];
+  }
+  return cardRows.map(row => rowToCard(row as Record<string, unknown>));
+}
+
+/** Targeted batch lookup — cards plus their joined prices. Two round-trips
+ *  total: (cards + mappings) in parallel, then (prices + products) in
+ *  parallel. The old serial pattern (cards → mappings → prices+products)
+ *  was three round-trips. */
+export async function getCardsByIds(cardIds: string[]): Promise<Card[]> {
+  if (!supabase || cardIds.length === 0) return [];
+  const normalized = Array.from(new Set(cardIds.map(normalizeCardId)));
+
+  // Round 1: cards and mappings in parallel. Neither depends on the other.
+  const [cardRes, mappingRes] = await Promise.all([
+    supabase.from('cards').select('*').in('id', normalized),
+    supabase.from('card_tcgplayer_mapping')
+      .select('card_id, tcgplayer_product_id, tcgplayer_url, tcgplayer_name')
+      .in('card_id', normalized),
+  ]);
+
+  if (cardRes.error) {
+    console.error('getCardsByIds cards error:', cardRes.error);
+    return [];
+  }
+  const cardRows = cardRes.data;
+  if (!cardRows || cardRows.length === 0) return [];
+
+  const mappings = mappingRes.data ?? [];
+  const productIds = mappings
+    .map(m => m.tcgplayer_product_id as number | null)
+    .filter((p): p is number => p != null);
+
+  // Round 2: prices + products, keyed by product_id from the mappings.
+  const [curRes, prodRes] = productIds.length > 0
+    ? await Promise.all([
+        supabase.from('tcgplayer_current_prices')
+          .select('tcgplayer_product_id, recorded_date, market_price, lowest_price, median_price, total_listings')
+          .in('tcgplayer_product_id', productIds),
+        supabase.from('tcgplayer_products')
+          .select('product_id, last_sold_price, last_sold_date')
+          .in('product_id', productIds),
+      ])
+    : [{ data: [] as Record<string, unknown>[] }, { data: [] as Record<string, unknown>[] }];
+
+  const curByProduct = new Map<number, Record<string, unknown>>();
+  for (const c of curRes.data ?? []) curByProduct.set(c.tcgplayer_product_id as number, c);
+  const prodByProduct = new Map<number, Record<string, unknown>>();
+  for (const p of prodRes.data ?? []) prodByProduct.set(p.product_id as number, p);
+
+  const prices: Record<string, CardPrice> = {};
+  for (const m of mappings ?? []) {
+    const cardId = m.card_id as string;
+    const productId = m.tcgplayer_product_id as number | null;
+    if (productId == null) continue;
+    const cur = curByProduct.get(productId) as { market_price: number | null; lowest_price: number | null; median_price: number | null; total_listings: number | null; recorded_date: string | null } | undefined;
+    const prod = prodByProduct.get(productId) as { last_sold_price: number | null; last_sold_date: string | null } | undefined;
+    prices[cardId] = buildCardPrice(cur ?? null, prod ?? null, {
+      product_id: productId,
+      url: (m.tcgplayer_url as string) ?? null,
+      name: (m.tcgplayer_name as string) ?? null,
+    });
+  }
+
+  return cardRows.map(row => mergePrice(rowToCard(row as Record<string, unknown>), prices));
 }
 
 export async function getBaseCards(): Promise<Card[]> {
