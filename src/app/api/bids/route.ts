@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getStripe } from '@/lib/stripe'
 
 const ALLOWED_GRADERS = new Set(['PSA', 'CGC', 'BGS', 'TAG'])
 
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { card_id, price, quantity, grading_company, grade } = body
+  const { card_id, price, quantity, grading_company, grade, payment_intent_id } = body
 
   if (!card_id || !price || price <= 0) {
     return NextResponse.json({ error: 'card_id and a positive price are required' }, { status: 400 })
@@ -76,6 +77,45 @@ export async function POST(request: Request) {
     )
   }
 
+  // Pre-auth flow: when the client provides a payment_intent_id, it
+  // must point at a PaymentIntent created by /api/bids/intent for THIS
+  // user and matching THIS amount/card. Without these checks a buyer
+  // could attach someone else's intent (or an intent for a different
+  // card) and create a bid backed by a charge they didn't authorize.
+  //
+  // Legacy bids (payment_intent_id omitted) still work but can't be
+  // accepted via the new fast-capture path — Sell-into-offer falls
+  // back to the /sell?card= routing for them.
+  if (payment_intent_id) {
+    try {
+      const stripe = getStripe()
+      const intent = await stripe.paymentIntents.retrieve(payment_intent_id)
+      if (intent.metadata?.user_id !== user.id) {
+        return NextResponse.json({ error: 'Payment intent owner mismatch' }, { status: 403 })
+      }
+      if (intent.metadata?.card_id !== card_id) {
+        return NextResponse.json({ error: 'Payment intent card_id mismatch' }, { status: 400 })
+      }
+      if (intent.amount !== Math.round(price * 100)) {
+        return NextResponse.json({ error: 'Payment intent amount does not match offer price' }, { status: 400 })
+      }
+      // After client confirms via Elements, the PI lands in
+      // 'requires_capture'. Reject anything else so we never store a
+      // bid backed by an unconfirmed (or already-captured/cancelled) PI.
+      if (intent.status !== 'requires_capture') {
+        return NextResponse.json(
+          { error: `Payment intent is in state '${intent.status}' — expected 'requires_capture'` },
+          { status: 400 },
+        )
+      }
+    } catch (err) {
+      return NextResponse.json(
+        { error: `Failed to validate payment intent: ${err instanceof Error ? err.message : 'unknown'}` },
+        { status: 400 },
+      )
+    }
+  }
+
   const { data, error } = await supabase
     .from('bids')
     .insert({
@@ -86,11 +126,19 @@ export async function POST(request: Request) {
       condition_min: 'near_mint',
       grading_company: hasCompany ? grading_company : null,
       grade: hasGrade ? grade : null,
+      stripe_payment_intent_id: payment_intent_id || null,
     })
     .select()
     .single()
 
   if (error) {
+    // If the bid insert failed and we already had a PI confirmed,
+    // cancel the PI so the buyer's pre-auth releases. Otherwise they'd
+    // have a card hold with no bid backing it.
+    if (payment_intent_id) {
+      try { await getStripe().paymentIntents.cancel(payment_intent_id) }
+      catch { /* best effort — the orphan PI will expire on its own in 24h */ }
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
@@ -112,14 +160,47 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Missing bid id' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  // Read the bid first so we know whether to cancel a PaymentIntent.
+  // Scoped to the user's own bids — RLS does the same enforcement but
+  // we want the 404 vs 200 distinction visible to the client.
+  const { data: existing, error: readError } = await supabase
+    .from('bids')
+    .select('id, status, stripe_payment_intent_id')
+    .eq('id', bidId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (readError || !existing) {
+    return NextResponse.json({ error: 'Bid not found' }, { status: 404 })
+  }
+  // Don't try to cancel a bid that's already terminal — the PI would
+  // also be in a terminal state and Stripe returns a confusing 400.
+  if (existing.status !== 'active') {
+    return NextResponse.json({ success: true, alreadyTerminal: true })
+  }
+
+  // Cancel the bid row first so the user-facing state flips quickly even
+  // if Stripe is slow. PI cancellation is best-effort — if it fails the
+  // pre-auth hold drops off on its own at the 7-day mark.
+  const { error: updateError } = await supabase
     .from('bids')
     .update({ status: 'cancelled' })
     .eq('id', bidId)
     .eq('user_id', user.id)
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (updateError) {
+    return NextResponse.json({ error: updateError.message }, { status: 500 })
+  }
+
+  if (existing.stripe_payment_intent_id) {
+    try {
+      await getStripe().paymentIntents.cancel(existing.stripe_payment_intent_id)
+    } catch (err) {
+      // Log but don't surface — the bid is already cancelled in our DB
+      // and Stripe will release the hold on its own. Logging gives us a
+      // trail to investigate if a buyer reports a stuck hold.
+      console.error(`[bids DELETE] PI cancel failed for ${existing.stripe_payment_intent_id}:`, err)
+    }
   }
 
   return NextResponse.json({ success: true })

@@ -318,6 +318,12 @@ export interface Bid {
   // the pair-consistent invariant (see migration 20260539).
   grading_company: GradingCompany | null
   grade: string | null
+  // Stripe PaymentIntent (capture_method=manual) created when the buyer
+  // placed the offer — buyer's card is reserved for `price` but not yet
+  // charged. Captured on accept, cancelled on cancel/expire. NULL for
+  // legacy bids created before migration 20260544 (those fall back to
+  // the old /sell?card= sell-into-offer route).
+  stripe_payment_intent_id: string | null
   // Joined fields
   user?: Profile
 }
