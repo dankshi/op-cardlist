@@ -11,6 +11,7 @@ import { US_STATES } from '@/lib/us-states'
 
 const STATUS_STYLES: Record<string, string> = {
   pending_payment: 'bg-zinc-200 text-zinc-600',
+  under_review: 'bg-amber-500/10 text-amber-600',
   paid: 'bg-yellow-500/10 text-yellow-400',
   seller_shipped: 'bg-blue-500/10 text-blue-400',
   received: 'bg-purple-500/10 text-purple-400',
@@ -25,6 +26,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Pending Payment',
+  under_review: 'Under Review',
   paid: 'Paid — Awaiting Shipment',
   seller_shipped: 'Shipped to Platform',
   received: 'Received by Platform',
@@ -267,6 +269,26 @@ export default function OrderDetailPage() {
           {STATUS_LABELS[order.status] || order.status}
         </span>
       </div>
+
+      {/* Under-review banner — buyers see this while Stripe Radar or our
+          fraud check has flagged the order. Sellers see a different message
+          since they shouldn't ship until cleared. */}
+      {order.status === 'under_review' && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+          {isSeller ? (
+            <p className="text-amber-900">
+              <strong>This order is under review.</strong> Don&apos;t ship yet — we&apos;re verifying the
+              payment to protect you from chargebacks. You&apos;ll get an email when it&apos;s cleared
+              (usually within 24 hours).
+            </p>
+          ) : (
+            <p className="text-amber-900">
+              <strong>We&apos;re reviewing your order.</strong> This is a quick fraud check that usually
+              clears within 24 hours. No action needed — we&apos;ll email you when it&apos;s done.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Pipeline Stepper */}
       {['paid', 'seller_shipped', 'received', 'authenticated', 'shipped_to_buyer', 'delivered'].includes(order.status) && (

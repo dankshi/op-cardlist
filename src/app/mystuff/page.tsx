@@ -13,6 +13,7 @@ import { US_STATES } from '@/lib/us-states'
 type Tab = 'selling' | 'collection' | 'offers' | 'orders' | 'settings'
 
 const STATUS_STYLES: Record<string, string> = {
+  under_review: 'bg-amber-500/10 text-amber-700',
   paid: 'bg-yellow-500/10 text-yellow-600',
   seller_shipped: 'bg-blue-500/10 text-blue-600',
   received: 'bg-purple-500/10 text-purple-600',
@@ -23,6 +24,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  under_review: 'Under Review — Don’t Ship Yet',
   paid: 'Action Required',
   seller_shipped: 'Shipped to Platform',
   received: 'Received by Platform',

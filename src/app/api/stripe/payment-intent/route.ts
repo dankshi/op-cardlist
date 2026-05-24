@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { getStripe } from '@/lib/stripe'
 import { calculatePayout, type FulfillmentId, type TierId } from '@/lib/fees'
 import { reserveListing, releaseReservation } from '@/lib/inventory'
+import { evaluateOrderRisk, extractClientIp } from '@/lib/risk'
 
 // Stripe requires a minimum charge of $0.50. We leave at least $1 on the card to be safe.
 const MIN_CARD_AMOUNT = 1
@@ -246,6 +247,29 @@ export async function POST(request: Request) {
       order_id: order.id,
       description: 'Credits applied at checkout',
     })
+  }
+
+  // Marketplace-specific risk check (self-dealing, first-listing rush).
+  // These signals are invisible to Stripe Radar because they're about the
+  // buyer/seller relationship, not the payment instrument. If anything
+  // fires we flip the order to under_review immediately — Stripe Radar
+  // still evaluates the charge in parallel.
+  const risk = await evaluateOrderRisk(admin, {
+    buyerId: user.id,
+    sellerId: listing.seller_id,
+    buyerIp: extractClientIp(request),
+    listingId: listing.id,
+  })
+  if (risk.flag) {
+    await admin
+      .from('orders')
+      .update({
+        status: 'under_review',
+        auto_flagged_reasons: risk.reasons,
+        review_opened_at: new Date().toISOString(),
+        review_reason: `marketplace_risk:${risk.reasons.join(',')}`,
+      })
+      .eq('id', order.id)
   }
 
   const paymentIntent = await getStripe().paymentIntents.create({

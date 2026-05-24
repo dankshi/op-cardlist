@@ -3,11 +3,13 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import type { Order, OrderItem } from '@/types/database'
 
 const STATUS_STYLES: Record<string, string> = {
   pending_payment: 'bg-zinc-200 text-zinc-600',
+  under_review: 'bg-amber-500/10 text-amber-400',
   paid: 'bg-yellow-500/10 text-yellow-400',
   seller_shipped: 'bg-blue-500/10 text-blue-400',
   received: 'bg-purple-500/10 text-purple-400',
@@ -16,10 +18,12 @@ const STATUS_STYLES: Record<string, string> = {
   shipped: 'bg-blue-500/10 text-blue-400',
   delivered: 'bg-green-500/10 text-green-400',
   cancelled: 'bg-red-500/10 text-red-400',
+  disputed: 'bg-rose-500/10 text-rose-400',
 }
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Pending Payment',
+  under_review: 'Under Review',
   paid: 'Paid',
   seller_shipped: 'Seller Shipped',
   received: 'Received',
@@ -28,6 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
   shipped: 'Shipped (legacy)',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
+  disputed: 'Disputed',
 }
 
 const ACTIONABLE_STATUSES: Record<string, { nextStatus: string; label: string; buttonClass: string }> = {
@@ -46,8 +51,28 @@ export default function AdminPage() {
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [notesMap, setNotesMap] = useState<Record<string, string>>({})
+  const [cardImages, setCardImages] = useState<Record<string, string>>({})
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+
+  // Pull the public search index once to map card_id -> image URL for the
+  // order-item thumbnails. The same endpoint already powers the header search,
+  // so it's cache-warm and free in practice.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/search-index')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.cards) return
+        const map: Record<string, string> = {}
+        for (const c of data.cards as Array<{ id: string; imageUrl: string }>) {
+          if (c.imageUrl) map[c.id] = c.imageUrl
+        }
+        setCardImages(map)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const fetchOrders = useCallback(async () => {
     const params = new URLSearchParams()
@@ -148,7 +173,15 @@ export default function AdminPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Orders</h1>
+      <div className="flex items-baseline justify-between mb-8">
+        <h1 className="text-3xl font-bold text-zinc-900">Orders</h1>
+        <Link
+          href="/admin/risk"
+          className="text-sm font-medium text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
+        >
+          Risk Review &rarr;
+        </Link>
+      </div>
 
       {/* Status counts */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-8">
@@ -210,18 +243,39 @@ export default function AdminPage() {
                 </div>
 
                 {/* Items with intake status */}
-                <div className="text-sm text-zinc-600 mb-3">
-                  {order.items?.map(item => (
-                    <span key={item.id} className="mr-3 inline-flex items-center gap-1">
-                      <span className={`w-2 h-2 rounded-full inline-block ${
-                        (item as OrderItem).intake_status === 'verified' ? 'bg-green-500' :
-                        (item as OrderItem).intake_status === 'flagged' ? 'bg-red-500' :
-                        (item as OrderItem).intake_status === 'resolved' ? 'bg-blue-500' :
-                        'bg-zinc-300'
-                      }`} />
-                      {item.card_name} x{item.quantity}
-                    </span>
-                  ))}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {order.items?.map(item => {
+                    const status = (item as OrderItem).intake_status
+                    const dotClass =
+                      status === 'verified' ? 'bg-green-500' :
+                      status === 'flagged' ? 'bg-red-500' :
+                      status === 'resolved' ? 'bg-blue-500' :
+                      'bg-zinc-300'
+                    const imageUrl = cardImages[item.card_id]
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-md pl-1 pr-2 py-1"
+                      >
+                        {imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt=""
+                            width={28}
+                            height={40}
+                            className="w-7 h-10 object-cover rounded-sm flex-shrink-0"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="w-7 h-10 rounded-sm bg-zinc-200 flex-shrink-0" />
+                        )}
+                        <div className="flex items-center gap-1.5 text-sm text-zinc-700">
+                          <span className={`w-2 h-2 rounded-full inline-block ${dotClass}`} />
+                          <span>{item.card_name} x{item.quantity}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
                 {/* Intake progress */}
                 {(order.status === 'received' || order.status === 'seller_shipped') && order.items && order.items.length > 0 && (() => {

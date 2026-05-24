@@ -24,6 +24,8 @@ export interface Profile {
   shipping_zip: string | null
   shipping_email: string | null
   shipping_phone: string | null
+  last_login_ip: string | null
+  last_seen_at: string | null
   created_at: string
   updated_at: string
 }
@@ -47,6 +49,7 @@ export type ListingStatus = 'active' | 'sold' | 'reserved' | 'delisted'
 
 export type OrderStatus =
   | 'pending_payment'
+  | 'under_review'    // Stripe Radar or our risk checks flagged it; payouts held, seller can't ship yet
   | 'paid'
   | 'seller_shipped'
   | 'received'
@@ -57,6 +60,8 @@ export type OrderStatus =
   | 'cancelled'
   | 'refunded'
   | 'disputed'
+
+export type RiskLevel = 'normal' | 'elevated' | 'highest' | 'not_assessed'
 
 export interface Listing {
   id: string
@@ -110,6 +115,15 @@ export interface Order {
   authenticated_at: string | null
   shipped_to_buyer_at: string | null
   delivered_at: string | null
+  // Radar fraud-review fields (see supabase/migrations/20260543_radar_fraud_review.sql)
+  stripe_review_id: string | null
+  risk_score: number | null
+  risk_level: RiskLevel | null
+  review_opened_at: string | null
+  review_closed_at: string | null
+  review_reason: string | null
+  review_closed_reason: string | null
+  auto_flagged_reasons: string[]
   created_at: string
   updated_at: string
   // Joined fields
@@ -182,6 +196,8 @@ export interface OrderItem {
   intake_verified_at: string | null
   intake_verified_by: string | null
   intake_notes: string | null
+  is_damaged: boolean
+  damage_notes: string | null
   created_at: string
 }
 
