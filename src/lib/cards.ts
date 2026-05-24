@@ -199,6 +199,42 @@ const fetchSetNameLookup = cache(async (): Promise<Record<string, string>> => {
   return lookup;
 });
 
+// Active on-site listings, grouped by card_id. Powers the "X listings
+// from $Y" line under the market price on set + search tiles — shown
+// only when sellers exist so the tile stays clean for the (currently
+// majority) of cards with no inventory. Row count per listing, not per
+// unit: one seller posting "3 of this card" = 1 ask. Lowest price is
+// the cheapest active ask, the "from $Y" anchor.
+export interface ListingsSummary {
+  count: number;
+  lowestPrice: number;
+}
+
+const fetchActiveListingsSummary = cache(async (): Promise<Record<string, ListingsSummary>> => {
+  if (!supabase) return {};
+  const rows = await paginated<{ card_id: string; price: number }>((from, to) =>
+    supabase!.from('listings')
+      .select('card_id, price')
+      .eq('status', 'active')
+      .range(from, to),
+  );
+  const summary: Record<string, ListingsSummary> = {};
+  for (const r of rows) {
+    const existing = summary[r.card_id];
+    if (existing) {
+      existing.count += 1;
+      if (r.price < existing.lowestPrice) existing.lowestPrice = r.price;
+    } else {
+      summary[r.card_id] = { count: 1, lowestPrice: r.price };
+    }
+  }
+  return summary;
+});
+
+export async function getActiveListingsSummary(): Promise<Record<string, ListingsSummary>> {
+  return fetchActiveListingsSummary();
+}
+
 // --- Helpers ------------------------------------------------------------
 
 function mergePrice(card: Card, prices: Record<string, CardPrice>): Card {

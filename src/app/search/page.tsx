@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { searchCards, searchSets, getBrowsableCards } from "@/lib/cards";
+import { searchCards, searchSets, getBrowsableCards, getActiveListingsSummary } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
 
 interface PageProps {
@@ -30,9 +30,10 @@ export async function generateMetadata({
 
 export default async function SearchPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
-  const [allCards, matchedSets] = await Promise.all([
+  const [allCards, matchedSets, listingsSummary] = await Promise.all([
     getBrowsableCards(),
     q ? searchSets(q) : Promise.resolve([]),
+    getActiveListingsSummary(),
   ]);
 
   return (
@@ -75,7 +76,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <CardGrid cards={allCards} setId="search" initialSearch={q ?? ""} />
+      <CardGrid cards={allCards} setId="search" initialSearch={q ?? ""} listingsSummary={listingsSummary} />
     </div>
   );
 }

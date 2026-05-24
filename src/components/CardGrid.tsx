@@ -3,8 +3,27 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import type { Card, CardColor, Rarity } from "@/types/card";
+import type { ListingsSummary } from "@/lib/cards";
 import { CardThumbnail } from "./card/CardThumbnail";
 import { PriceRow, ViewPill } from "./card/PriceRow";
+
+function formatUSD(n: number): string {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function ListingsLine({ summary, dark = false }: { summary: ListingsSummary; dark?: boolean }) {
+  const noun = summary.count === 1 ? 'listing' : 'listings';
+  const labelColor = dark ? 'text-zinc-400' : 'text-zinc-500';
+  const priceColor = dark ? 'text-amber-300' : 'text-zinc-900';
+  return (
+    <div className="text-xs">
+      <span className={labelColor}>{summary.count} {noun} from </span>
+      <span className={`font-semibold tabular-nums ${priceColor}`}>
+        ${formatUSD(summary.lowestPrice)}
+      </span>
+    </div>
+  );
+}
 
 /** GRAIL VIEW: SPs, TRs, and manga-art alts — the chase pulls. */
 function isGrailCard(card: Card): boolean {
@@ -23,6 +42,9 @@ interface CardGridProps {
   setId: string;
   initialSearch?: string;
   priceChanges?: Record<string, number>;
+  /** card_id → { count, lowestPrice } for active on-site listings.
+   *  Missing key = no sellers (tile shows only market price). */
+  listingsSummary?: Record<string, ListingsSummary>;
 }
 
 const COLORS: CardColor[] = ["Red", "Green", "Blue", "Purple", "Black", "Yellow"];
@@ -46,7 +68,7 @@ const SORT_LABELS: Record<SortOption, string> = {
   'id-asc': 'Card number',
 };
 
-export default function CardGrid({ cards, setId, initialSearch, priceChanges }: CardGridProps) {
+export default function CardGrid({ cards, setId, initialSearch, priceChanges, listingsSummary }: CardGridProps) {
   const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
   const [selectedColors, setSelectedColors] = useState<CardColor[]>([]);
   const [selectedRarities, setSelectedRarities] = useState<Rarity[]>([]);
@@ -291,7 +313,9 @@ export default function CardGrid({ cards, setId, initialSearch, priceChanges }: 
 
           {/* Card Grid */}
           <div className={`grid gap-x-4 gap-y-6 ${grailView ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'}`}>
-            {displayCards.map((card) => (
+            {displayCards.map((card) => {
+              const summary = listingsSummary?.[card.id];
+              return (
               <Link
                 key={card.id}
                 href={`/card/${card.id.toLowerCase()}`}
@@ -311,9 +335,14 @@ export default function CardGrid({ cards, setId, initialSearch, priceChanges }: 
                       </div>
                       <div className="text-lg font-semibold tracking-tight tabular-nums text-white group-hover:text-amber-300 transition-colors mt-0.5">
                         {card.price?.marketPrice != null
-                          ? `$${card.price.marketPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          ? `$${formatUSD(card.price.marketPrice)}`
                           : '—'}
                       </div>
+                      {summary && (
+                        <div className="mt-1">
+                          <ListingsLine summary={summary} dark />
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : (
@@ -326,10 +355,16 @@ export default function CardGrid({ cards, setId, initialSearch, priceChanges }: 
                         trailing={<ViewPill />}
                       />
                     )}
+                    {summary && (
+                      <div className={card.price?.marketPrice != null ? 'mt-1' : 'mt-2'}>
+                        <ListingsLine summary={summary} />
+                      </div>
+                    )}
                   </>
                 )}
               </Link>
-            ))}
+              );
+            })}
           </div>
 
           {displayCards.length === 0 && (

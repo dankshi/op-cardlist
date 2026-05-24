@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSetBySlug, getAllSets, isHiddenCard } from "@/lib/cards";
+import { getSetBySlug, getAllSets, isHiddenCard, getActiveListingsSummary } from "@/lib/cards";
 import CardGrid from "@/components/CardGrid";
 import { calculateBatchPriceChanges } from "@/lib/price-history";
 import { SITE_URL, SITE_NAME, getSetKeywords, getSetShortName, getBreadcrumbSchema } from "@/lib/seo";
@@ -102,6 +102,7 @@ export default async function SetPage({ params }: PageProps) {
     }
   }
   const priceChanges = calculateBatchPriceChanges(currentPrices);
+  const listingsSummary = await getActiveListingsSummary();
 
   // Top 10 value for the inline header stat
   const top10Value = [...set.cards]
@@ -137,7 +138,7 @@ export default async function SetPage({ params }: PageProps) {
       </header>
 
       {/* Card Grid with Filters */}
-      <CardGrid cards={set.cards.filter(c => !isHiddenCard(c))} setId={set.id} priceChanges={priceChanges} />
+      <CardGrid cards={set.cards.filter(c => !isHiddenCard(c))} setId={set.id} priceChanges={priceChanges} listingsSummary={listingsSummary} />
 
       {/* BreadcrumbList Schema */}
       <script
