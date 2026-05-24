@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { createClient } from '@/lib/supabase/client'
@@ -56,10 +56,46 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
   // Tracks which bid the seller is in the middle of accepting so the
   // tile shows a spinner state and can't be double-clicked.
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
+  // Lowest active listing price per variant key (e.g. "raw" → 12.50,
+  // "PSA::10" → 215.00). Used to nudge buyers away from offering MORE
+  // than they could just buy the card at — almost always means they
+  // picked the wrong variant (e.g. selected Raw when they meant PSA 10).
+  const [lowestAskByVariant, setLowestAskByVariant] = useState<Record<string, number>>({})
+  const supabase = useMemo(() => createClient(), [])
+  const didLoad = useRef(false)
 
   useEffect(() => {
+    if (didLoad.current) return
+    didLoad.current = true
     async function load() {
-      const supabase = createClient()
+      // Bids endpoint doesn't need auth context — fire it in parallel with
+      // the user lookup so the slower of the two is the only thing on the
+      // critical path.
+      const bidsPromise = fetch(`/api/bids?card_id=${encodeURIComponent(cardId)}&limit=50`)
+        .then(r => r.json())
+        .catch(() => ({ bids: [] }))
+
+      // Lowest active listing price per variant — informs the "you can
+      // buy it now for $X" nudge in the offer form. Cheap query; pulls
+      // every active listing for the card and reduces in JS so we don't
+      // need a per-variant SQL function.
+      const listingsPromise = supabase
+        .from('listings')
+        .select('price, grading_company, grade')
+        .eq('card_id', cardId)
+        .eq('status', 'active')
+        .gt('quantity_available', 0)
+        .then(({ data }) => {
+          const byVariant: Record<string, number> = {}
+          for (const l of data ?? []) {
+            const key = l.grading_company && l.grade ? `${l.grading_company}::${l.grade}` : 'raw'
+            const price = Number(l.price)
+            if (!Number.isFinite(price) || price <= 0) continue
+            if (byVariant[key] == null || price < byVariant[key]) byVariant[key] = price
+          }
+          return byVariant
+        })
+
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUserId(user?.id || null)
       if (user) {
@@ -70,18 +106,30 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
           .single()
         setIsSeller(!!profile?.is_seller && !!profile?.seller_approved)
       }
-      const bidRes = await fetch(`/api/bids?card_id=${encodeURIComponent(cardId)}&limit=50`)
-      const bidData = await bidRes.json()
+      const [bidData, listingMap] = await Promise.all([bidsPromise, listingsPromise])
       setBids(bidData.bids || [])
+      setLowestAskByVariant(listingMap)
       setLoading(false)
     }
     load()
-  }, [cardId])
+  }, [cardId, supabase])
 
   const gradeOptions = useMemo(() => {
     const all = GRADING_SCALES[gradingCompany] ?? []
     return showAllGrades ? all : all.filter(isGradeEligible)
   }, [gradingCompany, showAllGrades])
+
+  // Lowest active listing for whatever variant the form is currently set
+  // to. Used both to nudge the buyer inline ("you can buy now for $X")
+  // and to gate the submit with a confirm when their offer >= the ask.
+  const currentVariantKey = offerType === 'graded' && gradingCompany && grade
+    ? `${gradingCompany}::${grade}`
+    : 'raw'
+  const currentLowestAsk = lowestAskByVariant[currentVariantKey] ?? null
+  const offerPriceNum = parseFloat(bidPrice)
+  const offerAtOrAboveAsk = Number.isFinite(offerPriceNum) && offerPriceNum > 0
+    && currentLowestAsk != null
+    && offerPriceNum >= currentLowestAsk
 
   const groupedBids = useMemo(() => {
     const groups = new Map<string, { label: string; bids: Bid[] }>()
@@ -117,6 +165,20 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
     if (!priceNum || priceNum <= 0) {
       setError('Enter a valid offer price.')
       return
+    }
+    // If they're offering at-or-above the lowest matching listing, they
+    // probably picked the wrong variant (Raw NM when they meant PSA 10
+    // is the canonical mistake). Confirm before locking up a card hold.
+    if (offerAtOrAboveAsk && currentLowestAsk != null) {
+      const variantName = offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Raw NM'
+      const ok = window.confirm(
+        `Heads up: there's already a ${variantName} listing for $${currentLowestAsk.toFixed(2)} ` +
+        `— you can buy it right now instead of placing a $${priceNum.toFixed(2)} offer.\n\n` +
+        `Most common reason buyers see this: the wrong variant was picked (Raw vs graded). ` +
+        `Double-check the variant above is the one you meant.\n\n` +
+        `Click OK to place the offer anyway, or Cancel to go back.`,
+      )
+      if (!ok) return
     }
     setSubmitting(true)
     const res = await fetch('/api/bids/intent', {
@@ -316,18 +378,42 @@ export function BidAskSpread({ cardId }: BidAskSpreadProps) {
             </>
           )}
 
-          <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={bidPrice}
-              onChange={e => setBidPrice(e.target.value)}
-              required
-              placeholder="0.00"
-              className="w-full pl-6 pr-2 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-900 text-sm focus:border-orange-300 focus:outline-none"
-            />
+          <div>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={bidPrice}
+                onChange={e => setBidPrice(e.target.value)}
+                required
+                placeholder="0.00"
+                className={`w-full pl-6 pr-2 py-2 rounded-lg bg-white border text-zinc-900 text-sm focus:outline-none transition-colors ${
+                  offerAtOrAboveAsk
+                    ? 'border-amber-400 focus:border-amber-500'
+                    : 'border-zinc-200 focus:border-orange-300'
+                }`}
+              />
+            </div>
+            {/* Lowest-ask reference: tells the buyer they could buy at $X
+                instead of bidding. Switches to a stronger amber warning
+                when their offer hits or exceeds the ask — common signal
+                they picked the wrong variant. */}
+            {currentLowestAsk != null && (
+              offerAtOrAboveAsk ? (
+                <p className="mt-1.5 text-[11px] text-amber-700 leading-snug">
+                  ⚠ A {offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Raw NM'} listing
+                  is already <strong>${currentLowestAsk.toFixed(2)}</strong>. You can{' '}
+                  <a href="#listings" className="underline hover:no-underline">buy now</a>{' '}
+                  instead — make sure you picked the right variant above.
+                </p>
+              ) : (
+                <p className="mt-1.5 text-[11px] text-zinc-400 leading-snug">
+                  Lowest active {offerType === 'graded' ? `${gradingCompany} ${grade}` : 'Raw NM'} listing: ${currentLowestAsk.toFixed(2)}
+                </p>
+              )
+            )}
           </div>
 
           {error && <p className="text-xs text-red-600">{error}</p>}
