@@ -16,6 +16,7 @@ export default function DeckViewPage() {
   const [deck, setDeck] = useState<Deck | null>(null)
   const [cards, setCards] = useState<DeckCardInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(false)
   const params = useParams()
   const deckId = params.deckId as string
@@ -26,42 +27,46 @@ export default function DeckViewPage() {
     if (didLoad.current) return
     didLoad.current = true
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
 
-      const { data: deckData } = await supabase
-        .from('decks')
-        .select('*, user:profiles(display_name, username)')
-        .eq('id', deckId)
-        .single()
-
-      if (!deckData) { setLoading(false); return }
-
-      // Only show if public or owned by current user
-      if (!deckData.is_public && deckData.user_id !== user?.id) {
-        setLoading(false)
-        return
-      }
-
-      setDeck(deckData as Deck)
-      setIsOwner(user?.id === deckData.user_id)
-
-      // Increment view count if not owner
-      if (user?.id !== deckData.user_id) {
-        await supabase
+        const { data: deckData } = await supabase
           .from('decks')
-          .update({ view_count: (deckData.view_count || 0) + 1 })
+          .select('*, user:profiles(display_name, username)')
           .eq('id', deckId)
+          .single()
+
+        if (!deckData) return
+
+        // Only show if public or owned by current user
+        if (!deckData.is_public && deckData.user_id !== user?.id) {
+          return
+        }
+
+        setDeck(deckData as Deck)
+        setIsOwner(user?.id === deckData.user_id)
+
+        // Increment view count if not owner
+        if (user?.id !== deckData.user_id) {
+          await supabase
+            .from('decks')
+            .update({ view_count: (deckData.view_count || 0) + 1 })
+            .eq('id', deckId)
+        }
+
+        // Get deck cards
+        const { data: deckCards } = await supabase
+          .from('deck_cards')
+          .select('*')
+          .eq('deck_id', deckId)
+          .order('created_at')
+
+        setCards((deckCards as DeckCardInfo[]) || [])
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load deck')
+      } finally {
+        setLoading(false)
       }
-
-      // Get deck cards
-      const { data: deckCards } = await supabase
-        .from('deck_cards')
-        .select('*')
-        .eq('deck_id', deckId)
-        .order('created_at')
-
-      setCards((deckCards as DeckCardInfo[]) || [])
-      setLoading(false)
     }
     load()
   }, [supabase, deckId])
@@ -70,6 +75,14 @@ export default function DeckViewPage() {
     return (
       <div className="py-20 text-center">
         <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="py-20 text-center text-sm text-red-600">
+        Couldn&rsquo;t load deck: {loadError}
       </div>
     )
   }

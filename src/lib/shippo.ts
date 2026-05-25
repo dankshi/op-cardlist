@@ -104,6 +104,52 @@ export async function createShippingLabel(rateId: string) {
   }
 }
 
+/** Quote outbound (Nomi → buyer) rates without creating a label. Used at
+ *  checkout to show the buyer what shipping will cost before they pay.
+ *  Mirrors {@link getShippingRates} but with the platform as the sender.
+ *  Pass `insuranceAmount` for high-value cards — USPS Ground Advantage
+ *  insures up to $5k, UPS Ground Saver goes higher. */
+export async function getOutboundRates(
+  buyerAddress: AddressCreateRequest,
+  options?: { insuranceAmount?: number },
+): Promise<ShippingRate[]> {
+  const shippo = getShippo()
+
+  const shipment = await shippo.shipments.create({
+    addressFrom: PLATFORM_ADDRESS,
+    addressTo: buyerAddress,
+    parcels: [DEFAULT_PARCEL],
+    extra: options?.insuranceAmount
+      ? {
+          insurance: {
+            amount: options.insuranceAmount.toFixed(2),
+            content: 'Trading card',
+            currency: 'USD',
+          },
+        }
+      : undefined,
+  })
+
+  const ALLOWED_SERVICES = ['usps_ground_advantage', 'ups_ground_saver']
+
+  const rates = (shipment.rates || [])
+    .filter(r => r.amount !== undefined && r.objectId)
+    .filter(r => r.servicelevel?.token && ALLOWED_SERVICES.includes(r.servicelevel.token))
+    .sort((a, b) => Number(a.amount) - Number(b.amount))
+
+  if (rates.length === 0) {
+    throw new Error('No shipping rates available for this address')
+  }
+
+  return rates.map(r => ({
+    rateId: r.objectId!,
+    carrier: r.provider || 'Unknown',
+    service: r.servicelevel?.name || r.servicelevel?.token || 'Standard',
+    estimatedCost: Number(r.amount),
+    estimatedDays: r.estimatedDays || 3,
+  }))
+}
+
 export async function createOutboundLabel(buyerAddress: AddressCreateRequest) {
   const shippo = getShippo()
 

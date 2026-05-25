@@ -10,6 +10,7 @@ export default function DecksPage() {
   const [myDecks, setMyDecks] = useState<Deck[]>([])
   const [publicDecks, setPublicDecks] = useState<Deck[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [tab, setTab] = useState<'my' | 'public'>('my')
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
@@ -19,28 +20,32 @@ export default function DecksPage() {
     if (didLoad.current) return
     didLoad.current = true
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
 
-      if (user) {
-        const { data } = await supabase
+        if (user) {
+          const { data } = await supabase
+            .from('decks')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false })
+          setMyDecks((data as Deck[]) || [])
+        } else {
+          setTab('public')
+        }
+
+        const { data: pub } = await supabase
           .from('decks')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-        setMyDecks((data as Deck[]) || [])
-      } else {
-        setTab('public')
+          .select('*, user:profiles(display_name, username)')
+          .eq('is_public', true)
+          .order('view_count', { ascending: false })
+          .limit(50)
+        setPublicDecks((pub as Deck[]) || [])
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load decks')
+      } finally {
+        setLoading(false)
       }
-
-      const { data: pub } = await supabase
-        .from('decks')
-        .select('*, user:profiles(display_name, username)')
-        .eq('is_public', true)
-        .order('view_count', { ascending: false })
-        .limit(50)
-      setPublicDecks((pub as Deck[]) || [])
-
-      setLoading(false)
     }
     load()
   }, [supabase, router])
@@ -49,6 +54,14 @@ export default function DecksPage() {
     return (
       <div className="py-20 text-center">
         <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="py-20 text-center text-sm text-red-600">
+        Couldn&rsquo;t load decks: {loadError}
       </div>
     )
   }

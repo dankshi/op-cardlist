@@ -1,8 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 type Size = 'sm' | 'lg'
 
@@ -25,32 +23,20 @@ export function BuyNowButton({
   quantity?: number
   size?: Size
 }) {
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
-
   const qtySuffix = quantity > 1 ? `&qty=${quantity}` : ''
   const checkoutHref = `/checkout?listing_id=${listingId}${qtySuffix}`
 
-  async function handleBuyNow() {
-    setLoading(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push(`/auth/sign-in?next=${encodeURIComponent(checkoutHref)}`)
-      return
-    }
-
-    router.push(checkoutHref)
-  }
-
+  // Plain Link — checkout page handles its own auth redirect (with the
+  // same `next=` round-trip we'd build here), so doing it client-side
+  // duplicates the logic and risks a hung "Processing…" if the auth
+  // call stalls on gotrue-lock contention from other components on the
+  // card page.
   return (
-    <button
-      onClick={handleBuyNow}
-      disabled={loading}
-      className={`${SIZE_CLASSES[size]} rounded-lg font-semibold transition-colors cursor-pointer bg-orange-500 hover:bg-orange-600 text-white disabled:bg-orange-700 disabled:cursor-not-allowed`}
+    <Link
+      href={checkoutHref}
+      className={`${SIZE_CLASSES[size]} rounded-lg font-semibold transition-colors cursor-pointer bg-orange-500 hover:bg-orange-600 text-white inline-flex items-center justify-center`}
     >
-      {loading ? 'Processing…' : 'Buy Now'}
-    </button>
+      Buy Now
+    </Link>
   )
 }

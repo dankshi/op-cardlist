@@ -72,16 +72,21 @@ export default function IssuesDashboard() {
     if (didInit.current) return
     didInit.current = true
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/auth/sign-in'); return }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single()
-      if (!profile?.is_admin) { router.push('/'); return }
-      await fetchIssues()
-      setLoading(false)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/auth/sign-in'); return }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
+        if (!profile?.is_admin) { router.push('/'); return }
+        await fetchIssues()
+      } catch (err) {
+        console.error('[intake issues] init failed', err)
+      } finally {
+        setLoading(false)
+      }
     }
     init()
     // eslint-disable-next-line react-hooks/exhaustive-deps

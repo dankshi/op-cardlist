@@ -30,25 +30,31 @@ export function ListingsGrid({ cardId }: { cardId: string }) {
   useEffect(() => {
     async function fetchListings() {
       setLoading(true)
-      let query = supabase
-        .from('listings')
-        .select('*')
-        .eq('card_id', cardId)
-        .eq('status', 'active')
-        .order('price', { ascending: true })
+      try {
+        let query = supabase
+          .from('listings')
+          .select('*')
+          .eq('card_id', cardId)
+          .eq('status', 'active')
+          .order('price', { ascending: true })
 
-      if (typeFilter === 'raw') {
-        query = query.is('grading_company', null)
-      } else if (typeFilter === 'graded') {
-        query = query.not('grading_company', 'is', null)
-        if (companyFilter !== 'all') {
-          query = query.eq('grading_company', companyFilter)
+        if (typeFilter === 'raw') {
+          query = query.is('grading_company', null)
+        } else if (typeFilter === 'graded') {
+          query = query.not('grading_company', 'is', null)
+          if (companyFilter !== 'all') {
+            query = query.eq('grading_company', companyFilter)
+          }
         }
-      }
 
-      const { data } = await query
-      setListings((data as Listing[]) || [])
-      setLoading(false)
+        const { data } = await query
+        setListings((data as Listing[]) || [])
+      } catch (err) {
+        console.error('[listings-grid] fetch failed', err)
+        setListings([])
+      } finally {
+        setLoading(false)
+      }
     }
     fetchListings()
   }, [cardId, typeFilter, companyFilter, supabase])

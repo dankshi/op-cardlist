@@ -9,6 +9,7 @@ import type { WantListItem } from '@/types/database'
 export default function WantsPage() {
   const [items, setItems] = useState<WantListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const didLoad = useRef(false)
@@ -17,17 +18,22 @@ export default function WantsPage() {
     if (didLoad.current) return
     didLoad.current = true
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/auth/sign-in'); return }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/auth/sign-in'); return }
 
-      const { data } = await supabase
-        .from('want_list_items')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('priority', { ascending: false })
+        const { data } = await supabase
+          .from('want_list_items')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('priority', { ascending: false })
 
-      setItems((data as WantListItem[]) || [])
-      setLoading(false)
+        setItems((data as WantListItem[]) || [])
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load want list')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [supabase, router])
@@ -41,6 +47,14 @@ export default function WantsPage() {
     return (
       <div className="py-20 text-center">
         <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="py-20 text-center text-sm text-red-600">
+        Couldn&rsquo;t load want list: {loadError}
       </div>
     )
   }

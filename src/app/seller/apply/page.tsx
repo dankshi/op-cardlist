@@ -20,18 +20,23 @@ export default function SellerApplyPage() {
     if (didLoad.current) return
     didLoad.current = true
     async function loadProfile() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/sign-in')
-        return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/auth/sign-in')
+          return
+        }
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+        setProfile(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load profile')
+      } finally {
+        setLoading(false)
       }
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-      setProfile(data)
-      setLoading(false)
     }
     loadProfile()
   }, [supabase, router])

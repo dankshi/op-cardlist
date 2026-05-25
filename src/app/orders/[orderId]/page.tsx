@@ -118,74 +118,78 @@ export default function OrderDetailPage() {
     if (didLoad.current) return
     didLoad.current = true
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/auth/sign-in'); return }
-      setUserId(user.id)
-      setUserEmail(user.email || '')
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/auth/sign-in'); return }
+        setUserId(user.id)
+        setUserEmail(user.email || '')
 
-      // Order, items, review, and the seller's shipping profile are all
-      // independent — fire in parallel instead of sequentially. Cuts ~3
-      // round-trips of latency off the page-load critical path.
-      const [orderRes, itemsRes, reviewRes, sellerProfileRes] = await Promise.all([
-        supabase
-          .from('orders')
-          .select('*, buyer:profiles!orders_buyer_id_fkey(display_name, username, avatar_url), seller:profiles!orders_seller_id_fkey(display_name, username, avatar_url)')
-          .eq('id', orderId)
-          .single(),
-        supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', orderId),
-        supabase
-          .from('reviews')
-          .select('*')
-          .eq('order_id', orderId)
-          .maybeSingle(),
-        supabase
-          .from('profiles')
-          .select('shipping_street1, shipping_city, shipping_state, shipping_zip, shipping_email, shipping_phone')
-          .eq('id', user.id)
-          .single(),
-      ])
+        // Order, items, review, and the seller's shipping profile are all
+        // independent — fire in parallel instead of sequentially. Cuts ~3
+        // round-trips of latency off the page-load critical path.
+        const [orderRes, itemsRes, reviewRes, sellerProfileRes] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('*, buyer:profiles!orders_buyer_id_fkey(display_name, username, avatar_url), seller:profiles!orders_seller_id_fkey(display_name, username, avatar_url)')
+            .eq('id', orderId)
+            .single(),
+          supabase
+            .from('order_items')
+            .select('*')
+            .eq('order_id', orderId),
+          supabase
+            .from('reviews')
+            .select('*')
+            .eq('order_id', orderId)
+            .maybeSingle(),
+          supabase
+            .from('profiles')
+            .select('shipping_street1, shipping_city, shipping_state, shipping_zip, shipping_email, shipping_phone')
+            .eq('id', user.id)
+            .single(),
+        ])
 
-      const orderData = orderRes.data
-      const items = itemsRes.data
-      const reviewData = reviewRes.data
-      const sellerProfile = sellerProfileRes.data
+        const orderData = orderRes.data
+        const items = itemsRes.data
+        const reviewData = reviewRes.data
+        const sellerProfile = sellerProfileRes.data
 
-      if (!orderData || (orderData.buyer_id !== user.id && orderData.seller_id !== user.id)) {
-        router.push('/mystuff?tab=purchases')
-        return
+        if (!orderData || (orderData.buyer_id !== user.id && orderData.seller_id !== user.id)) {
+          router.push('/mystuff?tab=purchases')
+          return
+        }
+
+        setOrder({ ...orderData, items: items || [] } as Order)
+
+        // sellerProfile is the *current user's* profile — only relevant for
+        // the shipping-address gate when this user is the seller on the order.
+        if (orderData.seller_id === user.id) {
+          const hasAddr = !!(sellerProfile?.shipping_street1 && sellerProfile?.shipping_city && sellerProfile?.shipping_state && sellerProfile?.shipping_zip && sellerProfile?.shipping_phone)
+          setSellerHasAddress(hasAddr)
+        }
+
+        if (reviewData) setReview(reviewData as Review)
+
+        // Card images come from a different system (R2 + tcgplayer); fetch
+        // after items resolve so we have the card_ids to look up.
+        const cardIds = [...new Set((items || []).filter(i => !i.snapshot_photo_url).map(i => i.card_id))]
+        if (cardIds.length > 0) {
+          try {
+            // basic=1: only need imageUrl for thumbnails; skip the price join.
+            const r = await fetch(`/api/cards?basic=1&ids=${encodeURIComponent(cardIds.join(','))}`)
+            const d = await r.json()
+            const imgs: Record<string, string> = {}
+            for (const card of d.cards || []) {
+              if (card.imageUrl) imgs[card.id] = card.imageUrl
+            }
+            setCardImages(imgs)
+          } catch { /* skip */ }
+        }
+      } catch (err) {
+        console.error('[order detail] load failed', err)
+      } finally {
+        setLoading(false)
       }
-
-      setOrder({ ...orderData, items: items || [] } as Order)
-
-      // sellerProfile is the *current user's* profile — only relevant for
-      // the shipping-address gate when this user is the seller on the order.
-      if (orderData.seller_id === user.id) {
-        const hasAddr = !!(sellerProfile?.shipping_street1 && sellerProfile?.shipping_city && sellerProfile?.shipping_state && sellerProfile?.shipping_zip && sellerProfile?.shipping_phone)
-        setSellerHasAddress(hasAddr)
-      }
-
-      if (reviewData) setReview(reviewData as Review)
-
-      // Card images come from a different system (R2 + tcgplayer); fetch
-      // after items resolve so we have the card_ids to look up.
-      const cardIds = [...new Set((items || []).filter(i => !i.snapshot_photo_url).map(i => i.card_id))]
-      if (cardIds.length > 0) {
-        try {
-          // basic=1: only need imageUrl for thumbnails; skip the price join.
-          const r = await fetch(`/api/cards?basic=1&ids=${encodeURIComponent(cardIds.join(','))}`)
-          const d = await r.json()
-          const imgs: Record<string, string> = {}
-          for (const card of d.cards || []) {
-            if (card.imageUrl) imgs[card.id] = card.imageUrl
-          }
-          setCardImages(imgs)
-        } catch { /* skip */ }
-      }
-
-      setLoading(false)
     }
     load()
   }, [supabase, router, orderId])

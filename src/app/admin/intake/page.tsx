@@ -96,16 +96,22 @@ function IntakePageContent() {
     if (didAuthCheck.current) return
     didAuthCheck.current = true
     async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/auth/sign-in'); return }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single()
-      if (!profile?.is_admin) { router.push('/'); return }
-      setLoading(false)
-      scanRef.current?.focus()
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/auth/sign-in'); return }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
+        if (!profile?.is_admin) { router.push('/'); return }
+        scanRef.current?.focus()
+      } catch (err) {
+        console.error('[intake] auth check failed', err)
+        setError(err instanceof Error ? err.message : 'Failed to load intake')
+      } finally {
+        setLoading(false)
+      }
     }
     checkAuth()
   }, [supabase, router])

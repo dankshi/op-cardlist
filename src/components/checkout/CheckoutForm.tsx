@@ -72,34 +72,47 @@ export default function CheckoutForm({ listingId, quantity = 1 }: { listingId: s
     didInit.current = true
 
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push(`/auth/sign-in?next=${encodeURIComponent(`/checkout?listing_id=${listingId}${quantity > 1 ? `&qty=${quantity}` : ''}`)}`)
-        return
-      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push(`/auth/sign-in?next=${encodeURIComponent(`/checkout?listing_id=${listingId}${quantity > 1 ? `&qty=${quantity}` : ''}`)}`)
+          // Keep loading=true so the skeleton stays up during the nav —
+          // resetting here would flash an empty form for a tick.
+          return
+        }
 
-      const { ok, json } = await createPaymentIntent(listingId, quantity, 0)
-      if (!ok) {
-        setError(json.error || 'Failed to initialize checkout')
+        const { ok, json } = await createPaymentIntent(listingId, quantity, 0)
+        if (!ok) {
+          setError(json.error || 'Failed to initialize checkout')
+          return
+        }
+
+        // Server returns no clientSecret when the order is already in (or
+        // was just flagged into) a non-payable state — render the status
+        // screen instead of the payment form.
+        if (!json.clientSecret && json.orderStatus) {
+          setNonActionable(json as NonActionableState)
+          return
+        }
+
+        setData(json)
+      } catch (err) {
+        // Without this, a network blip, aborted fetch from a cancelled
+        // client-nav, or a JSON parse error leaves `loading` stuck at
+        // true and the user sees an infinite skeleton until they
+        // refresh. Surface the message so refresh stops being the
+        // only escape hatch.
+        setError(err instanceof Error ? err.message : 'Failed to initialize checkout')
+      } finally {
+        // Only flip loading off if we didn't redirect; the auth-redirect
+        // path returns early above so this still runs there, but `data`
+        // is null and the unauth Sign-in nav will replace the page.
         setLoading(false)
-        return
       }
-
-      // Server returns no clientSecret when the order is already in (or
-      // was just flagged into) a non-payable state — render the status
-      // screen instead of the payment form.
-      if (!json.clientSecret && json.orderStatus) {
-        setNonActionable(json as NonActionableState)
-        setLoading(false)
-        return
-      }
-
-      setData(json)
-      setLoading(false)
     }
 
     init()
-  }, [listingId, router, supabase])
+  }, [listingId, quantity, router, supabase])
 
   async function applyCredits(amount: number) {
     if (!data || creditsLoading) return
@@ -184,6 +197,15 @@ export default function CheckoutForm({ listingId, quantity = 1 }: { listingId: s
         totalAvailableCredits={totalAvailableCredits}
         creditsLoading={creditsLoading}
         onApplyCredits={applyCredits}
+        onQuotedShipping={(cost) => {
+          // Mirror the new card amount locally so a credit change after
+          // shipping is quoted re-runs through the same math next time.
+          setData(prev => prev ? {
+            ...prev,
+            cardAmount: Math.max(0, prev.subtotal - prev.creditsApplied) + cost,
+            total: prev.subtotal + cost,
+          } : prev)
+        }}
       />
     </Elements>
   )
@@ -247,6 +269,13 @@ function NonActionableScreen({ state }: { state: NonActionableState }) {
   )
 }
 
+interface ShippingQuote {
+  shippingCost: number
+  carrier: string
+  service: string
+  estimatedDays: number
+}
+
 function CheckoutFormInner({
   orderId,
   listing,
@@ -256,6 +285,7 @@ function CheckoutFormInner({
   totalAvailableCredits,
   creditsLoading,
   onApplyCredits,
+  onQuotedShipping,
 }: {
   orderId: string
   listing: ListingInfo
@@ -265,6 +295,7 @@ function CheckoutFormInner({
   totalAvailableCredits: number
   creditsLoading: boolean
   onApplyCredits: (amount: number) => void
+  onQuotedShipping: (cost: number) => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -281,39 +312,83 @@ function CheckoutFormInner({
     state: '',
     zip: '',
   })
+  const [quote, setQuote] = useState<ShippingQuote | null>(null)
+  const [quoting, setQuoting] = useState(false)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+  const quoteSeq = useRef(0)
 
   function updateShipping(field: string, value: string) {
     setShipping(prev => ({ ...prev, [field]: value }))
   }
 
+  // Auto-quote outbound shipping as soon as the form has enough info for
+  // Shippo to return a rate. Debounced so we don't fire on every keystroke
+  // of the ZIP. The seq ref protects against an in-flight stale response
+  // overwriting a newer quote when the buyer edits mid-call.
+  const addressComplete =
+    shipping.name.trim().length > 0 &&
+    shipping.line1.trim().length > 0 &&
+    shipping.city.trim().length > 0 &&
+    shipping.state.length === 2 &&
+    /^[0-9]{5}$/.test(shipping.zip)
+
+  useEffect(() => {
+    if (!addressComplete) {
+      setQuote(null)
+      setQuoteError(null)
+      return
+    }
+    const seq = ++quoteSeq.current
+    setQuoting(true)
+    setQuoteError(null)
+    const handle = setTimeout(async () => {
+      const res = await fetch(`/api/orders/${orderId}/shipping`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: shipping.name,
+          line1: shipping.line1,
+          line2: shipping.line2 || undefined,
+          city: shipping.city,
+          state: shipping.state,
+          zip: shipping.zip,
+          country: 'US',
+        }),
+      })
+      const json = await res.json()
+      if (seq !== quoteSeq.current) return
+      setQuoting(false)
+      if (!res.ok) {
+        setQuote(null)
+        setQuoteError(json.error || 'Couldn\'t calculate shipping for this address.')
+        return
+      }
+      const q: ShippingQuote = {
+        shippingCost: Number(json.shippingCost),
+        carrier: json.carrier,
+        service: json.service,
+        estimatedDays: Number(json.estimatedDays),
+      }
+      setQuote(q)
+      onQuotedShipping(q.shippingCost)
+    }, 600)
+    return () => clearTimeout(handle)
+    // onQuotedShipping is referentially unstable from the parent; address
+    // fields are the real trigger so we list them explicitly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, addressComplete, shipping.name, shipping.line1, shipping.line2, shipping.city, shipping.state, shipping.zip])
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
 
     if (!stripe || !elements) return
+    if (!quote) {
+      setPaymentError('Please wait for shipping to be calculated.')
+      return
+    }
 
     setProcessing(true)
     setPaymentError(null)
-
-    const shippingRes = await fetch(`/api/orders/${orderId}/shipping`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: shipping.name,
-        line1: shipping.line1,
-        line2: shipping.line2 || undefined,
-        city: shipping.city,
-        state: shipping.state,
-        zip: shipping.zip,
-        country: 'US',
-      }),
-    })
-
-    if (!shippingRes.ok) {
-      const shippingData = await shippingRes.json()
-      setPaymentError(shippingData.error || 'Failed to save shipping address.')
-      setProcessing(false)
-      return
-    }
 
     const origin = window.location.origin
     const { error } = await stripe.confirmPayment({
@@ -366,8 +441,25 @@ function CheckoutFormInner({
               <span className="text-zinc-900">${subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">Shipping</span>
-              <span className="text-zinc-900">Free</span>
+              <span className="text-zinc-500">
+                Shipping
+                {quote && (
+                  <span className="block text-[11px] text-zinc-400 mt-0.5">
+                    {quote.carrier} {quote.service} · ~{quote.estimatedDays}d
+                  </span>
+                )}
+              </span>
+              <span className="text-zinc-900">
+                {quote ? (
+                  `$${quote.shippingCost.toFixed(2)}`
+                ) : quoting ? (
+                  <span className="text-zinc-400 italic">Calculating…</span>
+                ) : quoteError ? (
+                  <span className="text-red-500 text-xs">{quoteError}</span>
+                ) : (
+                  <span className="text-zinc-400">Enter address</span>
+                )}
+              </span>
             </div>
             {creditsApplied > 0 && (
               <div className="flex justify-between text-sm">
@@ -479,7 +571,7 @@ function CheckoutFormInner({
 
         <button
           type="submit"
-          disabled={!stripe || processing || creditsLoading}
+          disabled={!stripe || processing || creditsLoading || quoting || !quote}
           className="w-full px-6 py-4 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed text-white font-bold text-lg transition-colors cursor-pointer"
         >
           {processing ? (
@@ -490,6 +582,10 @@ function CheckoutFormInner({
               </svg>
               Processing...
             </span>
+          ) : quoting ? (
+            'Calculating shipping…'
+          ) : !quote ? (
+            'Enter address to continue'
           ) : (
             `Pay $${cardAmount.toFixed(2)}`
           )}
