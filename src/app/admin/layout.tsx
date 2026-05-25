@@ -5,6 +5,12 @@ import { usePathname } from 'next/navigation'
 
 const NAV_SECTIONS: { heading: string; items: { href: string; label: string }[] }[] = [
   {
+    heading: 'Overview',
+    items: [
+      { href: '/admin', label: 'Dashboard' },
+    ],
+  },
+  {
     heading: 'Fulfillment',
     items: [
       // Ordered to mirror the order lifecycle: receive → authenticate
@@ -49,7 +55,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </p>
               <nav className="space-y-0.5">
                 {section.items.map(item => {
-                  const active = pathname === item.href || pathname.startsWith(item.href + '/')
+                  // Dashboard is /admin exactly — without this guard it
+                  // would match every nested admin route (since
+                  // '/admin/orders'.startsWith('/admin/') is true).
+                  const active = item.href === '/admin'
+                    ? pathname === '/admin'
+                    : pathname === item.href || pathname.startsWith(item.href + '/')
                   return (
                     <Link
                       key={item.href}
