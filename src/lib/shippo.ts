@@ -150,6 +150,12 @@ export async function getOutboundRates(
   }))
 }
 
+/** Generate a paid outbound (Nomi → buyer) label. `buyerAddress` must
+ *  include `email` and `phone` — USPS rejects the label without
+ *  recipient contact info (the error reads "Seller info missing
+ *  email or phone" which is misleading; it's the recipient/sender
+ *  whichever is incomplete). Callers should pre-fill these from the
+ *  buyer's auth account email + the phone captured at checkout. */
 export async function createOutboundLabel(buyerAddress: AddressCreateRequest) {
   const shippo = getShippo()
 

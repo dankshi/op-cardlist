@@ -311,6 +311,7 @@ function CheckoutFormInner({
     city: '',
     state: '',
     zip: '',
+    phone: '',
   })
   const [quote, setQuote] = useState<ShippingQuote | null>(null)
   const [quoting, setQuoting] = useState(false)
@@ -324,13 +325,17 @@ function CheckoutFormInner({
   // Auto-quote outbound shipping as soon as the form has enough info for
   // Shippo to return a rate. Debounced so we don't fire on every keystroke
   // of the ZIP. The seq ref protects against an in-flight stale response
-  // overwriting a newer quote when the buyer edits mid-call.
+  // overwriting a newer quote when the buyer edits mid-call. Phone is
+  // required (USPS rejects labels without recipient phone) but we accept
+  // 10+ digits in any format the buyer types — strip-and-validate on send.
+  const phoneDigits = shipping.phone.replace(/\D/g, '')
   const addressComplete =
     shipping.name.trim().length > 0 &&
     shipping.line1.trim().length > 0 &&
     shipping.city.trim().length > 0 &&
     shipping.state.length === 2 &&
-    /^[0-9]{5}$/.test(shipping.zip)
+    /^[0-9]{5}$/.test(shipping.zip) &&
+    phoneDigits.length >= 10
 
   useEffect(() => {
     if (!addressComplete) {
@@ -353,6 +358,7 @@ function CheckoutFormInner({
           state: shipping.state,
           zip: shipping.zip,
           country: 'US',
+          phone: phoneDigits,
         }),
       })
       const json = await res.json()
@@ -376,7 +382,7 @@ function CheckoutFormInner({
     // onQuotedShipping is referentially unstable from the parent; address
     // fields are the real trigger so we list them explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId, addressComplete, shipping.name, shipping.line1, shipping.line2, shipping.city, shipping.state, shipping.zip])
+  }, [orderId, addressComplete, shipping.name, shipping.line1, shipping.line2, shipping.city, shipping.state, shipping.zip, phoneDigits])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -542,6 +548,18 @@ function CheckoutFormInner({
                 className="w-full px-4 py-3 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
               />
             </div>
+            {/* Phone — required for USPS to generate the outbound
+                label. Carrier uses it for delivery exception SMS;
+                we never display it back to the seller. */}
+            <input
+              name="phone"
+              type="tel"
+              required
+              placeholder="Phone (for delivery updates)"
+              value={shipping.phone}
+              onChange={e => updateShipping('phone', e.target.value)}
+              className="w-full px-4 py-3 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+            />
             <p className="text-xs text-zinc-400">US shipping only</p>
           </div>
         </div>

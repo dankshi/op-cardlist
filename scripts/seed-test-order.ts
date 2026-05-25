@@ -133,6 +133,8 @@ async function seed() {
         state: 'CA',
         zip: '90001',
         country: 'US',
+        // USPS rejects outbound label generation without recipient phone.
+        phone: '5555550199',
       },
     })
     .select()

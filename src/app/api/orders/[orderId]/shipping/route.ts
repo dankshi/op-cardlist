@@ -37,7 +37,7 @@ export async function PUT(
 
   const body = await request.json()
 
-  if (!body.name || !body.line1 || !body.city || !body.state || !body.zip) {
+  if (!body.name || !body.line1 || !body.city || !body.state || !body.zip || !body.phone) {
     return NextResponse.json({ error: 'Missing required address fields' }, { status: 400 })
   }
 
@@ -49,6 +49,10 @@ export async function PUT(
     state: String(body.state),
     zip: String(body.zip),
     country: body.country ? String(body.country) : 'US',
+    // USPS requires a recipient phone for the outbound label. Capture
+    // it at checkout so admin doesn't have to chase the buyer at ship
+    // time. Stored inside the JSONB blob to avoid a column migration.
+    phone: String(body.phone),
   }
 
   // Quote outbound (Nomi → buyer) shipping live so the buyer's total
