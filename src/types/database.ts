@@ -53,6 +53,7 @@ export type OrderStatus =
   | 'paid'
   | 'seller_shipped'
   | 'received'
+  | 'exception_review' // authenticator flagged one or more items; resolution pending
   | 'authenticated'
   | 'shipped_to_buyer'
   | 'shipped'        // legacy — kept for old orders

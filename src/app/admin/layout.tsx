@@ -7,9 +7,13 @@ const NAV_SECTIONS: { heading: string; items: { href: string; label: string }[] 
   {
     heading: 'Fulfillment',
     items: [
-      { href: '/admin', label: 'Orders' },
+      // Ordered to mirror the order lifecycle: receive → authenticate
+      // → resolve issues / risk. Reading the nav top-to-bottom should
+      // walk you through a package's journey.
+      { href: '/admin/orders', label: 'Orders' },
       { href: '/admin/intake', label: 'Intake' },
       { href: '/admin/intake/issues', label: 'Issues' },
+      { href: '/admin/risk', label: 'Risk Review' },
     ],
   },
   {
@@ -38,10 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </p>
               <nav className="space-y-0.5">
                 {section.items.map(item => {
-                  const active =
-                    item.href === '/admin'
-                      ? pathname === '/admin'
-                      : pathname === item.href || pathname.startsWith(item.href + '/')
+                  const active = pathname === item.href || pathname.startsWith(item.href + '/')
                   return (
                     <Link
                       key={item.href}
