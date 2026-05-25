@@ -190,6 +190,101 @@ If we ever cross 500 packages/day, revisit.
 
 ---
 
+## Hardware + setup
+
+### Printer
+
+We use a **Zebra thermal label printer** (direct thermal — no ink, no toner; the label paper is heat-reactive). The code in `src/lib/zebra.ts` talks to the printer via **Zebra BrowserPrint**, a free agent app that runs on the workstation and exposes a JSON API on `http://localhost:9100`. Our browser pages POST raw ZPL command strings to that endpoint; the agent forwards to the USB-connected printer.
+
+**Why BrowserPrint and not a print driver:**
+- No driver install per machine
+- No "system print dialog" interruption — labels go straight to the printer
+- Same code path on Mac and Windows
+- Lets us send raw ZPL (Zebra's native language) instead of converting to PDF first
+
+**Recommended printer models (any will work, in price order):**
+
+| Model | Price | Notes |
+|---|---|---|
+| Zebra ZD220 / ZD230 | ~$200 | Budget desktop. Fine for QR stickers. |
+| Zebra ZD421 | ~$400 | Better build, faster, USB + Ethernet. Can handle both QR and shipping labels with a roll swap. |
+| Zebra ZD620 | ~$600 | Adds Bluetooth + Wi-Fi if you don't want it tethered to a workstation. |
+
+**Two printers, not one (recommended for production):**
+QR labels and shipping labels are different sizes (2"×1" vs 4"×6"). You *can* swap rolls on one printer, but it's slow and error-prone at volume. Most marketplaces use **two printers**: one always loaded with QR stock for intake, one always loaded with 4"×6" stock for shipping. The BrowserPrint agent supports multiple devices simultaneously — we currently call `getDefaultPrinter()` which picks the one marked default. A small follow-up (`printerHint: 'qr' | 'shipping'`) routes each label to the right machine when both are connected.
+
+### Scanner
+
+Any **USB barcode scanner that reads 2D codes** (QR, DataMatrix). They act as keyboard-emulation devices — plug in via USB, no drivers, no setup. When triggered, the scanner "types" the decoded contents followed by Enter into whatever input is focused.
+
+Our screens (`/admin/intake`, `/admin/authenticate`, `/admin/pack`) all auto-focus the scan input on mount. So the operator's loop is just: pick up next package → squeeze scanner → screen reacts.
+
+**Recommended scanner models:**
+
+| Model | Price | Notes |
+|---|---|---|
+| Generic USB QR scanner (Amazon) | $20–40 | Fine for indoor sticker-density QR. Wired only. |
+| Tera Pro 5100 | ~$50 | Wireless dongle, popular indie-warehouse pick. |
+| Honeywell Voyager 1450g | ~$150 | Wired, rugged, what big warehouses run. |
+
+### One-time setup (per workstation)
+
+1. Install **Zebra BrowserPrint**: https://www.zebra.com/us/en/support-downloads/printer-software/by-request-software.html — download the agent installer for your OS, run it, accept defaults.
+2. Plug the Zebra printer in via USB. The BrowserPrint settings UI (a tray icon menu) lets you set the default device.
+3. Load a roll of 2"×1" direct-thermal labels (for QR) — most rolls come pre-loaded for the printer's spindle.
+4. Plug the USB scanner in — no install. Trigger it at any text field to confirm it types.
+5. Open the admin app in Chrome or Edge. The Pack/Intake/Authenticate pages show a green "Printer ready" pill when the agent + printer are reachable.
+
+### Ongoing management
+
+- **Printer offline:** the pill flips to amber "Printer offline" and labels fall back to PDF preview. Most common causes: agent not running (relaunch from tray), USB unplugged, paper jam.
+- **Wrong size labels loaded:** ZPL is layout-relative — printing a 2"×1" template on a 4"×6" roll just leaves blank space. Templates are defined in `print-label/route.ts` (intake) and Shippo (outbound).
+- **Multiple workstations:** every workstation needs its own BrowserPrint agent + USB printer. The agent is per-machine; no networked configuration.
+
+---
+
+## How to test the pack flow end-to-end
+
+These steps validate the full loop on a real dev machine. Read these before you have hardware connected — most steps work without hardware (the ship still succeeds, just no physical print).
+
+### Without hardware (dev / desk testing)
+
+1. **Get an order to `authenticated` status.** Easiest: take any existing order and walk it through:
+   - `/admin/intake` to receive (need it in `seller_shipped` to start)
+   - `/admin/authenticate/[orderId]` to mark items Authentic + Near Mint → Finalize
+2. **Grab the order_item ID** for any item — from `/admin/orders/[orderId]` URL or by inspecting the database. It's a UUID.
+3. **Open `/admin/pack`** — scan input is auto-focused.
+4. **Paste the order_item UUID into the scan input and press Enter.** The lookup fires, the preview card appears with buyer name, items, address, shipping cost. The scanned item gets an orange ring.
+5. **Click "Generate + Print Label" (or press Enter).** Shippo generates the label, order flips to `shipped_to_buyer`, you see the green "Shipped ✓" confirmation. Since there's no Zebra agent on your dev machine, you'll see "label generated but auto-print failed" with an "Open label PDF" link — click to verify the PDF rendered correctly.
+6. **Confirm the database side:** the order should now have `tracking_number`, `tracking_carrier`, `outbound_label_url`, `outbound_label_cost`, and `shipped_to_buyer_at`. An `intake_activity_log` row with `action='packed_out'` should exist.
+7. **Confirm the buyer email fired:** check the Resend dashboard or the buyer's inbox.
+
+### With hardware (real-warehouse testing)
+
+Same as above, but with the BrowserPrint agent installed and a Zebra printer plugged in:
+
+1. **Print Product QR stickers for the items** — use the new "Print Labels" link on `/admin/orders/[orderId]` to re-print stickers any time. (Or run through the intake flow which prints them automatically when receiving the package.)
+2. **Stick the QR labels on the cards.**
+3. **Open `/admin/pack`** — confirm the "Printer ready" pill is green.
+4. **Squeeze the scanner at a sticker.** The QR contents type into the input, the lookup fires automatically (Enter is appended by the scanner).
+5. **Confirm the preview shows the right buyer + items.**
+6. **Click "Generate + Print Label" or press Enter.** The shipping label should print directly to your Zebra. The green "Shipped ✓" should appear, then auto-reset after ~2.5 seconds to ready for the next scan.
+
+### Edge cases worth verifying
+
+| Scenario | Setup | Expected |
+|---|---|---|
+| Already-shipped order | Re-scan a sticker for an order you just packed | Blue "Already shipped" card with reprint-label link |
+| Order in `exception_review` | Walk one through auth flagging a Fake or Wrong Card | Amber card with "Open authentication" link |
+| Order in `received` (not yet authenticated) | Pack-scan a freshly-received order | Amber card with "Open authentication" link |
+| Missing phone | Set `orders.shipping_address.phone` to NULL via SQL for a test order | Amber card with "Open order" fixup link |
+| Invalid QR | Type "not-a-uuid" into the input | Red "QR scan unreadable" message |
+| Triage QR | Stick a triage label by mistake | Red "This is a triage label, not a product" |
+| Cancelled order | Cancel an authenticated order via SQL, then pack-scan | Gray "Order is cancelled" card |
+| Concurrent ship | Open two browser tabs, scan the same sticker, click Ship in both | First wins; second gets red "Another admin shipped this order seconds ago" |
+
+---
+
 ## Decisions locked (2026-05-25)
 
 - **Pack queue counter in header — yes.** "12 orders ready to pack" lives in the screen header so ambient throughput awareness is always visible. Doesn't clutter the central single-purpose action because it's chrome, not content.
