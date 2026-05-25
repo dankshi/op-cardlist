@@ -23,9 +23,9 @@ Activity types:
 - **Purchase** — spent at checkout
 - **Refund** — credits returned (e.g. from a cancelled checkout)
 - **Adjustment** — manual admin tweak or platform corrections
-- **Cash out** — withdrawal (coming soon)
+- **Cash out** — withdrawal to a connected bank account
 
-The "Cash out to bank" panel exists but is disabled. Ships when the bank-link integration lands.
+The "Cash out to bank" panel walks users through Stripe Connect Express onboarding the first time they use it. See [wallet-cashout.md](./wallet-cashout.md) for the full cashout flow.
 
 ---
 
@@ -109,8 +109,12 @@ The seller's payout is always `subtotal − $5 − 9.5%`, regardless of how the 
 
 ---
 
+## Cash out to bank
+
+Available now via Stripe Connect Express. $10 minimum; standard ACH free (1-3 days) or instant ($1 fee). First-time cashouts require ~3 minutes of Stripe onboarding (bank account + KYC); after that, two clicks. Full details: [wallet-cashout.md](./wallet-cashout.md).
+
 ## What's next (not built yet)
 
-- **Cash out to bank** — Stripe Financial Connections + Connect Express.
 - **100% credit checkout** — skip Stripe entirely when the buyer pays the full amount in credits.
 - **Scheduled cleanup** — auto-refund credits on truly-abandoned orders (currently only refunded when the buyer next opens checkout for that listing).
+- **Auto-cashout** — "withdraw automatically whenever I hit $X" schedule.

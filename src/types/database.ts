@@ -106,6 +106,8 @@ export interface Order {
   seller_tracking_carrier: string | null
   seller_label_url: string | null
   seller_label_cost: number | null
+  outbound_label_url: string | null
+  outbound_label_cost: number | null
   admin_notes: string | null
   buyer_notes: string | null
   seller_notes: string | null
@@ -180,6 +182,25 @@ export interface CreditTransaction {
   description: string | null
   metadata: Record<string, unknown>
   created_at: string
+}
+
+export type PayoutMethod = 'standard' | 'instant'
+export type CashoutStatus = 'pending' | 'paid' | 'failed' | 'cancelled'
+
+export interface Cashout {
+  id: string
+  user_id: string
+  amount: number
+  fee: number
+  total_debited: number
+  method: PayoutMethod
+  status: CashoutStatus
+  stripe_transfer_id: string | null
+  stripe_payout_id: string | null
+  failure_reason: string | null
+  credit_transaction_id: string | null
+  requested_at: string
+  completed_at: string | null
 }
 
 export interface OrderItem {

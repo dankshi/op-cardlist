@@ -322,6 +322,113 @@ export async function POST(request: Request) {
         .eq('id', orderId)
       break
     }
+
+    case 'account.updated': {
+      // Connected-account state changed (Express onboarding completed, a
+      // capability flipped, payouts paused, etc.). Mirror payouts_enabled +
+      // details_submitted into profiles so /wallet doesn't have to roundtrip
+      // to Stripe on every page load. Pre-this handler the
+      // stripe_onboarding_complete flag was never written by any code path.
+      const account = event.data.object as Stripe.Account
+      await supabase
+        .from('profiles')
+        .update({
+          stripe_onboarding_complete:
+            !!(account.details_submitted && account.payouts_enabled),
+        })
+        .eq('stripe_account_id', account.id)
+      break
+    }
+
+    case 'payout.paid': {
+      // Funds left the Stripe balance and hit the bank.
+      //   - Instant payouts: we stored stripe_payout_id on the cashout row
+      //     directly at create time, so this is a one-row update.
+      //   - Standard payouts: Stripe batches multiple transfers into one
+      //     daily payout; the payout has no inherent link back to the
+      //     individual cashout. As a pragmatic v1, mark any pending
+      //     standard cashouts for this connected account as paid when its
+      //     daily payout lands. Misattribution is bounded — the user
+      //     either gets paid (correct outcome) or the cashout sits pending
+      //     until the next payout (visible to admin via the cashouts table).
+      const payout = event.data.object as Stripe.Payout
+
+      // Instant path
+      const { data: instantMatch } = await supabase
+        .from('cashouts')
+        .select('id, status')
+        .eq('stripe_payout_id', payout.id)
+        .maybeSingle()
+      if (instantMatch && instantMatch.status === 'pending') {
+        await supabase
+          .from('cashouts')
+          .update({ status: 'paid', completed_at: new Date().toISOString() })
+          .eq('id', instantMatch.id)
+        break
+      }
+
+      // Standard path: requires the connected account context. Stripe
+      // delivers account-scoped events with `account` on the envelope.
+      const connectedAccountId = (event as Stripe.Event & { account?: string }).account
+      if (!connectedAccountId) break
+
+      const { data: profileRow } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('stripe_account_id', connectedAccountId)
+        .maybeSingle()
+      if (!profileRow) break
+
+      await supabase
+        .from('cashouts')
+        .update({ status: 'paid', completed_at: new Date().toISOString() })
+        .eq('user_id', profileRow.id)
+        .eq('status', 'pending')
+        .eq('method', 'standard')
+      break
+    }
+
+    case 'payout.failed': {
+      // Funds didn't reach the bank (bad routing number, account closed,
+      // etc.). Stripe puts the money back in the connected account's
+      // balance. From the user's perspective we need to credit the wallet
+      // back and mark the cashout failed so they can retry.
+      const payout = event.data.object as Stripe.Payout
+
+      const { data: cashout } = await supabase
+        .from('cashouts')
+        .select('id, user_id, total_debited, status')
+        .eq('stripe_payout_id', payout.id)
+        .maybeSingle()
+
+      if (!cashout || cashout.status !== 'pending') break
+
+      const reason = payout.failure_message ?? 'payout failed'
+
+      await supabase
+        .from('cashouts')
+        .update({
+          status: 'failed',
+          failure_reason: reason,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', cashout.id)
+
+      // Restore the wallet balance race-safely via the increment_balance RPC.
+      await supabase.rpc('increment_balance', {
+        p_user_id: cashout.user_id,
+        p_amount: cashout.total_debited,
+      })
+
+      await supabase.from('credit_transactions').insert({
+        user_id: cashout.user_id,
+        amount: cashout.total_debited,
+        type: 'refund_credit',
+        description: `Cashout failed: ${reason}`,
+        metadata: { cashout_id: cashout.id },
+      })
+      break
+    }
   }
 
   return NextResponse.json({ received: true })
