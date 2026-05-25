@@ -204,6 +204,10 @@ export interface Cashout {
   completed_at: string | null
 }
 
+export type AuthDecision = 'pending' | 'authentic' | 'fake'
+export type AuthCondition = 'near_mint' | 'exception'
+export type ExceptionType = 'incorrect_product' | 'fake' | 'conditional' | 'physical_damage'
+
 export interface OrderItem {
   id: string
   order_id: string
@@ -220,6 +224,13 @@ export interface OrderItem {
   intake_notes: string | null
   is_damaged: boolean
   damage_notes: string | null
+  // Auth flow Phase 2 — migration 20260603_authentication_flow.sql.
+  auth_decision: AuthDecision
+  auth_condition: AuthCondition | null
+  exception_types: ExceptionType[]
+  exception_details: Record<string, unknown>
+  auth_decided_at: string | null
+  auth_decided_by: string | null
   created_at: string
 }
 

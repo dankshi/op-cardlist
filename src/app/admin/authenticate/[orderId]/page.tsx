@@ -47,12 +47,9 @@ interface ItemState {
   exceptions: ExceptionEntry[]
 }
 
-interface OrderItemExt extends OrderItem {
-  auth_decision?: string | null
-  auth_condition?: string | null
-  exception_types?: string[] | null
-  exception_details?: Record<string, unknown> | null
-}
+// Alias for clarity — the auth-flow columns are now native on OrderItem
+// (added in types/database.ts when migration 20260603 landed).
+type OrderItemExt = OrderItem
 
 interface OrderExt {
   id: string

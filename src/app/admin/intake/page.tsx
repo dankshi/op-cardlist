@@ -1148,7 +1148,7 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, onReset, sho
           )}
           <button
             onClick={() => setFlagModal({
-              item: { id: '', order_id: order.id, card_name: '', listing_id: '', card_id: '', quantity: 0, unit_price: 0, condition: 'near_mint', snapshot_photo_url: null, intake_status: 'pending', intake_verified_at: null, intake_verified_by: null, intake_notes: null, is_damaged: false, damage_notes: null, created_at: '' },
+              item: { id: '', order_id: order.id, card_name: '', listing_id: '', card_id: '', quantity: 0, unit_price: 0, condition: 'near_mint', snapshot_photo_url: null, intake_status: 'pending', intake_verified_at: null, intake_verified_by: null, intake_notes: null, is_damaged: false, damage_notes: null, auth_decision: 'pending', auth_condition: null, exception_types: [], exception_details: {}, auth_decided_at: null, auth_decided_by: null, created_at: '' },
               orderId: order.id,
             })}
             className="px-4 py-2 bg-red-100 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-200 cursor-pointer"

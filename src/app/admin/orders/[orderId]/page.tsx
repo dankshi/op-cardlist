@@ -400,23 +400,28 @@ export default function AdminOrderDetailPage() {
           calls finalize-auth to set the order's next status. The
           inline "Mark Authenticated" button used to bypass the
           per-item flow and routinely failed the verify-gate. */}
-      {(order.status === 'received' || order.status === 'exception_review') && (
+      {order.status === 'received' && (
         <div className="bg-white border border-zinc-200 rounded-lg p-4 mb-6">
           <p className="text-xs uppercase tracking-wide text-zinc-400 font-medium mb-3">
-            {order.status === 'received' ? 'Next Step' : 'Resolution'}
+            Next Step
           </p>
           <p className="text-sm text-zinc-600 mb-3">
-            {order.status === 'received'
-              ? 'Open the authentication workspace to decide each item (Authentic / Fake → Near Mint / Exception) and finalize.'
-              : 'This order has at least one flagged item. Reopen the authentication workspace to update decisions and re-finalize.'}
+            Open the authentication workspace to decide each item (Authentic / Fake → Near Mint / Exception) and finalize.
           </p>
           <Link
             href={`/admin/authenticate/${order.id}`}
             className="block text-center w-full px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition-colors"
           >
-            {order.status === 'received' ? 'Start Authentication →' : 'Reopen Authentication →'}
+            Start Authentication →
           </Link>
         </div>
+      )}
+
+      {order.status === 'exception_review' && (
+        <ExceptionResolutionPanel
+          order={order}
+          onResolved={() => refetch()}
+        />
       )}
 
       {/* Status transition controls — for non-auth transitions
@@ -575,6 +580,260 @@ function PipelineStepper({ currentStatus }: { currentStatus: string }) {
           <span className="text-amber-700 font-medium">Branched to Exception Review</span>
           <span className="text-zinc-400">— resolve from the authentication workspace</span>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ExceptionResolutionPanel — Phase 5 of the auth flow.
+//
+// Renders only when status='exception_review'. Surfaces every flagged
+// item with the right per-disposition input (consignment relist price,
+// carrier claim ID, fake confirmation) and a single button to commit
+// the resolution: refund buyer to wallet, mark order cancelled, fire
+// the buyer refund email. Calls POST /api/admin/orders/[id]/resolve-exception.
+// ─────────────────────────────────────────────────────────────────
+
+function ExceptionResolutionPanel({
+  order,
+  onResolved,
+}: {
+  order: Order
+  onResolved: () => void
+}) {
+  const items = (order.items || []).filter(
+    i => (i.exception_types && i.exception_types.length > 0) || i.auth_decision === 'fake',
+  )
+  const [consignmentPrices, setConsignmentPrices] = useState<Record<string, string>>({})
+  const [claimIds, setClaimIds] = useState<Record<string, string>>({})
+  const [notes, setNotes] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const refundAmount = Number(order.total || 0)
+
+  async function submit() {
+    if (!confirm(
+      `Refund $${refundAmount.toFixed(2)} to the buyer's wallet and cancel this order? This can't be undone.`,
+    )) return
+
+    setSubmitting(true)
+    setError(null)
+    try {
+      // Convert string inputs to numeric prices; drop empties.
+      const priceMap: Record<string, number> = {}
+      for (const [k, v] of Object.entries(consignmentPrices)) {
+        const n = Number.parseFloat(v)
+        if (Number.isFinite(n) && n >= 0) priceMap[k] = n
+      }
+      const claimMap: Record<string, string> = {}
+      for (const [k, v] of Object.entries(claimIds)) {
+        if (v.trim()) claimMap[k] = v.trim()
+      }
+
+      const res = await fetch(`/api/admin/orders/${order.id}/resolve-exception`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          consignment_prices: priceMap,
+          carrier_claim_ids: claimMap,
+          notes: notes.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to resolve')
+        return
+      }
+      onResolved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="bg-white border-2 border-amber-300 rounded-lg overflow-hidden mb-6">
+      <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
+        <p className="text-xs uppercase tracking-wide font-bold text-amber-800">
+          Exception resolution
+        </p>
+        <p className="text-sm text-amber-900 mt-0.5">
+          Set per-item dispositions below, then refund the buyer to close out the order.
+        </p>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {items.length === 0 ? (
+          <p className="text-sm text-zinc-500">
+            No flagged items found. The order may have reached exception_review by an older flow.
+          </p>
+        ) : (
+          items.map(item => (
+            <ResolutionItemRow
+              key={item.id}
+              item={item}
+              consignmentPrice={consignmentPrices[item.id] ?? ''}
+              claimId={claimIds[item.id] ?? ''}
+              onConsignmentPriceChange={v => setConsignmentPrices(p => ({ ...p, [item.id]: v }))}
+              onClaimIdChange={v => setClaimIds(p => ({ ...p, [item.id]: v }))}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="px-4 pb-4">
+        <label className="block text-xs uppercase tracking-wide text-zinc-400 font-medium mb-1.5">
+          Resolution notes (optional)
+        </label>
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Any additional context — appended to admin notes."
+          rows={2}
+          className="w-full px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+        />
+      </div>
+
+      {error && (
+        <div className="mx-4 mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="px-4 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between gap-3">
+        <div className="text-sm text-zinc-600">
+          Buyer refund:{' '}
+          <span className="font-bold text-zinc-900 tabular-nums">${refundAmount.toFixed(2)}</span>{' '}
+          <span className="text-zinc-400">to wallet</span>
+        </div>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={submitting || items.length === 0}
+          className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors disabled:bg-emerald-300 disabled:cursor-not-allowed"
+        >
+          {submitting ? 'Resolving…' : 'Refund + Cancel Order'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** One row in the resolution panel — renders the right input for the
+ *  item's exception types. Fake items just need acknowledgment (the
+ *  disposition was chosen at authentication time and is read-only
+ *  here). Consigned items take a price. Courier-damage items take a
+ *  carrier claim reference. Multi-exception items render multiple
+ *  inputs stacked. */
+function ResolutionItemRow({
+  item,
+  consignmentPrice,
+  claimId,
+  onConsignmentPriceChange,
+  onClaimIdChange,
+}: {
+  item: OrderItem
+  consignmentPrice: string
+  claimId: string
+  onConsignmentPriceChange: (v: string) => void
+  onClaimIdChange: (v: string) => void
+}) {
+  const exTypes = item.exception_types || []
+  const exDetails = (item.exception_details || {}) as Record<string, unknown>
+  const isFake = item.auth_decision === 'fake'
+
+  // The disposition type drives which input(s) to render. We
+  // compute the set so multi-exception items (e.g. Wrong Card +
+  // Conditional) render one shared consignment-price input.
+  const consigned = exTypes.some(t => {
+    if (t === 'incorrect_product' || t === 'conditional') return true
+    if (t === 'physical_damage') {
+      const d = exDetails[t] as { attribution?: string } | undefined
+      return d?.attribution === 'seller'
+    }
+    return false
+  })
+  const courierDamage = exTypes.includes('physical_damage') && (
+    (exDetails['physical_damage'] as { attribution?: string } | undefined)?.attribution === 'courier'
+  )
+  const nomiDamage = exTypes.includes('physical_damage') && (
+    (exDetails['physical_damage'] as { attribution?: string } | undefined)?.attribution === 'nomi'
+  )
+
+  return (
+    <div className="border border-zinc-200 rounded-lg p-3">
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <span className="font-medium text-zinc-900">{item.card_name || item.card_id}</span>
+        {isFake && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-800">
+            Fake — {(exDetails['fake'] as { disposition?: string } | undefined)?.disposition === 'return_to_seller' ? 'return' : 'destroy'}
+          </span>
+        )}
+        {exTypes.map(t => (
+          <span
+            key={t}
+            className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800"
+          >
+            {t.replace('_', ' ')}
+          </span>
+        ))}
+      </div>
+
+      {consigned && (
+        <div className="mb-2">
+          <label className="block text-xs text-zinc-500 font-medium mb-1">
+            Consignment relist price
+          </label>
+          <div className="flex items-center">
+            <span className="px-3 py-1.5 rounded-l-lg bg-zinc-100 text-zinc-500 text-sm border border-r-0 border-zinc-200">$</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={consignmentPrice}
+              onChange={e => onConsignmentPriceChange(e.target.value)}
+              placeholder="0.00"
+              className="flex-1 px-3 py-1.5 rounded-r-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+          </div>
+          <p className="text-[11px] text-zinc-400 mt-1">
+            Optional — leaves the consigned item ready for ops to list. Can be set later.
+          </p>
+        </div>
+      )}
+
+      {courierDamage && (
+        <div className="mb-2">
+          <label className="block text-xs text-zinc-500 font-medium mb-1">
+            Carrier claim ID
+          </label>
+          <input
+            type="text"
+            value={claimId}
+            onChange={e => onClaimIdChange(e.target.value)}
+            placeholder="e.g. Shippo claim ref or USPS case #"
+            className="w-full px-3 py-1.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+          />
+          <p className="text-[11px] text-zinc-400 mt-1">
+            Optional — files the claim against the existing buyout row. Seller is already credited.
+          </p>
+        </div>
+      )}
+
+      {nomiDamage && (
+        <p className="text-xs text-zinc-500">
+          Seller has already been bought out at the sale price. No further action needed beyond cancelling the order.
+        </p>
+      )}
+
+      {isFake && (
+        <p className="text-xs text-zinc-500">
+          {(exDetails['fake'] as { disposition?: string } | undefined)?.disposition === 'return_to_seller'
+            ? 'Ship the card back to the seller and record tracking on their notification.'
+            : 'Confirm the card has been destroyed (photo certification recommended).'}
+        </p>
       )}
     </div>
   )
