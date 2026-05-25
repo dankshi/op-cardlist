@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { gradingStyle } from "@/lib/gradingStyle";
 
 export interface EnrichedOffer {
   id: string;
@@ -36,10 +37,6 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-function variantLabel(o: Pick<EnrichedOffer, 'grading_company' | 'grade'>): string {
-  if (!o.grading_company || !o.grade) return 'Raw NM';
-  return `${o.grading_company} ${o.grade}`;
-}
 
 /** Buyer-side discovery surface: a horizontal carousel of the highest
  *  active offers across the marketplace. Mirrors ListingCarousel's
@@ -135,13 +132,23 @@ export function OfferCarousel({
         >
           {offers.map((offer) => {
             const isGraded = !!offer.grading_company;
+            // Mirror the variant-pill treatment used in MarketTabs /
+            // ConditionBadge so the same slab tier looks the same here.
+            // Ungraded NM falls back to the neutral white-on-light chip.
+            const style = isGraded
+              ? gradingStyle(offer.grading_company, offer.grade)
+              : null;
             return (
               <Link
                 key={offer.id}
                 href={`/card/${offer.card_id.toLowerCase()}`}
-                className="w-[160px] sm:w-[180px] flex-shrink-0 group/card"
+                className="w-[180px] sm:w-[200px] flex-shrink-0 group/card"
                 style={{ scrollSnapAlign: "start" }}
               >
+                {/* Bare card image — no overlays. The slab is already
+                    visually busy; stacking a pill on top of it competes
+                    with the art and reads as cramped. Variant info goes
+                    below where it has room to breathe. */}
                 <div className="relative aspect-[2.5/3.5] rounded-lg overflow-hidden bg-zinc-100 border border-zinc-200">
                   <Image
                     src={offer.cardImageUrl}
@@ -150,26 +157,30 @@ export function OfferCarousel({
                     className="object-cover"
                     unoptimized
                   />
-                  {/* Variant pill — green for graded slabs so they stand
-                      out vs the more-common raw NM offers. */}
-                  <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
-                    isGraded
-                      ? 'bg-emerald-500/95 text-white'
-                      : 'bg-white/95 text-zinc-700 ring-1 ring-zinc-200'
+                </div>
+                {/* Variant pill — its own row below the card so the
+                    grade tier is the first thing the eye lands on after
+                    the art, before the price. */}
+                <div className="mt-3">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded ring-1 text-[10px] font-bold uppercase tracking-wider ${
+                    style ? style.pill : 'bg-zinc-100 text-zinc-700 ring-zinc-200'
                   }`}>
-                    {variantLabel(offer)}
+                    {style ? style.shortLabel : 'Ungraded NM'}
                   </span>
                 </div>
                 <div className="mt-2">
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-emerald-700 font-semibold">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 font-semibold">
                     Top offer
                   </div>
-                  <div className="text-lg font-semibold tabular-nums text-emerald-600 mt-0.5">
+                  <div className="text-xl font-bold tabular-nums text-zinc-900 mt-0.5">
                     ${Number(offer.price).toFixed(2)}
                   </div>
-                  <div className="text-[11px] text-zinc-400 mt-0.5">
+                  <div className="text-[11px] text-zinc-400 mt-1">
                     {timeAgo(offer.createdAt)}
                   </div>
+                  <span className="mt-2.5 inline-flex w-full items-center justify-center px-3 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider bg-emerald-600 text-white group-hover/card:bg-emerald-700 transition-colors">
+                    Sell now
+                  </span>
                 </div>
                 <span className="sr-only">{offer.cardName}</span>
               </Link>

@@ -24,6 +24,24 @@ interface Props {
    *  stack duplicates — each represents a distinct physical card, so
    *  adding another can be legitimate, but we want them to think about it. */
   existingOwnListings?: Array<{ id: string; price: number }>
+  /** Fired after a successful POST /api/listings with the new listing
+   *  row. Lets the parent push it into local state so the Listings tab
+   *  + chip row reflect it without a page reload. */
+  onListed?: (listing: ListedListing) => void
+}
+
+/** Subset of the listing row returned by POST /api/listings that the
+ *  parent needs to optimistically render the new ask. Keeps the modal
+ *  decoupled from the full DB type. */
+export interface ListedListing {
+  id: string
+  price: number
+  condition: string
+  quantity: number
+  quantity_available: number
+  grading_company: string | null
+  grade: string | null
+  created_at: string
 }
 
 /** Quick-list modal — minimum-friction path for a seller who already
@@ -41,17 +59,33 @@ export function ListModal({
   topOfferPrice,
   marketPrice,
   existingOwnListings,
+  onListed,
 }: Props) {
   const router = useRouter()
   const [price, setPrice] = useState('')
+  const [quantity, setQuantity] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Post-placement confirmation. Holds the freshly-listed row so the
+  // success view can show price + qty + variant without a re-fetch.
+  // Cleared on each open so a stale success doesn't bleed into a new
+  // listing session.
+  const [placedListing, setPlacedListing] = useState<ListedListing | null>(null)
+  useEffect(() => { if (open) setPlacedListing(null) }, [open])
+  // Graded slabs are by definition unique physical cards — qty is always
+  // 1, no input shown. Ungraded raw can have multiple at the same price
+  // (e.g. seller opened 4 of the same playset card).
+  const isGraded = company != null && grade != null
+  const maxQty = isGraded ? 1 : 20
 
   // Pre-fill with a sensible default: ~10% above top offer, falling
-  // back to market price + 5%, falling back to blank.
+  // back to market price + 5%, falling back to blank. Reset qty too —
+  // a stale "4" from the last open would be a footgun when listing a
+  // new variant where the user actually only has 1.
   useEffect(() => {
     if (!open) return
     setError(null)
+    setQuantity(1)
     if (topOfferPrice != null && topOfferPrice > 0) {
       setPrice((topOfferPrice * 1.1).toFixed(2))
     } else if (marketPrice != null && marketPrice > 0) {
@@ -114,7 +148,7 @@ export function ListModal({
         title,
         price: priceNum,
         condition: 'near_mint',
-        quantity: 1,
+        quantity,
         language: 'EN',
         is_first_edition: false,
         photo_urls: [],
@@ -128,11 +162,22 @@ export function ListModal({
       setError(body.error || 'Failed to list. You may need to complete seller setup.')
       return
     }
-    onClose()
-    // Soft-refresh so the new listing appears in the chip row + Listings
-    // tab. Could swap for router.refresh() once we move to React state-
-    // sync, but reload is the bullet-proof shortcut today.
-    if (typeof window !== 'undefined') window.location.reload()
+    // Switch to success state + push the new listing up so the parent
+    // can append to its asksState. No page reload — the modal stays
+    // open with a confirmation; user closes when ready.
+    const created = await res.json().catch(() => null)
+    const placed: ListedListing = {
+      id: created?.id ?? '',
+      price: priceNum,
+      condition: created?.condition ?? 'near_mint',
+      quantity: created?.quantity ?? quantity,
+      quantity_available: created?.quantity_available ?? quantity,
+      grading_company: company,
+      grade,
+      created_at: created?.created_at ?? new Date().toISOString(),
+    }
+    setPlacedListing(placed)
+    onListed?.(placed)
   }
 
   if (!open) return null
@@ -150,7 +195,7 @@ export function ListModal({
       >
         <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-3 border-b border-zinc-100">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-zinc-900">List your card</h2>
+            <h2 className="text-lg font-bold text-zinc-900">{placedListing ? 'Listed' : 'List your card'}</h2>
             <div className="flex items-center gap-2 mt-1">
               {style ? (
                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ring-1 ${style.pill}`}>
@@ -175,6 +220,18 @@ export function ListModal({
             </svg>
           </button>
         </div>
+
+        {placedListing ? (
+          <ListingPlacedSuccess
+            placed={placedListing}
+            cardName={cardName}
+            company={company}
+            grade={grade}
+            onClose={onClose}
+            onListAnother={() => setPlacedListing(null)}
+          />
+        ) : (
+        <>
 
         <div className="px-6 py-5 space-y-4">
           {/* Existing-listings warning. We don't block adding another
@@ -225,12 +282,52 @@ export function ListModal({
             </div>
           )}
 
+          {/* Quantity stepper (ungraded only — slabs are 1-of-1 by
+              definition). Lets a seller list "4 of the same raw card at
+              this price" without making four separate listings. */}
+          {!isGraded && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                How many do you have?
+              </label>
+              <div className="inline-flex items-stretch rounded-lg ring-2 ring-zinc-300 overflow-hidden text-base font-bold text-zinc-900 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  disabled={quantity <= 1 || submitting}
+                  aria-label="Decrease quantity"
+                  className="px-3 hover:bg-zinc-100 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  −
+                </button>
+                <span className="px-4 py-2.5 min-w-[3rem] text-center tabular-nums border-x border-zinc-200">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity(q => Math.min(maxQty, q + 1))}
+                  disabled={quantity >= maxQty || submitting}
+                  aria-label="Increase quantity"
+                  className="px-3 hover:bg-zinc-100 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  +
+                </button>
+              </div>
+              {quantity > 1 && (
+                <p className="text-[11px] text-zinc-500 mt-1.5 leading-snug">
+                  All {quantity} ship together to Nomi. Buyers can purchase any
+                  number from this listing in one checkout.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Price input + percentage-bump chips. Percentages scale the
               anchor (top offer > market > nothing), so the same chips
               are useful on a $5 raw card and a $25k slab. */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
-              Your asking price
+              {quantity > 1 ? 'Asking price (per card)' : 'Your asking price'}
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-2xl font-bold text-zinc-400">$</span>
@@ -287,10 +384,111 @@ export function ListModal({
             disabled={submitting || !validPrice || belowFloor}
             className="px-5 py-2.5 rounded-lg text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Listing…' : validPrice ? `List for $${priceNum.toFixed(2)}` : 'List'}
+            {submitting
+              ? 'Listing…'
+              : validPrice
+                ? quantity > 1
+                  ? `List ${quantity} at $${priceNum.toFixed(2)} each`
+                  : `List for $${priceNum.toFixed(2)}`
+                : 'List'}
           </button>
         </div>
+        </>
+        )}
       </div>
     </div>
   )
 }
+
+/** Post-placement confirmation. Replaces the jarring "modal closes +
+ *  page reloads" handoff with a clear "Listed." moment so the seller
+ *  knows the submit actually went through. */
+function ListingPlacedSuccess({
+  placed,
+  cardName,
+  company,
+  grade,
+  onClose,
+  onListAnother,
+}: {
+  placed: ListedListing
+  cardName: string
+  company: string | null
+  grade: string | null
+  onClose: () => void
+  onListAnother: () => void
+}) {
+  const style = company && grade ? gradingStyle(company, grade) : null
+  const total = placed.price * placed.quantity
+  return (
+    <div>
+      <div className="px-6 py-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+            <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold text-zinc-900 mb-0.5">Your listing is live.</p>
+            <p className="text-sm text-zinc-500 truncate">{cardName}</p>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-zinc-50 ring-1 ring-zinc-100 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">
+                {placed.quantity > 1 ? `${placed.quantity} listed at` : 'Listed for'}
+              </p>
+              <p className="text-3xl font-bold tabular-nums text-zinc-900">${placed.price.toFixed(2)}</p>
+              {placed.quantity > 1 && (
+                <p className="text-xs text-zinc-500 mt-1 tabular-nums">
+                  ${total.toFixed(2)} total if all sell
+                </p>
+              )}
+            </div>
+            {style ? (
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ring-1 ${style.pill}`}>
+                {style.shortLabel}
+              </span>
+            ) : (
+              <span className="inline-block px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300">
+                Ungraded NM
+              </span>
+            )}
+          </div>
+        </div>
+
+        <ul className="text-xs text-zinc-500 space-y-1.5 leading-relaxed">
+          <li className="flex gap-2">
+            <span className="text-emerald-500 font-bold flex-shrink-0">✓</span>
+            <span>Visible in the Listings tab right away. Buyers can purchase once you ship the card to Nomi for verification.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-emerald-500 font-bold flex-shrink-0">✓</span>
+            <span>Edit price or add photos from your <strong className="text-zinc-700">Selling</strong> tab in My Stuff.</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-2xl">
+        <button
+          type="button"
+          onClick={onListAnother}
+          className="px-4 py-2 rounded-lg text-sm font-semibold text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+        >
+          List another
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-5 py-2.5 rounded-lg text-sm font-bold bg-zinc-900 hover:bg-zinc-800 text-white transition-colors cursor-pointer"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  )
+}
+

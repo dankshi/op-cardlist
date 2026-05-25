@@ -6,6 +6,7 @@ import { MarketTabs } from './MarketTabs'
 import { OfferModal } from './OfferModal'
 import { AcceptOfferModal } from './AcceptOfferModal'
 import { ListModal } from './ListModal'
+import { createClient } from '@/lib/supabase/client'
 import type { CardCondition } from '@/types/database'
 
 interface AskInput {
@@ -72,6 +73,15 @@ export function CardMainPanel({
    *  tag the buyer's own offers in the Offers tab. */
   currentUserId: string | null
 }) {
+  // Local mirror of server-passed bids + listings so inline mutations
+  // (cancel / quick-action update / new placements) reflect in the UI
+  // instantly without a page reload. Initialized once from props; we
+  // don't re-sync on prop changes because props only change on a server-
+  // driven navigation, at which point the local copy is correctly thrown
+  // away with the component.
+  const [bidsState, setBidsState] = useState<BidInput[]>(bids)
+  const [asksState, setAsksState] = useState<AskInput[]>(asks)
+  const supabase = useMemo(() => createClient(), [])
   // Initial selection mirrors what CardBuyPanel would have picked: the
   // cheapest variant with a listing, fall back to Raw. We compute it here
   // so the inline drawer's filter starts in sync.
@@ -111,8 +121,8 @@ export function CardMainPanel({
   const isRaw = selectedKey === 'raw'
 
   const filteredAsks = useMemo(
-    () => asks.filter(a => matchVariant(a.grading_company, a.grade, filter)),
-    [asks, filter],
+    () => asksState.filter(a => matchVariant(a.grading_company, a.grade, filter)),
+    [asksState, filter],
   )
   // Lowest ask for the selected variant. We hide any offers priced at or
   // above this — they're nonsensical (a buyer should just buy the
@@ -123,10 +133,10 @@ export function CardMainPanel({
     [filteredAsks],
   )
   const filteredBids = useMemo(
-    () => bids
+    () => bidsState
       .filter(b => matchVariant(b.grading_company, b.grade, filter))
       .filter(b => lowestAsk == null || b.price < lowestAsk),
-    [bids, filter, lowestAsk],
+    [bidsState, filter, lowestAsk],
   )
   const filteredSales = useMemo(
     () => sales.filter(s => matchVariant(s.company, s.grade, filter)),
@@ -190,6 +200,23 @@ export function CardMainPanel({
         initialCompany={filter?.company ?? null}
         initialGrade={filter?.grade ?? null}
         existingOffer={existingOwnOffer ? { id: existingOwnOffer.id, price: existingOwnOffer.price } : null}
+        lowestAskPrice={lowestAsk}
+        topOfferPrice={topOffer?.price ?? null}
+        marketPrice={isRaw ? marketPrice : null}
+        onPlaced={(bid) => {
+          // Optimistically append the new bid so it shows up in the
+          // market drawer's Offers tab + flows into the buy-panel
+          // top-offer pill without waiting for a page reload.
+          setBidsState(prev => [{
+            id: bid.id,
+            price: Number(bid.price),
+            grading_company: bid.grading_company,
+            grade: bid.grade,
+            created_at: bid.created_at,
+            buyerName: 'You',
+            userId: bid.user_id,
+          }, ...prev])
+        }}
       />
 
       {topOffer && (
@@ -213,6 +240,25 @@ export function CardMainPanel({
         topOfferPrice={topOffer?.price ?? null}
         marketPrice={marketPrice}
         existingOwnListings={existingOwnListings.map(l => ({ id: l.id, price: l.price }))}
+        onListed={(placed) => {
+          // Optimistic append so the new listing shows up in the
+          // Listings tab and (if it's the new lowest) the chip-row
+          // price + Buy panel without a reload.
+          setAsksState(prev => {
+            const next: AskInput = {
+              id: placed.id,
+              price: placed.price,
+              condition: placed.condition as AskInput['condition'],
+              grading_company: placed.grading_company,
+              grade: placed.grade,
+              quantity_available: placed.quantity_available,
+              created_at: placed.created_at,
+              sellerName: 'You',
+              sellerId: currentUserId ?? '',
+            }
+            return [...prev, next].sort((a, b) => a.price - b.price)
+          })
+        }}
       />
 
       <div id="market" className="mt-4">
@@ -239,7 +285,10 @@ export function CardMainPanel({
         {open && (
           <div className="mt-3">
             <MarketTabs
-              asks={filteredAsks}
+              asks={filteredAsks.map(a => ({
+                ...a,
+                isYou: currentUserId != null && a.sellerId === currentUserId,
+              }))}
               bids={filteredBids.map(b => ({
                 id: b.id,
                 price: b.price,
@@ -254,17 +303,37 @@ export function CardMainPanel({
               bidsVariantFilter={{ company: filter?.company ?? null, grade: filter?.grade ?? null }}
               modeBias={mode}
               onCancelOffer={async (bidId: string) => {
+                // Optimistic remove — the row disappears from the table
+                // immediately. On failure we restore + alert.
+                const snapshot = bidsState
+                setBidsState(prev => prev.filter(b => b.id !== bidId))
                 const res = await fetch(`/api/bids?id=${bidId}`, { method: 'DELETE' })
                 if (!res.ok) {
+                  setBidsState(snapshot)
                   alert('Failed to cancel offer.')
-                  return
                 }
-                // Soft-refresh: a full page reload is the simplest way to
-                // re-fetch server data without a client-side store. The
-                // buy panel + market drawer both update from server props.
-                if (typeof window !== 'undefined') window.location.reload()
+              }}
+              onCancelListing={async (listingId) => {
+                // Optimistic remove from asks. Soft-delete (status='delisted')
+                // via direct supabase write — listings RLS lets the owner
+                // do this. Hard DELETE would fail if the listing has any
+                // order history; delist is the universally-safe verb.
+                const snapshot = asksState
+                setAsksState(prev => prev.filter(a => a.id !== listingId))
+                const { error } = await supabase
+                  .from('listings')
+                  .update({ status: 'delisted' })
+                  .eq('id', listingId)
+                if (error) {
+                  setAsksState(snapshot)
+                  alert('Failed to cancel listing.')
+                }
               }}
               onUpdateOffer={async (bidId, newPrice) => {
+                // Optimistic price update — row reorders instantly. On
+                // failure we restore the previous state + alert.
+                const snapshot = bidsState
+                setBidsState(prev => prev.map(b => b.id === bidId ? { ...b, price: newPrice } : b))
                 const res = await fetch(`/api/bids/${bidId}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
@@ -272,10 +341,9 @@ export function CardMainPanel({
                 })
                 if (!res.ok) {
                   const body = await res.json().catch(() => ({}))
+                  setBidsState(snapshot)
                   alert(body.error || 'Failed to update offer.')
-                  return
                 }
-                if (typeof window !== 'undefined') window.location.reload()
               }}
               lowestAskPrice={lowestAsk}
               topOfferPrice={topOffer?.price ?? null}

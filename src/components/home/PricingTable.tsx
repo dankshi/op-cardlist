@@ -143,7 +143,7 @@ export function PricingTable() {
                 {method.sellerFee === 0 ? 'Free' : `$${method.sellerFee.toFixed(2)}`}
               </span>
               <span className="text-xs text-zinc-500">
-                seller fee per card
+                platform fee per card
               </span>
             </div>
             <div className="mt-3 pt-3 border-t border-zinc-100 text-xs text-zinc-500">

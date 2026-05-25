@@ -147,7 +147,7 @@ export function PayoutCalculator() {
                     >
                       <div className="text-sm font-semibold leading-tight">{f.name}</div>
                       <div className={`text-[11px] mt-0.5 ${selected ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                        {f.sellerFee === 0 ? 'No seller fee' : `${formatUSD(f.sellerFee, 0)} seller fee`}
+                        {f.sellerFee === 0 ? 'No platform fee' : `${formatUSD(f.sellerFee, 0)} platform fee`}
                       </div>
                     </button>
                   );
@@ -196,7 +196,7 @@ export function PayoutCalculator() {
                 <dd className="text-zinc-900 tabular-nums">{formatUSD(result.salePrice)}</dd>
               </div>
               <div className="flex items-center justify-between">
-                <dt className="text-zinc-500">Seller fee</dt>
+                <dt className="text-zinc-500">Platform fee</dt>
                 <dd className={`tabular-nums ${result.sellerFee > 0 ? 'text-rose-600' : 'text-zinc-400'}`}>
                   {result.sellerFee > 0 ? `−${formatUSD(result.sellerFee)}` : 'Free'}
                 </dd>

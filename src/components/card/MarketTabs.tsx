@@ -14,6 +14,10 @@ interface AskRow {
   quantity_available: number
   created_at: string
   sellerName: string
+  /** Set when this listing belongs to the currently-logged-in user.
+   *  Drives the "Your listing" badge + faint row tint, matching the
+   *  Offers tab's treatment of own offers. */
+  isYou?: boolean
 }
 interface BidRow {
   id: string
@@ -45,6 +49,7 @@ export function MarketTabs({
   cardId,
   bidsVariantFilter,
   onCancelOffer,
+  onCancelListing,
   onUpdateOffer,
   lowestAskPrice,
   topOfferPrice,
@@ -59,6 +64,9 @@ export function MarketTabs({
    *  CardMainPanel before the rows hit the table. */
   bidsVariantFilter?: { company: string | null; grade: string | null }
   onCancelOffer?: (bidId: string) => Promise<void> | void
+  /** Delist (status='delisted') the caller's own listing in the Listings
+   *  tab. Parent does the supabase write + optimistic state mutation. */
+  onCancelListing?: (listingId: string) => Promise<void> | void
   /** Quick-action update of an own offer's price. PATCH-style. */
   onUpdateOffer?: (bidId: string, newPrice: number) => Promise<void> | void
   /** Used to compute quick-action targets: "Match top" = topOffer + $1,
@@ -135,7 +143,7 @@ export function MarketTabs({
         ))}
       </div>
 
-      {tab === 'asks' && <AsksTable rows={asks} cardId={cardId} />}
+      {tab === 'asks' && <AsksTable rows={asks} cardId={cardId} onCancel={onCancelListing} />}
       {tab === 'bids' && (
         <BidsTable
           rows={bids}
@@ -150,7 +158,16 @@ export function MarketTabs({
   )
 }
 
-function AsksTable({ rows, cardId }: { rows: AskRow[]; cardId: string }) {
+function AsksTable({
+  rows,
+  cardId,
+  onCancel,
+}: {
+  rows: AskRow[]
+  cardId: string
+  onCancel?: (listingId: string) => Promise<void> | void
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null)
   if (rows.length === 0) {
     return (
       <div className="p-8 text-center text-zinc-500">
@@ -171,20 +188,63 @@ function AsksTable({ rows, cardId }: { rows: AskRow[]; cardId: string }) {
           marketplace, and quantity is always 1 for graded slabs. Only the
           lowest is buyable — the higher rows exist as context. */}
       <Header cols={['Price', 'Condition']} layout="asks" />
-      {rows.map((row) => (
-        <div
-          key={row.id}
-          className="grid grid-cols-[1fr_2fr] items-center gap-3 px-4 py-3 border-b border-zinc-100 last:border-b-0"
-        >
-          <span className="text-base font-bold tabular-nums text-zinc-900">${row.price.toFixed(2)}</span>
-          {/* justify-self-start prevents the inline-flex span from being
-              stretched to fill its grid cell (default grid-item alignment
-              is stretch, which made the pill span the entire column). */}
-          <div className="justify-self-start">
-            <ConditionBadge condition={row.condition} gradingCompany={row.grading_company} grade={row.grade} />
+      {rows.map((row) => {
+        const isBusy = busyId === row.id
+        return (
+          <div
+            key={row.id}
+            className={`flex items-center gap-3 px-4 py-3 border-b border-zinc-100 last:border-b-0 transition-colors ${
+              row.isYou ? 'bg-orange-50/40' : ''
+            }`}
+          >
+            {/* Price column — fixed-ish width via min/max so condition
+                aligns down the table even with very different price
+                lengths ($3 vs $12,345.67). */}
+            <div className="flex items-baseline gap-2 flex-wrap min-w-[120px]">
+              <span className="text-base font-bold tabular-nums text-zinc-900">${row.price.toFixed(2)}</span>
+              {/* "× N" multiplier when this listing has multiple units in
+                  stock. Suppressed for qty=1 (most rows) to keep quiet. */}
+              {row.quantity_available > 1 && (
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 tabular-nums">
+                  × {row.quantity_available}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <ConditionBadge condition={row.condition} gradingCompany={row.grading_company} grade={row.grade} />
+            </div>
+            {/* Own-row action group: Edit jumps to the full /sell edit
+                page (photos, description, etc.); Cancel delists in place
+                with an optimistic removal so the row disappears now. */}
+            {row.isYou && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-bold uppercase tracking-wider mr-1">
+                  Yours
+                </span>
+                <Link
+                  href={`/sell/${row.id}/edit`}
+                  className="px-2 py-1 rounded text-[11px] font-semibold text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
+                >
+                  Edit
+                </Link>
+                {onCancel && (
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={async () => {
+                      setBusyId(row.id)
+                      try { await onCancel(row.id) } finally { setBusyId(null) }
+                    }}
+                    className="px-2 py-1 rounded text-[11px] font-semibold text-zinc-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                  >
+                    {isBusy ? 'Cancelling…' : 'Cancel'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -240,30 +300,30 @@ function BidsTable({
         return (
           <div
             key={row.id}
-            className={`border-b border-zinc-100 last:border-b-0 ${isYours ? 'bg-orange-50/30' : ''}`}
+            className={`border-b border-zinc-100 last:border-b-0 transition-colors ${isYours ? 'bg-orange-50/40' : ''}`}
           >
-            <div className="grid grid-cols-[1fr_2fr] items-center gap-3 px-4 py-3">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="flex items-baseline gap-2 min-w-[120px]">
                 <span className="text-base font-bold tabular-nums text-zinc-900">${row.price.toFixed(2)}</span>
-                {isYours && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-bold uppercase tracking-wider">
-                    Your offer
-                  </span>
-                )}
               </div>
-              <div className="justify-self-start">
+              <div className="flex-1 min-w-0">
                 <ConditionBadge
                   condition={'near_mint' as CardCondition}
                   gradingCompany={row.grading_company}
                   grade={row.grade}
                 />
               </div>
+              {isYours && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-bold uppercase tracking-wider flex-shrink-0">
+                  Yours
+                </span>
+              )}
             </div>
             {isYours && (onUpdate || onCancel) && (
-              <div className="flex items-center justify-end gap-1.5 px-4 pb-3 -mt-1 text-[11px]">
+              <div className="flex items-center justify-end gap-1.5 px-4 pb-3 -mt-1.5">
                 {canMatchTop && onUpdate && (
                   <ActionChip onClick={() => update(matchTopTarget!)} disabled={isBusy}>
-                    Match top (${matchTopTarget!.toFixed(0)})
+                    Match top ${matchTopTarget!.toFixed(0)}
                   </ActionChip>
                 )}
                 {canPlus1 && onUpdate && (

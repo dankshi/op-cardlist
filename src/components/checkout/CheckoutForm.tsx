@@ -43,17 +43,17 @@ interface NonActionableState {
 
 const stripePromise = getStripeClient()
 
-async function createPaymentIntent(listingId: string, creditsApplied: number) {
+async function createPaymentIntent(listingId: string, quantity: number, creditsApplied: number) {
   const res = await fetch('/api/stripe/payment-intent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ listing_id: listingId, quantity: 1, credits_applied: creditsApplied }),
+    body: JSON.stringify({ listing_id: listingId, quantity, credits_applied: creditsApplied }),
   })
   const json = await res.json()
   return { ok: res.ok, json }
 }
 
-export default function CheckoutForm({ listingId }: { listingId: string }) {
+export default function CheckoutForm({ listingId, quantity = 1 }: { listingId: string; quantity?: number }) {
   const router = useRouter()
   const supabase = createClient()
   const [data, setData] = useState<PaymentIntentData | null>(null)
@@ -74,11 +74,11 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        router.push(`/auth/sign-in?next=${encodeURIComponent(`/checkout?listing_id=${listingId}`)}`)
+        router.push(`/auth/sign-in?next=${encodeURIComponent(`/checkout?listing_id=${listingId}${quantity > 1 ? `&qty=${quantity}` : ''}`)}`)
         return
       }
 
-      const { ok, json } = await createPaymentIntent(listingId, 0)
+      const { ok, json } = await createPaymentIntent(listingId, quantity, 0)
       if (!ok) {
         setError(json.error || 'Failed to initialize checkout')
         setLoading(false)
@@ -104,7 +104,7 @@ export default function CheckoutForm({ listingId }: { listingId: string }) {
   async function applyCredits(amount: number) {
     if (!data || creditsLoading) return
     setCreditsLoading(true)
-    const { ok, json } = await createPaymentIntent(listingId, amount)
+    const { ok, json } = await createPaymentIntent(listingId, quantity, amount)
     if (ok) setData(json)
     else setError(json.error || 'Failed to update credits')
     setCreditsLoading(false)

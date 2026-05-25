@@ -167,12 +167,20 @@ export default function EditListingPage() {
     if (!priceNum || priceNum <= 0) { setError('Enter a valid price'); setSaving(false); return }
     if (!qtyNum || qtyNum <= 0) { setError('Enter a valid quantity'); setSaving(false); return }
 
+    // Only bump `quantity` (the historical total) when there's actual sale
+    // history to preserve. If the listing is "clean" (no purchases yet —
+    // qty_available still equals quantity), keep the two fields in lockstep
+    // so seller-side qty adjustments don't masquerade as sales in the
+    // hasOrderHistory heuristic (which reads quantity_available < quantity).
+    const hasSales = listing.quantity_available < listing.quantity
+    const nextQuantity = hasSales ? Math.max(listing.quantity, qtyNum) : qtyNum
+
     const { error: updateError } = await supabase
       .from('listings')
       .update({
         price: priceNum,
         quantity_available: qtyNum,
-        quantity: Math.max(listing.quantity, qtyNum),
+        quantity: nextQuantity,
         condition: 'near_mint',
         grading_company: isGraded ? gradingCompany : null,
         grade: isGraded ? grade : null,

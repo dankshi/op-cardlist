@@ -5,7 +5,7 @@ const items = [
   },
   {
     q: 'What are the fees for sellers?',
-    a: 'Slabs use a tier model that drops from 9% (Basic) down to 7% (Diamond) as your sales volume grows. Raw cards stay at a flat 9.5% across every tier — ungraded cards take more work to authenticate and carry more risk. On top of that, all sales include a flat 3% payment-processing fee, and Ship-to-Nomi listings have a $5 per-card seller fee (waived on Drop-off). No listing fees, no subscriptions. Use the home-page calculator to preview your exact payout before you list.',
+    a: 'Slabs use a tier model that drops from 9% (Basic) down to 7% (Diamond) as your sales volume grows. Raw cards stay at a flat 9.5% across every tier — ungraded cards take more work to authenticate and carry more risk. On top of that, all sales include a flat 3% payment-processing fee, and Ship-to-Nomi listings have a $5 per-card platform fee (waived on Drop-off). No listing fees, no subscriptions. Use the home-page calculator to preview your exact payout before you list.',
   },
   {
     q: 'How do seller tiers work?',

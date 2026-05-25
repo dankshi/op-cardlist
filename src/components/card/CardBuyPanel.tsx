@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { BuyNowButton } from '@/components/marketplace/BuyNowButton'
 import { PriceChangeBadge } from '@/components/PriceChangeBadge'
@@ -17,6 +17,10 @@ export interface VariantData {
   population: number
   lowestListingId: string | null
   lowestListingPrice: number | null
+  /** How many units of the lowest listing the seller still has. Drives
+   *  the qty selector on Buy Now — capped at this value. Always 1 for
+   *  graded slabs (each is a unique physical card). */
+  lowestListingQuantityAvailable: number
   listingCount: number
 }
 
@@ -63,6 +67,8 @@ interface ChipData {
   population: number
   lowestListingId: string | null
   lowestListingPrice: number | null
+  /** Cap for the multi-quantity Buy Now selector. 0 when no listing. */
+  lowestListingQuantityAvailable: number
   listingCount: number
 }
 
@@ -132,6 +138,7 @@ export function CardBuyPanel({
       population: 0,
       lowestListingId: raw?.lowestListingId ?? null,
       lowestListingPrice: raw?.lowestListingPrice ?? null,
+      lowestListingQuantityAvailable: raw?.lowestListingQuantityAvailable ?? 0,
       listingCount: raw?.listingCount ?? 0,
       primary: true,
     }
@@ -147,6 +154,7 @@ export function CardBuyPanel({
         population: v?.population ?? 0,
         lowestListingId: v?.lowestListingId ?? null,
         lowestListingPrice: v?.lowestListingPrice ?? null,
+        lowestListingQuantityAvailable: v?.lowestListingQuantityAvailable ?? 0,
         listingCount: v?.listingCount ?? 0,
         primary: def.primary,
       }
@@ -178,10 +186,16 @@ export function CardBuyPanel({
     setModeState(next)
     onModeChange?.(next)
   }
+
   // Controlled when the parent passes `selectedKey`; uncontrolled when it
   // doesn't. Lets CardBuyPanel keep working standalone (e.g. on /market)
   // while also slotting into CardMainPanel where state lifts up.
   const selectedKey = controlledKey ?? uncontrolledKey
+  // Multi-quantity Buy Now state. Reset whenever the variant changes —
+  // what was 4 NM raw isn't valid as 4 of some other variant the user
+  // just clicked into.
+  const [buyQuantity, setBuyQuantity] = useState(1)
+  useEffect(() => { setBuyQuantity(1) }, [selectedKey])
   const [expanded, setExpanded] = useState(cheapestIsSecondary)
 
   const selected = allChips.find(c => c.key === selectedKey) ?? allChips[0]
@@ -248,7 +262,7 @@ export function CardBuyPanel({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                   Buy now for
                 </span>
-                {selected.listingCount === 1 && (
+                {selected.listingCount === 1 && selected.lowestListingQuantityAvailable === 1 && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 ring-1 ring-rose-200">
                     Last one
                   </span>
@@ -260,12 +274,30 @@ export function CardBuyPanel({
                 )}
               </div>
               <div className="flex items-end justify-between gap-3">
-                <p className="text-4xl font-bold tabular-nums text-zinc-900 leading-none">
-                  ${selected.lowestListingPrice.toFixed(2)}
-                </p>
+                <div>
+                  <p className="text-4xl font-light tabular-nums tracking-tight text-zinc-900 leading-none">
+                    ${(selected.lowestListingPrice * buyQuantity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  {buyQuantity > 1 && (
+                    <p className="text-xs text-zinc-500 mt-1.5 tabular-nums">
+                      {buyQuantity} × ${selected.lowestListingPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* Qty selector only for ungraded with multiple units
+                      in stock at the lowest price. Graded slabs are by
+                      definition qty=1 (each is a unique physical card),
+                      and single-unit raw listings don't need a selector. */}
+                  {selected.companyKey === null && selected.lowestListingQuantityAvailable > 1 && (
+                    <QtyStepper
+                      value={buyQuantity}
+                      max={selected.lowestListingQuantityAvailable}
+                      onChange={setBuyQuantity}
+                    />
+                  )}
                   <OfferButton onClick={onOfferClick} cardId={cardId} />
-                  <BuyNowButton listingId={selected.lowestListingId} price={selected.lowestListingPrice} size="lg" />
+                  <BuyNowButton listingId={selected.lowestListingId} price={selected.lowestListingPrice} quantity={buyQuantity} size="lg" />
                 </div>
               </div>
             </div>
@@ -288,8 +320,8 @@ export function CardBuyPanel({
             <div className="mb-4">
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Sell now for</p>
               <div className="flex items-end justify-between gap-3">
-                <p className="text-4xl font-bold tabular-nums text-emerald-700 leading-none">
-                  ${topOfferPrice.toFixed(2)}
+                <p className="text-4xl font-light tabular-nums tracking-tight text-emerald-700 leading-none">
+                  ${topOfferPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <ListButton onClick={onListClick} cardId={cardId} selected={selected} variant="outline">
@@ -328,7 +360,7 @@ export function CardBuyPanel({
             className="text-emerald-700 hover:text-emerald-800 font-semibold inline-flex items-center gap-1 cursor-pointer"
           >
             {topOfferPrice != null && topOfferPrice > 0
-              ? <>Sell yours now for <span className="tabular-nums">${topOfferPrice.toFixed(2)}</span> →</>
+              ? <>Sell yours now for <span className="tabular-nums tracking-tight">${topOfferPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> →</>
               : <>Sell yours →</>}
           </button>
         ) : (
@@ -407,27 +439,30 @@ function VariantChip({ chip, isActive, onClick }: { chip: ChipData; isActive: bo
           </span>
         )}
         {isGraded ? (
-          <span className="text-[10px] text-zinc-500 whitespace-nowrap flex-shrink-0">
-            <span className="font-bold uppercase tracking-wider">Pop</span>{' '}
-            <span className="tabular-nums font-semibold text-zinc-700">
+          <span className="text-[10px] text-zinc-400 whitespace-nowrap flex-shrink-0 tracking-wider uppercase">
+            Pop <span className="tabular-nums text-zinc-600 normal-case tracking-normal">
               {chip.population.toLocaleString()}
             </span>
           </span>
         ) : (
-          <span className={`text-[10px] font-bold uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isActive ? 'text-orange-700' : 'text-zinc-700'}`}>
+          <span className={`text-[10px] uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isActive ? 'text-orange-600' : 'text-zinc-500'}`}>
             NM
           </span>
         )}
       </div>
 
-      {/* Bottom row: lowest listing price. */}
+      {/* Bottom row: lowest listing price. Light weight + comma-grouped
+          numerals + tight tracking borrows the premium-retail (MR PORTER,
+          SSENSE) price treatment — the eye reads "two thousand dollars"
+          as a value rather than a banner. Heavy tier pill on top + thin
+          price on bottom gives the chip a clear visual hierarchy. */}
       <div>
         {hasListing ? (
-          <span className={`text-base font-bold tabular-nums ${isActive ? 'text-orange-600' : 'text-zinc-900'}`}>
-            ${chip.lowestListingPrice!.toFixed(0)}
+          <span className={`text-[15px] font-light tabular-nums tracking-tight ${isActive ? 'text-orange-600' : 'text-zinc-900'}`}>
+            ${chip.lowestListingPrice!.toLocaleString('en-US', { maximumFractionDigits: 0 })}
           </span>
         ) : (
-          <span className="text-xs text-zinc-400 font-medium">0 listings</span>
+          <span className="text-xs text-zinc-400 font-light italic">No listings</span>
         )}
       </div>
     </button>
@@ -461,6 +496,41 @@ function OfferButton({
     <Link href={`/card/${cardId.toLowerCase()}/market#bids`} className={cls}>
       {variant === 'inline' ? 'Offer' : 'Make Offer'}
     </Link>
+  )
+}
+
+/** Compact ±qty stepper for the multi-quantity Buy Now flow. Caps at
+ *  `max` (the lowest listing's quantity_available). No keyboard input —
+ *  the use case is "buyer wants a playset of 4", not arbitrary numbers,
+ *  so two click steps to 4 is fine and avoids a wide number field. */
+function QtyStepper({ value, max, onChange }: { value: number; max: number; onChange: (n: number) => void }) {
+  function clamp(n: number) {
+    return Math.max(1, Math.min(max, n))
+  }
+  return (
+    <div className="inline-flex items-stretch rounded-lg ring-2 ring-zinc-300 overflow-hidden text-base font-bold text-zinc-900 bg-white">
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value - 1))}
+        disabled={value <= 1}
+        aria-label="Decrease quantity"
+        className="px-3 hover:bg-zinc-100 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        −
+      </button>
+      <span className="px-3 py-3 min-w-[2.5rem] text-center tabular-nums border-x border-zinc-200">
+        {value}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value + 1))}
+        disabled={value >= max}
+        aria-label="Increase quantity"
+        className="px-3 hover:bg-zinc-100 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        +
+      </button>
+    </div>
   )
 }
 

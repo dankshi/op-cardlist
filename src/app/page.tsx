@@ -194,6 +194,9 @@ export default async function Home() {
     // money for right now — do you have one?" Mirrors "Just Listed" on
     // the seller side.
     const sinceOffers = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    // Pull a wider batch — we dedup by card_id below, so a chase card
+    // with 7 grade-tier offers consumes 7 raw rows but only earns 1 tile.
+    // Need enough headroom to still land 12 unique cards on a busy day.
     const { data: rawOffers } = await supabase
       .from('bids')
       .select('id, card_id, price, grading_company, grade, created_at, expires_at, status')
@@ -201,8 +204,15 @@ export default async function Home() {
       .gt('expires_at', new Date().toISOString())
       .gte('created_at', sinceOffers)
       .order('price', { ascending: false })
-      .limit(20);
+      .limit(100);
 
+    // Dedup by card_id so the carousel surfaces *variety* — one tile per
+    // card, showing its single highest offer across every grade tier.
+    // Without this, a chase card with offers on raw + PSA 10 + BGS 10 +
+    // CGC 10 etc. pushes that one card's art across seven tiles and
+    // visually crowds out the rest of the marketplace. Query is already
+    // price-desc, so the first row seen per card is its top offer.
+    const seenCardId = new Set<string>();
     topOffers = ((rawOffers || []) as Array<{
       id: string;
       card_id: string;
@@ -211,6 +221,11 @@ export default async function Home() {
       grade: string | null;
       created_at: string;
     }>)
+      .filter(o => {
+        if (seenCardId.has(o.card_id)) return false;
+        seenCardId.add(o.card_id);
+        return true;
+      })
       .map(o => {
         const card = cardMap.get(o.card_id);
         if (!card) return null;

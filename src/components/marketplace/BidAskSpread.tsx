@@ -27,6 +27,10 @@ interface BidAskSpreadProps {
    *  Lets the market-data drawer's Offers tab honor the chip selection
    *  on the buy panel above. `{ company: null, grade: null }` = ungraded. */
   variantFilter?: { company: string | null; grade: string | null }
+  /** Fired after the user successfully places an offer. Lets the parent
+   *  modal switch to a success state + push the new bid into shared
+   *  state so the market drawer reflects it without a page reload. */
+  onPlaced?: (bid: Bid) => void
 }
 
 // Match the eligibility rule used in /sell — offers can only target slab
@@ -61,6 +65,7 @@ export function BidAskSpread({
   initialGrade,
   hideExistingBids = false,
   variantFilter,
+  onPlaced,
 }: BidAskSpreadProps) {
   const router = useRouter()
   const [bids, setBids] = useState<Bid[]>([])
@@ -262,6 +267,7 @@ export function BidAskSpread({
     const newBid = await res.json()
     setBids(prev => [newBid, ...prev])
     closeForm()
+    onPlaced?.(newBid)
   }
 
   function closeForm() {

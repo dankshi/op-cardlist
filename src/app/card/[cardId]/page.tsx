@@ -39,16 +39,18 @@ function gradeRank(grade: string): number {
 }
 
 function buildVariants(
-  listings: Array<{ id: string; price: number; grading_company: string | null; grade: string | null }>,
+  listings: Array<{ id: string; price: number; grading_company: string | null; grade: string | null; quantity_available: number }>,
   populations: Partial<Record<GradeCompany, PopulationBucket[]>>,
 ): VariantData[] {
   // Group listings by variant key. Listings already arrive price-ascending
-  // so listings[0] for any key is its cheapest.
-  const listingsByKey = new Map<string, { id: string; price: number }[]>();
+  // so listings[0] for any key is its cheapest. We also carry forward
+  // quantity_available on the cheapest so the buy panel can render the
+  // multi-quantity selector capped at what's actually in stock.
+  const listingsByKey = new Map<string, { id: string; price: number; quantity_available: number }[]>();
   for (const l of listings) {
     const key = l.grading_company && l.grade ? `${l.grading_company}-${l.grade}` : 'raw';
     const arr = listingsByKey.get(key) ?? [];
-    arr.push({ id: l.id, price: Number(l.price) });
+    arr.push({ id: l.id, price: Number(l.price), quantity_available: l.quantity_available });
     listingsByKey.set(key, arr);
   }
 
@@ -87,6 +89,7 @@ function buildVariants(
       population: popsByKey.get(key) ?? 0,
       lowestListingId: variantListings[0]?.id ?? null,
       lowestListingPrice: variantListings[0]?.price ?? null,
+      lowestListingQuantityAvailable: variantListings[0]?.quantity_available ?? 0,
       listingCount: variantListings.length,
     });
   }

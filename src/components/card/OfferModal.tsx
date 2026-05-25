@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { BidAskSpread } from '@/components/marketplace/BidAskSpread'
-import type { GradingCompany } from '@/types/database'
+import type { Bid, GradingCompany } from '@/types/database'
+import { gradingStyle } from '@/lib/gradingStyle'
 
 interface Props {
   open: boolean
@@ -19,13 +20,41 @@ interface Props {
    *  input that PATCHes the existing bid instead of stacking a second
    *  offer on top. */
   existingOffer?: { id: string; price: number } | null
+  /** Notified when an offer is successfully placed — lets the parent
+   *  push the new bid into shared state so the market drawer reflects
+   *  it without a page reload. */
+  onPlaced?: (bid: Bid) => void
+  /** Reference prices shown above the offer form so the buyer doesn't
+   *  have to close the modal to check what others are paying / asking.
+   *  All optional — each is rendered only when set. */
+  lowestAskPrice?: number | null
+  topOfferPrice?: number | null
+  marketPrice?: number | null
 }
 
 /** Focused offer-placement modal. Wraps BidAskSpread with its form
  *  auto-opened and prefilled, plus a backdrop + escape-to-close + body-
  *  scroll lock. Lives on the card page so users don't have to navigate
  *  to the market data view just to make an offer. */
-export function OfferModal({ open, onClose, cardId, cardName, initialCompany, initialGrade, existingOffer }: Props) {
+export function OfferModal({
+  open,
+  onClose,
+  cardId,
+  cardName,
+  initialCompany,
+  initialGrade,
+  existingOffer,
+  onPlaced,
+  lowestAskPrice,
+  topOfferPrice,
+  marketPrice,
+}: Props) {
+  // After-placement success state. Holds the just-placed bid so we can
+  // confirm the price + variant on the success view. Cleared each time
+  // the modal opens so a previous success doesn't bleed into a new
+  // session.
+  const [placedBid, setPlacedBid] = useState<Bid | null>(null)
+  useEffect(() => { if (open) setPlacedBid(null) }, [open])
   // Esc closes; lock body scroll while open so the page behind doesn't
   // scroll under the modal.
   useEffect(() => {
@@ -65,7 +94,7 @@ export function OfferModal({ open, onClose, cardId, cardName, initialCompany, in
         <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-3 border-b border-zinc-100">
           <div>
             <h2 className="text-lg font-bold text-zinc-900">
-              {existingOffer ? 'Update your offer' : 'Make an offer'}
+              {placedBid ? 'Offer placed' : existingOffer ? 'Update your offer' : 'Make an offer'}
             </h2>
             <p className="text-sm text-zinc-500 mt-0.5 truncate">{cardName}</p>
           </div>
@@ -80,13 +109,46 @@ export function OfferModal({ open, onClose, cardId, cardName, initialCompany, in
           </button>
         </div>
 
-        {existingOffer ? (
+        {placedBid ? (
+          <OfferPlacedSuccess
+            bid={placedBid}
+            cardName={cardName}
+            onClose={onClose}
+            onPlaceAnother={() => setPlacedBid(null)}
+          />
+        ) : existingOffer ? (
           <UpdateOfferForm
             existingOffer={existingOffer}
             onClose={onClose}
           />
         ) : (
-          <div className="px-6 py-4">
+          <div className="px-6 py-4 space-y-4">
+            {/* Reference panel — three small cards so the buyer can
+                anchor their offer without bouncing back to the market
+                drawer. Lowest ask is the upper bound (above it = buy
+                instead); top offer is what they need to beat to lead. */}
+            {(lowestAskPrice != null || topOfferPrice != null || marketPrice != null) && (
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {topOfferPrice != null ? (
+                  <div className="rounded-lg bg-emerald-50 ring-1 ring-emerald-100 p-2.5">
+                    <p className="font-bold uppercase tracking-wider text-emerald-700 mb-0.5 text-[10px]">Top offer</p>
+                    <p className="text-base font-bold tabular-nums text-emerald-900">${topOfferPrice.toFixed(2)}</p>
+                  </div>
+                ) : <ReferencePlaceholder label="Top offer" />}
+                {lowestAskPrice != null ? (
+                  <div className="rounded-lg bg-orange-50 ring-1 ring-orange-100 p-2.5">
+                    <p className="font-bold uppercase tracking-wider text-orange-700 mb-0.5 text-[10px]">Lowest ask</p>
+                    <p className="text-base font-bold tabular-nums text-orange-900">${lowestAskPrice.toFixed(2)}</p>
+                  </div>
+                ) : <ReferencePlaceholder label="Lowest ask" />}
+                {marketPrice != null ? (
+                  <div className="rounded-lg bg-zinc-50 ring-1 ring-zinc-100 p-2.5">
+                    <p className="font-bold uppercase tracking-wider text-zinc-500 mb-0.5 text-[10px]">Market</p>
+                    <p className="text-base font-bold tabular-nums text-zinc-900">${marketPrice.toFixed(2)}</p>
+                  </div>
+                ) : <ReferencePlaceholder label="Market" />}
+              </div>
+            )}
             <BidAskSpread
               cardId={cardId}
               initialFormOpen
@@ -94,6 +156,10 @@ export function OfferModal({ open, onClose, cardId, cardName, initialCompany, in
               initialGradingCompany={initialGradingCompany}
               initialGrade={initialGrade ?? undefined}
               hideExistingBids
+              onPlaced={(bid) => {
+                setPlacedBid(bid)
+                onPlaced?.(bid)
+              }}
             />
           </div>
         )}
@@ -226,3 +292,97 @@ function UpdateOfferForm({
     </div>
   )
 }
+
+/** Empty-state slot in the reference grid — keeps the three columns
+ *  the same width whether or not all data points are populated. */
+function ReferencePlaceholder({ label }: { label: string }) {
+  return (
+    <div className="rounded-lg bg-zinc-50 ring-1 ring-zinc-100 p-2.5 opacity-60">
+      <p className="font-bold uppercase tracking-wider text-zinc-400 mb-0.5 text-[10px]">{label}</p>
+      <p className="text-base font-bold text-zinc-300">—</p>
+    </div>
+  )
+}
+
+/** Post-placement confirmation. Cleaner than dropping the user into an
+ *  empty modal body (which is what they used to see — BidAskSpread reset
+ *  to its initial state and `hideExistingBids` hid the freshly-placed
+ *  bid, leaving a blank shell). Now they get a confirmation + clear
+ *  next actions: place another or close. */
+function OfferPlacedSuccess({
+  bid,
+  cardName,
+  onClose,
+  onPlaceAnother,
+}: {
+  bid: Bid
+  cardName: string
+  onClose: () => void
+  onPlaceAnother: () => void
+}) {
+  const style = bid.grading_company && bid.grade ? gradingStyle(bid.grading_company, bid.grade) : null
+  return (
+    <div>
+      <div className="px-6 py-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+            <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold text-zinc-900 mb-0.5">Your offer is live.</p>
+            <p className="text-sm text-zinc-500 truncate">{cardName}</p>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-zinc-50 ring-1 ring-zinc-100 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Offer</p>
+              <p className="text-3xl font-bold tabular-nums text-zinc-900">${Number(bid.price).toFixed(2)}</p>
+            </div>
+            {style ? (
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ring-1 ${style.pill}`}>
+                {style.shortLabel}
+              </span>
+            ) : (
+              <span className="inline-block px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300">
+                Ungraded NM
+              </span>
+            )}
+          </div>
+        </div>
+
+        <ul className="text-xs text-zinc-500 space-y-1.5 leading-relaxed">
+          <li className="flex gap-2">
+            <span className="text-emerald-500 font-bold flex-shrink-0">✓</span>
+            <span>Your card is held in pre-authorization. Nothing is charged until a seller accepts.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-emerald-500 font-bold flex-shrink-0">✓</span>
+            <span>You can edit or cancel from the <strong className="text-zinc-700">Offers</strong> tab below.</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-2xl">
+        <button
+          type="button"
+          onClick={onPlaceAnother}
+          className="px-4 py-2 rounded-lg text-sm font-semibold text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+        >
+          Place another
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-5 py-2.5 rounded-lg text-sm font-bold bg-zinc-900 hover:bg-zinc-800 text-white transition-colors cursor-pointer"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  )
+}
+
