@@ -5,6 +5,8 @@ import { createOutboundLabel } from '@/lib/shippo'
 import {
   sendSellerStatusUpdateEmail,
   sendBuyerShippedToBuyerEmail,
+  sendBuyerReceivedEmail,
+  sendBuyerAuthenticatedEmail,
 } from '@/lib/email'
 
 const VALID_TRANSITIONS: Record<string, string> = {
@@ -132,10 +134,11 @@ export async function POST(
       })
     }
   } else if (status === 'shipped_to_buyer') {
-    update.shipped_to_buyer_at = now
-
-    // Generate outbound label (platform → buyer)
-    if (order.shipping_address) {
+    // Only auto-generate the outbound label if the admin hasn't already
+    // generated one manually from the admin order detail page. Keeps the
+    // single-button "Ship to Buyer" flow working while letting power users
+    // do the label first when they need a specific service level.
+    if (!order.outbound_label_url && order.shipping_address) {
       try {
         const buyerAddr = order.shipping_address as { name: string; line1: string; line2?: string; city: string; state: string; zip: string; country: string }
         const label = await createOutboundLabel({
@@ -149,11 +152,21 @@ export async function POST(
         })
         update.tracking_number = label.trackingNumber
         update.tracking_carrier = label.carrier
+        update.outbound_label_url = label.labelUrl
+        update.outbound_label_cost = label.cost
       } catch (err) {
+        // Hold the status flip — without a tracking number the buyer
+        // would get the "your card has shipped!" email with no way to
+        // track it AND nobody would know the auto-label silently
+        // failed. Force the admin to print manually via the order
+        // detail page and retry, or fix the address.
         console.error('Outbound label generation failed:', err)
-        // Still update status but without auto-generated tracking
+        return NextResponse.json({
+          error: `Couldn't generate outbound shipping label: ${err instanceof Error ? err.message : 'unknown error'}. Print the label manually from this page (the button is in the "Outbound" card), then retry "Mark Shipped to Buyer".`,
+        }, { status: 502 })
       }
     }
+    update.shipped_to_buyer_at = now
   }
 
   // Append admin notes
@@ -174,10 +187,13 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
   }
 
-  // Send email notifications
-  try {
-    if (status === 'received' || status === 'authenticated') {
-      // Notify seller
+  // Send email notifications. Each branch is wrapped independently so a
+  // failed seller email doesn't suppress the buyer email (and vice
+  // versa) — without per-branch try/catch a single Resend hiccup would
+  // silently swallow the rest of the lifecycle notifications.
+  if (status === 'received' || status === 'authenticated') {
+    // Notify seller (same as before)
+    try {
       const sellerAuth = await adminSupabase.auth.admin.getUserById(order.seller_id)
       const { data: sellerProfileData } = await supabase
         .from('profiles')
@@ -194,16 +210,46 @@ export async function POST(
           status,
         })
       }
+    } catch (emailErr) {
+      console.error('Failed to send seller status update email:', emailErr)
     }
 
-    if (status === 'shipped_to_buyer') {
-      // Notify buyer
-      const buyerId = order.buyer_id
-      const buyerAuth = await adminSupabase.auth.admin.getUserById(buyerId)
+    // Notify buyer too — closes the silence gap between "seller shipped"
+    // and "shipped to you" that used to leave buyers in the dark for the
+    // 1–2 day verification window.
+    try {
+      const buyerAuth = await adminSupabase.auth.admin.getUserById(order.buyer_id)
       const { data: buyerProfileData } = await supabase
         .from('profiles')
         .select('display_name')
-        .eq('id', buyerId)
+        .eq('id', order.buyer_id)
+        .single()
+
+      const buyerEmail = buyerAuth?.data?.user?.email
+      if (buyerEmail) {
+        const args = {
+          buyerEmail,
+          buyerName: buyerProfileData?.display_name || '',
+          orderId,
+        }
+        if (status === 'received') {
+          await sendBuyerReceivedEmail(args)
+        } else {
+          await sendBuyerAuthenticatedEmail(args)
+        }
+      }
+    } catch (emailErr) {
+      console.error(`Failed to send buyer ${status} email:`, emailErr)
+    }
+  }
+
+  if (status === 'shipped_to_buyer') {
+    try {
+      const buyerAuth = await adminSupabase.auth.admin.getUserById(order.buyer_id)
+      const { data: buyerProfileData } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', order.buyer_id)
         .single()
 
       const buyerEmail = buyerAuth?.data?.user?.email
@@ -216,9 +262,9 @@ export async function POST(
           trackingCarrier: (update.tracking_carrier as string) || null,
         })
       }
+    } catch (emailErr) {
+      console.error('Failed to send buyer shipped email:', emailErr)
     }
-  } catch (emailErr) {
-    console.error('Failed to send status update email:', emailErr)
   }
 
   return NextResponse.json({ success: true, status })
