@@ -307,6 +307,88 @@ export async function sendSellerStatusUpdateEmail({
   })
 }
 
+// ─── Buyer: Card Received at Nomi ─────────────────────────────────
+
+/** Sent when the order transitions to `received` — Nomi has the card in
+ *  hand and is starting authentication. Closes the silence gap between
+ *  "seller shipped" and "shipped to you" (otherwise a 1–2 day blackout
+ *  during verification). */
+export async function sendBuyerReceivedEmail({
+  buyerEmail,
+  buyerName,
+  orderId,
+}: {
+  buyerEmail: string
+  buyerName: string
+  orderId: string
+}) {
+  await getResend().emails.send({
+    from: `nomi market <${FROM}>`,
+    to: buyerEmail,
+    subject: `We received your card — #${orderId.slice(0, 8)}`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;">
+        <h1 style="color:#18181b;font-size:24px;margin-bottom:4px;">Your card arrived at Nomi</h1>
+        <p style="color:#71717a;margin-top:0;">Hi ${buyerName || 'there'}, the seller&rsquo;s package landed at our authentication center.</p>
+
+        <div style="background:#f4f4f5;border-radius:8px;padding:16px;margin-top:16px;">
+          <p style="margin:0 0 8px;font-weight:600;color:#18181b;">What happens next</p>
+          <p style="margin:0;color:#3f3f46;">Our team will verify the card matches the listing — condition, grade, authenticity. You&rsquo;ll get another email the moment it passes, usually within 1&ndash;2 business days.</p>
+        </div>
+
+        <div style="margin-top:24px;text-align:center;">
+          <a href="${SITE_URL}/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+            Track Your Order
+          </a>
+        </div>
+
+        <p style="margin-top:32px;font-size:12px;color:#a1a1aa;text-align:center;">nomi market &middot; The Trusted TCG Marketplace</p>
+      </div>
+    `,
+  })
+}
+
+// ─── Buyer: Card Authenticated ────────────────────────────────────
+
+/** Sent when the order transitions to `authenticated` — the card passed
+ *  Nomi's verification but hasn't shipped yet. Without this, the buyer
+ *  hears nothing between "received" and "shipped_to_buyer" (which can be
+ *  another business day). */
+export async function sendBuyerAuthenticatedEmail({
+  buyerEmail,
+  buyerName,
+  orderId,
+}: {
+  buyerEmail: string
+  buyerName: string
+  orderId: string
+}) {
+  await getResend().emails.send({
+    from: `nomi market <${FROM}>`,
+    to: buyerEmail,
+    subject: `Authenticated — your card ships soon — #${orderId.slice(0, 8)}`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;">
+        <h1 style="color:#18181b;font-size:24px;margin-bottom:4px;">Authenticated &mdash; it&rsquo;s the real deal</h1>
+        <p style="color:#71717a;margin-top:0;">Hi ${buyerName || 'there'}, your card passed our verification. It matches the listing&rsquo;s condition and grade.</p>
+
+        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:16px;margin-top:16px;">
+          <p style="margin:0 0 8px;font-weight:600;color:#065f46;">Next up: shipping</p>
+          <p style="margin:0;color:#047857;">We&rsquo;re prepping the outbound package now. You&rsquo;ll get tracking the moment it leaves our center.</p>
+        </div>
+
+        <div style="margin-top:24px;text-align:center;">
+          <a href="${SITE_URL}/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+            View Order
+          </a>
+        </div>
+
+        <p style="margin-top:32px;font-size:12px;color:#a1a1aa;text-align:center;">nomi market &middot; The Trusted TCG Marketplace</p>
+      </div>
+    `,
+  })
+}
+
 // ─── Buyer: Card Authenticated & Shipped ─────────────────────────
 
 export async function sendBuyerShippedToBuyerEmail({
