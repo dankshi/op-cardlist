@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
+import { printProductLabel } from '@/lib/zebra'
 import type { Order, OrderItem, CardCondition } from '@/types/database'
 
 const STATUS_STYLES: Record<string, string> = {
@@ -265,6 +266,37 @@ export default function AdminOrderDetailPage() {
               Authenticate Items &rarr;
             </Link>
           )}
+          {/* Always-available reprint of Product QR labels. Useful
+              when intake's print failed mid-batch, a sticker got
+              damaged, or during dev/testing the pack flow without
+              going through the full receive step. */}
+          <button
+            type="button"
+            onClick={async () => {
+              const items = order.items || []
+              if (items.length === 0) {
+                alert('Order has no items')
+                return
+              }
+              const shortId = order.id.slice(0, 8).toUpperCase()
+              let printed = 0
+              let failed = 0
+              for (const item of items) {
+                const r = await printProductLabel(
+                  item.id,
+                  item.card_name || item.card_id,
+                  shortId,
+                )
+                if (r.success) printed++
+                else failed++
+              }
+              alert(`Printed ${printed} label${printed === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}.`)
+            }}
+            className="text-sm font-medium text-zinc-500 hover:text-zinc-700"
+            title="Reprint Product QR labels for every item — useful for testing pack flow"
+          >
+            Print Labels
+          </button>
         </div>
         <div className="divide-y divide-zinc-100">
           {order.items?.map(item => {

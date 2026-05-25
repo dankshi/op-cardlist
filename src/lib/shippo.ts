@@ -156,8 +156,17 @@ export async function getOutboundRates(
  *  email or phone" which is misleading; it's the recipient/sender
  *  whichever is incomplete). Callers should pre-fill these from the
  *  buyer's auth account email + the phone captured at checkout. */
-export async function createOutboundLabel(buyerAddress: AddressCreateRequest) {
+export async function createOutboundLabel(
+  buyerAddress: AddressCreateRequest,
+  options?: { format?: 'PDF' | 'ZPL' },
+) {
   const shippo = getShippo()
+  // Default PDF for back-compat with the existing
+  // /admin/orders/[orderId]/outbound-label callers that open the
+  // file in a browser tab. Pack-out passes ZPL for direct-to-Zebra
+  // dispatch (no PDF preview, no manual print click). Shippo's
+  // SDK names the format "ZPLII".
+  const labelFileType = options?.format === 'ZPL' ? 'ZPLII' : 'PDF'
 
   const shipment = await shippo.shipments.create({
     addressFrom: PLATFORM_ADDRESS,
@@ -176,7 +185,7 @@ export async function createOutboundLabel(buyerAddress: AddressCreateRequest) {
 
   const transaction = await shippo.transactions.create({
     rate: cheapest.objectId,
-    labelFileType: 'PDF',
+    labelFileType,
     async: false,
   })
 
@@ -184,9 +193,24 @@ export async function createOutboundLabel(buyerAddress: AddressCreateRequest) {
     throw new Error(transaction.messages?.map(m => m.text).join(', ') || 'Outbound label creation failed')
   }
 
+  // For ZPL, Shippo still returns a `labelUrl` pointing at the raw
+  // ZPL text (Content-Type: text/plain). Fetch it server-side so the
+  // client gets the ZPL inline and can dispatch to the Zebra agent
+  // without a CORS round-trip.
+  let zpl: string | null = null
+  if (labelFileType === 'ZPLII') {
+    try {
+      const res = await fetch(transaction.labelUrl)
+      if (res.ok) zpl = await res.text()
+    } catch {
+      // Fall through — caller can use labelUrl as a fallback download.
+    }
+  }
+
   const outRate = typeof transaction.rate === 'object' ? transaction.rate : null
   return {
     labelUrl: transaction.labelUrl,
+    zpl,
     trackingNumber: transaction.trackingNumber || '',
     carrier: outRate?.provider || 'USPS',
     cost: Number(outRate?.amount || 0),
