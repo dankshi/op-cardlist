@@ -84,6 +84,11 @@ function IntakePageContent() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [printerStatus, setPrinterStatus] = useState<'ready' | 'offline' | 'error' | 'checking'>('checking')
+  // Ambient queue + today's-received counts in the header so the
+  // operator sees "12 packages to receive · 8 received today" at a
+  // glance without leaving the screen. Matches /admin/pack pattern.
+  const [queueCount, setQueueCount] = useState<number | null>(null)
+  const [receivedToday, setReceivedToday] = useState(0)
   const scanRef = useRef<HTMLInputElement>(null)
   const autoScannedRef = useRef(false)
   const didAuthCheck = useRef(false)
@@ -106,6 +111,23 @@ function IntakePageContent() {
           .single()
         if (!profile?.is_admin) { router.push('/'); return }
         scanRef.current?.focus()
+
+        // Counts for the header. Best-effort — failure here just
+        // leaves the counts blank, doesn't block intake.
+        const startOfDay = new Date()
+        startOfDay.setHours(0, 0, 0, 0)
+        const [{ count: queue }, { count: received }] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'seller_shipped'),
+          supabase
+            .from('orders')
+            .select('id', { count: 'exact', head: true })
+            .gte('received_at', startOfDay.toISOString()),
+        ])
+        setQueueCount(queue ?? 0)
+        setReceivedToday(received ?? 0)
       } catch (err) {
         console.error('[intake] auth check failed', err)
         setError(err instanceof Error ? err.message : 'Failed to load intake')
@@ -239,17 +261,30 @@ function IntakePageContent() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Header — matches /admin/pack pattern: title left, ambient
+          stats + printer status + tools right. Queue counter gives
+          the operator a "how much is on me right now" without leaving
+          the screen. */}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-900">Intake Scanner</h1>
-          <p className="text-sm text-zinc-500 mt-1">Scan tracking number from shipping label to begin</p>
+          <h1 className="text-2xl font-bold text-zinc-900">Intake</h1>
+          <p className="text-sm text-zinc-500 mt-1">
+            Scan an inbound tracking number or product QR to begin.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 text-sm">
           <PrinterStatusBadge status={printerStatus} />
+          <div className="px-3 py-1.5 rounded-lg bg-zinc-100 text-zinc-700">
+            <span className="font-bold tabular-nums">{queueCount ?? '—'}</span>{' '}
+            <span className="text-zinc-500">awaiting intake</span>
+          </div>
+          <div className="px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700">
+            <span className="font-bold tabular-nums">{receivedToday}</span>{' '}
+            <span className="text-purple-600">received today</span>
+          </div>
           <Link
             href="/admin/intake/issues"
-            className="px-4 py-2 bg-zinc-100 text-zinc-700 rounded-lg text-sm font-medium hover:bg-zinc-200 transition-colors"
+            className="px-3 py-1.5 rounded-lg ring-1 ring-zinc-200 text-zinc-700 text-sm font-medium hover:bg-zinc-50 transition-colors"
           >
             View Issues
           </Link>
@@ -257,31 +292,34 @@ function IntakePageContent() {
       </div>
 
       {/* Always-visible scan input */}
-      <div className="mb-6">
-        <div className="relative max-w-2xl">
+      <div className="mb-6 max-w-2xl">
+        <label className="block text-xs uppercase tracking-wide text-zinc-500 font-semibold mb-2">
+          {currentStep.step === 'scan' ? 'Scan Tracking / PON / QR' : 'Scan Next'}
+        </label>
+        <div className="relative">
           <input
             ref={scanRef}
             type="text"
             placeholder={currentStep.step === 'scan'
-              ? 'Scan tracking number from shipping label...'
-              : 'Scan next tracking / PON / triage QR...'
+              ? 'Scanner will type here. Or paste a tracking number / order ID.'
+              : 'Scan next tracking, PON, or triage QR…'
             }
             value={scanInput}
             onChange={e => setScanInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleScan() }}
             autoFocus
-            className="w-full px-6 py-4 rounded-xl bg-white border-2 border-zinc-300 text-zinc-900 placeholder-zinc-400 text-lg font-mono focus:border-orange-500 focus:outline-none transition-colors"
+            className="w-full px-5 py-4 rounded-xl bg-white border-2 border-zinc-200 text-zinc-900 placeholder-zinc-400 text-lg font-mono focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
           />
           <button
             onClick={() => handleScan()}
             disabled={scanLoading}
-            className="absolute right-3 top-1/2 -translate-y-1/2 px-5 py-2 bg-orange-500 text-white rounded-lg font-semibold text-sm hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer"
+            className="absolute right-3 top-1/2 -translate-y-1/2 px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold text-sm hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {scanLoading ? 'Searching...' : 'Look Up'}
+            {scanLoading ? 'Searching…' : 'Look Up'}
           </button>
         </div>
-        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-        {successMessage && <p className="text-green-500 text-sm mt-2 font-medium">{successMessage}</p>}
+        {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+        {successMessage && <p className="text-emerald-600 text-sm mt-2 font-medium">{successMessage}</p>}
       </div>
 
       {/* Step content */}
