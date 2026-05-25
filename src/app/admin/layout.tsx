@@ -25,6 +25,12 @@ const NAV_SECTIONS: { heading: string; items: { href: string; label: string }[] 
       { href: '/admin/promos', label: 'Promo Cards' },
     ],
   },
+  {
+    heading: 'Community',
+    items: [
+      { href: '/admin/raffles', label: 'Raffles' },
+    ],
+  },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
