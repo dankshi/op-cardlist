@@ -6,6 +6,7 @@ import {
   sendBuyerReceivedEmail,
   sendBuyerAuthenticatedEmail,
 } from '@/lib/email'
+import { recordOrderRaffleEntries } from '@/lib/raffle'
 
 /** Commits the per-item auth decisions into an order-level status
  *  transition and triggers the data side-effects (consigned_intakes,
@@ -171,6 +172,19 @@ export async function POST(
     return NextResponse.json({
       error: `Failed to update order status: ${updateError.message}`,
     }, { status: 500 })
+  }
+
+  // ── Raffle entries for a clean authentication. Best-effort,
+  //    never throws — see lib/raffle.ts. Skips for exception_review
+  //    (entries fire when the order ultimately settles into
+  //    authenticated, not while it's still in triage).
+  if (nextStatus === 'authenticated') {
+    await recordOrderRaffleEntries({
+      orderId,
+      buyerId: order.buyer_id,
+      sellerId: order.seller_id,
+      items: typedItems.map(i => ({ id: i.id, quantity: i.quantity })),
+    })
   }
 
   // ── Notify buyer + seller. Each email is independently

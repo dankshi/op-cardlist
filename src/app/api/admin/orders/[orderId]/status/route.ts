@@ -8,6 +8,7 @@ import {
   sendBuyerReceivedEmail,
   sendBuyerAuthenticatedEmail,
 } from '@/lib/email'
+import { recordOrderRaffleEntries } from '@/lib/raffle'
 
 const VALID_TRANSITIONS: Record<string, string> = {
   seller_shipped: 'received',
@@ -71,7 +72,7 @@ export async function POST(
     // Check that all items have been verified or resolved before authenticating
     const { data: items } = await supabase
       .from('order_items')
-      .select('id, intake_status, card_name')
+      .select('id, intake_status, card_name, quantity')
       .eq('order_id', orderId)
 
     const unverifiedItems = (items || []).filter(
@@ -86,6 +87,17 @@ export async function POST(
     }
 
     update.authenticated_at = now
+
+    // Raffle entries — fire-and-forget on authentication. Safe to call
+    // before the update completes since the helper is idempotent (won't
+    // double-insert if the order already has entries from a prior
+    // partial run). See lib/raffle.ts.
+    await recordOrderRaffleEntries({
+      orderId,
+      buyerId: order.buyer_id,
+      sellerId: order.seller_id,
+      items: (items || []).map(i => ({ id: i.id, quantity: i.quantity })),
+    })
 
     // Credit seller balance now that card is authenticated.
     //

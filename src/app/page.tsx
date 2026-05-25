@@ -8,7 +8,7 @@ import { SITE_URL, BASE_KEYWORDS } from "@/lib/seo";
 import { CardCarousel } from "@/components/home/CardCarousel";
 import { ListingCarousel } from "@/components/home/ListingCarousel";
 import { SellCTA } from "@/components/home/SellCTA";
-import { TrustStrip } from "@/components/home/TrustStrip";
+import { LaunchRaffleBanner } from "@/components/home/LaunchRaffleBanner";
 import { MarketplacePulse } from "@/components/home/MarketplacePulse";
 import { HowItWorks } from "@/components/home/HowItWorks";
 import { FAQ } from "@/components/home/FAQ";
@@ -264,12 +264,8 @@ export default async function Home() {
 
   return (
     <div>
-      {/* ===== TRUST STRIP ===== */}
-      <TrustStrip
-        cardCount={totalCards}
-        setCount={sets.length}
-        activeListings={activeListingsCount}
-      />
+      {/* ===== LAUNCH RAFFLE (community event placeholder) ===== */}
+      <LaunchRaffleBanner />
 
       {/* ===== RECENTLY VIEWED (returning users) ===== */}
       <RecentlyViewed />
