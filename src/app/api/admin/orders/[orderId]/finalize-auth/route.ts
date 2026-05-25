@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import {
-  sendSellerStatusUpdateEmail,
-  sendBuyerReceivedEmail,
   sendBuyerAuthenticatedEmail,
+  sendBuyerExceptionReviewEmail,
+  sendSellerExceptionEmail,
+  type ExceptionItemSummary,
 } from '@/lib/email'
 import { recordOrderRaffleEntries } from '@/lib/raffle'
 
@@ -189,12 +190,27 @@ export async function POST(
 
   // ── Notify buyer + seller. Each email is independently
   //    try/catch'd so a Resend hiccup doesn't break the others.
+  //    For exception_review we send the bespoke per-exception
+  //    email with item-by-item summaries; for clean authenticated
+  //    orders the existing status route's authenticated branch
+  //    already emails the seller about their credit (we just send
+  //    the buyer their "authenticated, shipping soon" note here).
+  const exceptionItems: ExceptionItemSummary[] = typedItems
+    .filter(i => i.exception_types.length > 0 || i.auth_decision === 'fake')
+    .map(i => ({
+      card_name: i.card_name || 'Unknown card',
+      exceptions: i.exception_types.map(t => ({
+        type: t as ExceptionItemSummary['exceptions'][number]['type'],
+        details: (i.exception_details as Record<string, unknown>)[t] as Record<string, unknown>,
+      })),
+    }))
+
   await notifyParties({
     orderId,
     buyerId: order.buyer_id,
     sellerId: order.seller_id,
     nextStatus,
-    hasFake: typedItems.some(i => i.auth_decision === 'fake'),
+    exceptionItems,
   })
 
   // Audit row — mirrors the per-item logs we wrote in auth-decision.
@@ -226,13 +242,13 @@ async function notifyParties({
   buyerId,
   sellerId,
   nextStatus,
-  hasFake,
+  exceptionItems,
 }: {
   orderId: string
   buyerId: string
   sellerId: string
   nextStatus: 'authenticated' | 'exception_review'
-  hasFake: boolean
+  exceptionItems: ExceptionItemSummary[]
 }) {
   const adminSupabase = getSupabaseAdmin()
 
@@ -255,12 +271,15 @@ async function notifyParties({
       if (nextStatus === 'authenticated') {
         await sendBuyerAuthenticatedEmail({ buyerEmail, buyerName, orderId })
       } else {
-        // exception_review — using sendBuyerReceivedEmail as the
-        // closest fit for v1 ("we have your card and are working on
-        // it"). Tailored exception-specific email lives in a
-        // follow-up; for now buyer gets a generic "we're handling it"
-        // note rather than total silence. Better than nothing.
-        await sendBuyerReceivedEmail({ buyerEmail, buyerName, orderId })
+        // Bespoke per-exception email — Phase 4 of the auth flow.
+        // Replaces the generic "we got your card" stub with item-by-item
+        // summaries the buyer can actually act on (or at least understand).
+        await sendBuyerExceptionReviewEmail({
+          buyerEmail,
+          buyerName,
+          orderId,
+          items: exceptionItems,
+        })
       }
     } catch (err) {
       console.error('[finalize-auth] buyer email failed', err)
@@ -269,22 +288,17 @@ async function notifyParties({
 
   // ── Seller email
   // For 'authenticated' clean orders, the existing status route's
-  // 'authenticated' branch will email the seller separately when it
-  // credits their balance. Here we only email the seller for
-  // exception_review (and if any item was fake, the email needs to
-  // reflect that the disposition was already chosen by the
-  // authenticator).
+  // 'authenticated' branch emails the seller about their credit
+  // separately. Here we only email the seller for exception_review
+  // with the bespoke per-exception summary so they know what we
+  // found and what we're doing (consign / buyout / return / destroy).
   if (sellerEmail && nextStatus === 'exception_review') {
     try {
-      // v1: reuse the seller status-update template with a generic
-      // 'received' message. A bespoke exception-summary email lives
-      // in a follow-up — for now the seller knows their card
-      // arrived and is in review.
-      await sendSellerStatusUpdateEmail({
+      await sendSellerExceptionEmail({
         sellerEmail,
         sellerName,
         orderId,
-        status: hasFake ? 'received' : 'received',  // placeholder until exception-specific template lands
+        items: exceptionItems,
       })
     } catch (err) {
       console.error('[finalize-auth] seller email failed', err)

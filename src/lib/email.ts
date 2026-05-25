@@ -307,6 +307,198 @@ export async function sendSellerStatusUpdateEmail({
   })
 }
 
+// ─── Exception emails (Auth Flow Phase 4) ────────────────────────
+
+/** Per-item exception summary used in both buyer and seller exception
+ *  emails. Each item can carry multiple exceptions (Wrong Card +
+ *  Conditional, for example) — we render one line per exception so
+ *  the recipient sees the full picture. */
+export interface ExceptionItemSummary {
+  card_name: string
+  exceptions: Array<{
+    type: 'incorrect_product' | 'fake' | 'conditional' | 'physical_damage'
+    details: Record<string, unknown>
+  }>
+}
+
+/** Buyer-friendly summary line per exception type. Plain language —
+ *  the buyer doesn't care about our internal taxonomy, they care that
+ *  the card they bought isn't what was listed. */
+function buyerSummary(ex: ExceptionItemSummary['exceptions'][number]): string {
+  switch (ex.type) {
+    case 'incorrect_product': {
+      const d = ex.details as { received_type?: string; received_card_name?: string }
+      if (d.received_type === 'wrong_card') {
+        return d.received_card_name
+          ? `The seller shipped <strong>${d.received_card_name}</strong> instead of the card you ordered.`
+          : `The seller shipped the wrong card.`
+      }
+      if (d.received_type === 'slab') {
+        return `The seller shipped a graded slab, but you ordered a raw card.`
+      }
+      if (d.received_type === 'raw') {
+        return `The seller shipped a raw card, but you ordered a graded slab.`
+      }
+      return `The product didn't match the listing.`
+    }
+    case 'fake': {
+      return `Our authenticators determined the card is not authentic.`
+    }
+    case 'conditional': {
+      const d = ex.details as { actual_condition?: string }
+      const cond = d.actual_condition === 'lightly_played' ? 'Lightly Played'
+        : d.actual_condition === 'heavily_played' ? 'Heavily Played'
+        : 'lower than listed'
+      return `The card is in <strong>${cond}</strong> condition — below what the listing claimed.`
+    }
+    case 'physical_damage': {
+      return `The card arrived with physical damage.`
+    }
+  }
+}
+
+/** Seller-side summary line per exception. More clinical than the
+ *  buyer version — the seller already knows the card they sent, so
+ *  we tell them what we found and what happens next. */
+function sellerSummary(ex: ExceptionItemSummary['exceptions'][number]): string {
+  switch (ex.type) {
+    case 'incorrect_product': {
+      const d = ex.details as { received_type?: string }
+      const what = d.received_type === 'wrong_card' ? 'a different card than listed'
+        : d.received_type === 'slab' ? 'a graded slab instead of the listed raw card'
+        : d.received_type === 'raw' ? 'a raw card instead of the listed graded slab'
+        : 'something other than what was listed'
+      return `<strong>Wrong product:</strong> we received ${what}. The card will be relisted on consignment.`
+    }
+    case 'fake': {
+      const d = ex.details as { disposition?: string }
+      if (d.disposition === 'return_to_seller') {
+        return `<strong>Authenticity failed:</strong> we determined the card is not authentic. We'll ship it back to you with tracking.`
+      }
+      return `<strong>Authenticity failed:</strong> we determined the card is not authentic. Per intake instructions, the card will be destroyed.`
+    }
+    case 'conditional': {
+      const d = ex.details as { actual_condition?: string; damage_areas?: string[] }
+      const cond = d.actual_condition === 'lightly_played' ? 'Lightly Played'
+        : d.actual_condition === 'heavily_played' ? 'Heavily Played'
+        : 'lower than the listing'
+      const areas = d.damage_areas && d.damage_areas.length > 0
+        ? ` (${d.damage_areas.join(', ')})` : ''
+      return `<strong>Condition downgrade:</strong> grader marked the card ${cond}${areas}. It'll be relisted on consignment at the new condition.`
+    }
+    case 'physical_damage': {
+      const d = ex.details as { attribution?: string }
+      if (d.attribution === 'courier') {
+        return `<strong>Damaged in transit:</strong> the courier damaged the card. We're buying you out at the sale price and filing a carrier claim — no action needed from you.`
+      }
+      if (d.attribution === 'nomi') {
+        return `<strong>Damaged in our handling:</strong> we damaged the card and are buying you out at the sale price. We're sorry.`
+      }
+      return `<strong>Damaged on arrival:</strong> the card was damaged when we received it. It'll be relisted on consignment at a damaged grade.`
+    }
+  }
+}
+
+function renderItemBlock(item: ExceptionItemSummary, fmt: 'buyer' | 'seller'): string {
+  const fn = fmt === 'buyer' ? buyerSummary : sellerSummary
+  return `
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:10px;">
+      <p style="margin:0 0 6px;font-weight:600;color:#92400e;">${item.card_name}</p>
+      ${item.exceptions.map(ex => `<p style="margin:0;color:#78350f;font-size:14px;line-height:1.5;">${fn(ex)}</p>`).join('')}
+    </div>
+  `
+}
+
+/** Buyer-facing: order has been flagged for exception review. Replaces
+ *  the stub I left in finalize-auth that just sent the generic
+ *  "received" template. The buyer needs to know there's a problem *now*
+ *  rather than waiting until ops resolves it — most exception orders
+ *  end in a refund + relisting, and the buyer should hear that journey
+ *  start, not just the conclusion. */
+export async function sendBuyerExceptionReviewEmail({
+  buyerEmail,
+  buyerName,
+  orderId,
+  items,
+}: {
+  buyerEmail: string
+  buyerName: string
+  orderId: string
+  items: ExceptionItemSummary[]
+}) {
+  const itemBlocks = items.map(item => renderItemBlock(item, 'buyer')).join('')
+
+  await getResend().emails.send({
+    from: `nomi market <${FROM}>`,
+    to: buyerEmail,
+    subject: `We found an issue with your order — #${orderId.slice(0, 8)}`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;">
+        <h1 style="color:#18181b;font-size:24px;margin-bottom:4px;">There's an issue with your order</h1>
+        <p style="color:#71717a;margin-top:0;">Hi ${buyerName || 'there'}, our authenticators found one or more issues with the cards in Order #${orderId.slice(0, 8)} when they arrived at our center.</p>
+
+        ${itemBlocks}
+
+        <div style="background:#f4f4f5;border-radius:8px;padding:16px;margin-top:16px;">
+          <p style="margin:0 0 6px;font-weight:600;color:#18181b;">What happens next</p>
+          <p style="margin:0;color:#3f3f46;font-size:14px;line-height:1.5;">Our team is processing the resolution now — usually a refund + a re-listing of the card if you still want it. You'll hear from us within 24 hours with specifics. No action needed from you right now.</p>
+        </div>
+
+        <div style="margin-top:24px;text-align:center;">
+          <a href="${SITE_URL}/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+            View Order
+          </a>
+        </div>
+
+        <p style="margin-top:32px;font-size:12px;color:#a1a1aa;text-align:center;">nomi market &middot; The Trusted TCG Marketplace</p>
+      </div>
+    `,
+  })
+}
+
+/** Seller-facing: their item(s) failed authentication or condition
+ *  review. Tells them what we found and what we're doing — including
+ *  the financial consequence (buyout vs consignment vs return). */
+export async function sendSellerExceptionEmail({
+  sellerEmail,
+  sellerName,
+  orderId,
+  items,
+}: {
+  sellerEmail: string
+  sellerName: string
+  orderId: string
+  items: ExceptionItemSummary[]
+}) {
+  const itemBlocks = items.map(item => renderItemBlock(item, 'seller')).join('')
+
+  await getResend().emails.send({
+    from: `nomi market <${FROM}>`,
+    to: sellerEmail,
+    subject: `Authentication outcome — Order #${orderId.slice(0, 8)}`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;">
+        <h1 style="color:#18181b;font-size:24px;margin-bottom:4px;">Authentication outcome</h1>
+        <p style="color:#71717a;margin-top:0;">Hi ${sellerName || 'there'}, here's what our authenticators found on Order #${orderId.slice(0, 8)}.</p>
+
+        ${itemBlocks}
+
+        <div style="background:#f4f4f5;border-radius:8px;padding:16px;margin-top:16px;">
+          <p style="margin:0;color:#3f3f46;font-size:14px;line-height:1.5;">Any consignment or buyout credits will land in your wallet automatically once the disposition is processed. Returns ship within 2 business days.</p>
+        </div>
+
+        <div style="margin-top:24px;text-align:center;">
+          <a href="${SITE_URL}/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+            View Order
+          </a>
+        </div>
+
+        <p style="margin-top:32px;font-size:12px;color:#a1a1aa;text-align:center;">nomi market &middot; The Trusted TCG Marketplace</p>
+      </div>
+    `,
+  })
+}
+
 // ─── Buyer: Card Received at Nomi ─────────────────────────────────
 
 /** Sent when the order transitions to `received` — Nomi has the card in
