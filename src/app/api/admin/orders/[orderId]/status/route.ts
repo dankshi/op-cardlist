@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { createOutboundLabel } from '@/lib/shippo'
+import { notifyLabelFailure } from '@/lib/slack'
 import {
   sendSellerStatusUpdateEmail,
   sendBuyerShippedToBuyerEmail,
@@ -172,9 +173,11 @@ export async function POST(
         // track it AND nobody would know the auto-label silently
         // failed. Force the admin to print manually via the order
         // detail page and retry, or fix the address.
+        const msg = err instanceof Error ? err.message : 'unknown error'
         console.error('Outbound label generation failed:', err)
+        notifyLabelFailure({ orderId, errorMessage: msg, side: 'outbound' })
         return NextResponse.json({
-          error: `Couldn't generate outbound shipping label: ${err instanceof Error ? err.message : 'unknown error'}. Print the label manually from this page (the button is in the "Outbound" card), then retry "Mark Shipped to Buyer".`,
+          error: `Couldn't generate outbound shipping label: ${msg}. Print the label manually from this page (the button is in the "Outbound" card), then retry "Mark Shipped to Buyer".`,
         }, { status: 502 })
       }
     }

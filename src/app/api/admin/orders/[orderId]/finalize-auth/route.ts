@@ -7,6 +7,7 @@ import {
   sendSellerExceptionEmail,
   type ExceptionItemSummary,
 } from '@/lib/email'
+import { notifyExceptionReview, notifyBuyoutCreated } from '@/lib/slack'
 import { recordOrderRaffleEntries } from '@/lib/raffle'
 
 /** Commits the per-item auth decisions into an order-level status
@@ -128,13 +129,21 @@ export async function POST(
       if (exType === 'physical_damage') {
         const det = details as { attribution: 'courier' | 'nomi' | 'seller'; notes?: string } | undefined
         if (det?.attribution === 'courier' || det?.attribution === 'nomi') {
+          const buyoutAmount = Number(item.unit_price) * item.quantity
           await adminSupabase.from('buyouts').insert({
             order_item_id: item.id,
             seller_id: order.seller_id,
-            amount: Number(item.unit_price) * item.quantity,
+            amount: buyoutAmount,
             reason: `physical_damage:${det.attribution}`,
             carrier_claim_status: det.attribution === 'courier' ? 'pending' : null,
             notes: det.notes ?? null,
+          })
+          // Slack ping — buyouts are real money out the door, ops
+          // should see them surface. Fire-and-forget.
+          notifyBuyoutCreated({
+            orderId,
+            amount: buyoutAmount,
+            attribution: det.attribution,
           })
           continue
         }
@@ -212,6 +221,18 @@ export async function POST(
     nextStatus,
     exceptionItems,
   })
+
+  // ── Slack ping if we routed to exception_review — ops needs to
+  //    know there's resolution work pending. Skipped for clean
+  //    authenticated orders (those are the happy path; no admin
+  //    action required).
+  if (nextStatus === 'exception_review' && exceptionItems.length > 0) {
+    const allTypes = exceptionItems.flatMap(i => i.exceptions.map(e => e.type))
+    notifyExceptionReview({
+      orderId,
+      exceptionTypes: allTypes,
+    })
+  }
 
   // Audit row — mirrors the per-item logs we wrote in auth-decision.
   await adminSupabase.from('intake_activity_log').insert({

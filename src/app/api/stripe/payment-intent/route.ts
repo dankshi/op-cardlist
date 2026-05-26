@@ -5,6 +5,7 @@ import { getStripe } from '@/lib/stripe'
 import { calculatePayout, type FulfillmentId, type TierId } from '@/lib/fees'
 import { reserveListing, releaseReservation } from '@/lib/inventory'
 import { evaluateOrderRisk, extractClientIp } from '@/lib/risk'
+import { notifyOrderUnderReview } from '@/lib/slack'
 
 // Stripe requires a minimum charge of $0.50. We leave at least $1 on the card to be safe.
 const MIN_CARD_AMOUNT = 1
@@ -301,6 +302,15 @@ export async function POST(request: Request) {
         review_reason: `marketplace_risk:${risk.reasons.join(',')}`,
       })
       .eq('id', order.id)
+
+    // Ping Slack so an admin sees the new under_review order without
+    // waiting for the next dashboard refresh. Fire-and-forget, never
+    // throws — see src/lib/slack.ts.
+    notifyOrderUnderReview({
+      orderId: order.id,
+      reasons: risk.reasons,
+      total: subtotal,
+    })
 
     // Don't create a PaymentIntent — the order is being reviewed and the
     // buyer can't proceed to payment yet. Return a structured status so
