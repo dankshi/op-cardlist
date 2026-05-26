@@ -216,6 +216,17 @@ export default function AdminPackPage() {
         window.open(data.label_url, '_blank', 'noopener,noreferrer')
       }
 
+      // Open the buyer-facing packing slip in a new tab. The endpoint
+      // auto-fires window.print() on load so the operator's regular
+      // paper printer pops up the system dialog without an extra
+      // click. Locked decision from the design doc: packing slip
+      // goes in every box.
+      window.open(
+        `/api/admin/orders/${data.order_id}/outbound-packing-slip`,
+        '_blank',
+        'noopener,noreferrer',
+      )
+
       setShipped({
         order_id: data.order_id,
         label_url: data.label_url,
@@ -559,6 +570,20 @@ function ShippedCard({ result }: { result: ShipResult }) {
           </>
         )}
       </p>
+      {/* Packing slip — buyer-facing slip that goes IN THE BOX with
+          the card. Opens in a new tab; the endpoint auto-fires the
+          browser print dialog on load so the operator's flow stays
+          "scan, ship, print slip" without an extra confirm click. */}
+      <div className="mt-4">
+        <a
+          href={`/api/admin/orders/${result.order_id}/outbound-packing-slip`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block px-4 py-2 rounded-lg bg-white text-emerald-700 ring-1 ring-emerald-300 text-sm font-semibold hover:bg-emerald-50 transition-colors"
+        >
+          Print Packing Slip →
+        </a>
+      </div>
       <p className="text-xs text-emerald-600/70 mt-4">
         Resetting for next scan…
       </p>
