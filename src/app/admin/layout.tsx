@@ -14,13 +14,15 @@ const NAV_SECTIONS: { heading: string; items: { href: string; label: string }[] 
     heading: 'Fulfillment',
     items: [
       // Ordered to mirror the order lifecycle: receive → authenticate
-      // → pack → resolve issues / risk. Reading top-to-bottom walks
-      // you through a package's journey.
+      // → pack → resolve issues / risk → manage post-exception
+      // inventory. Reading top-to-bottom walks you through a package's
+      // journey including its afterlife when something went wrong.
       { href: '/admin/orders', label: 'Orders' },
       { href: '/admin/intake', label: 'Intake' },
       { href: '/admin/pack', label: 'Pack' },
       { href: '/admin/intake/issues', label: 'Issues' },
       { href: '/admin/risk', label: 'Risk Review' },
+      { href: '/admin/inventory', label: 'Inventory' },
     ],
   },
   {
