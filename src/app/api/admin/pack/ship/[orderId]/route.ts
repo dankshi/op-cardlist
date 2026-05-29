@@ -15,7 +15,7 @@ import { sendBuyerShippedToBuyerEmail } from '@/lib/email'
  *
  *  Admin-only. */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ orderId: string }> }
 ) {
   const { orderId } = await params
@@ -35,6 +35,17 @@ export async function POST(
   if (!profile?.is_admin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+
+  // Label format follows the client's detected printer:
+  //   - 'ZPL'  → Zebra ZD printer present, dispatch raw ZPL to BrowserPrint
+  //   - 'PDF'  → no ZPL printer (ZSB DP12 / AirPrint / inkjet), open the
+  //              PDF in a tab and print via the OS dialog
+  // Default PDF — the universal path. The client only asks for ZPL
+  // when it has actually detected a Zebra. For ZPL we still get a
+  // valid label_url back (it points at the ZPL text), but the client
+  // won't open it; for PDF the label_url is a real printable PDF.
+  const body = await request.json().catch(() => ({}))
+  const format: 'PDF' | 'ZPL' = body?.format === 'ZPL' ? 'ZPL' : 'PDF'
 
   const admin = getSupabaseAdmin()
 
@@ -78,7 +89,8 @@ export async function POST(
     }, { status: 400 })
   }
 
-  // ── Generate the label as ZPL for direct Zebra dispatch ───────
+  // ── Generate the label in the format the client's printer needs.
+  //    ZPL → Zebra direct dispatch; PDF → universal print dialog.
   let label: Awaited<ReturnType<typeof createOutboundLabel>>
   try {
     label = await createOutboundLabel(
@@ -93,7 +105,7 @@ export async function POST(
         email: buyerEmail,
         phone: addr.phone,
       },
-      { format: 'ZPL' },
+      { format },
     )
   } catch (err) {
     console.error('Pack outbound label generation failed:', err)

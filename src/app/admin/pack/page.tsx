@@ -195,8 +195,17 @@ export default function AdminPackPage() {
     setShipping(true)
     setError(null)
     try {
+      // Ask for the label format that matches the detected printer:
+      // ZPL for a Zebra (direct BrowserPrint dispatch), PDF otherwise
+      // (ZSB DP12 / AirPrint / inkjet — opens in a tab to print via
+      // the OS dialog). Requesting PDF when there's no Zebra means the
+      // label_url we get back is a real printable PDF, not a ZPL text
+      // file the browser can't render.
+      const wantZpl = printerStatus === 'ready'
       const res = await fetch(`/api/admin/pack/ship/${preview.id}`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: wantZpl ? 'ZPL' : 'PDF' }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -205,11 +214,10 @@ export default function AdminPackPage() {
         return
       }
 
-      // Direct-to-Zebra dispatch. ZPL is the happy path; if Shippo
-      // couldn't deliver ZPL (rare) we fall back to opening the PDF
-      // tab so the operator can print manually.
+      // Dispatch the print. Zebra path: send ZPL to BrowserPrint.
+      // Universal path: open the PDF in a tab → OS print dialog.
       let printed = false
-      if (data.zpl) {
+      if (wantZpl && data.zpl) {
         printed = await printZpl(data.zpl as string)
       }
       if (!printed && data.label_url) {
@@ -363,12 +371,22 @@ function PrinterStatusBadge({ status }: { status: 'ready' | 'offline' | 'error' 
     status === 'ready' ? 'bg-emerald-50 text-emerald-700'
       : status === 'checking' ? 'bg-zinc-100 text-zinc-500'
       : 'bg-amber-50 text-amber-700'
+  // "offline" here means specifically "no Zebra ZPL printer via
+  // BrowserPrint" — labels still print fine via the PDF/HTML
+  // fallback on any other printer (ZSB DP12, AirPrint, inkjet). So
+  // we phrase the non-ready state as "PDF mode" rather than the
+  // alarming "offline", which would make a DP12 operator think
+  // they're blocked when they aren't.
   const label =
-    status === 'ready' ? 'Printer ready'
+    status === 'ready' ? 'Zebra ready'
       : status === 'checking' ? 'Printer…'
-      : 'Printer offline'
+      : 'PDF mode'
+  const title =
+    status === 'ready' ? 'Zebra detected — labels print directly via BrowserPrint'
+      : status === 'checking' ? 'Checking for a Zebra printer…'
+      : 'No Zebra detected — labels open as a printable PDF for any printer'
   return (
-    <div className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${cls}`}>
+    <div className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${cls}`} title={title}>
       <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
         status === 'ready' ? 'bg-emerald-500'
           : status === 'checking' ? 'bg-zinc-400'

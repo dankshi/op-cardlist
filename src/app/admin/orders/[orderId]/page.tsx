@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { ConditionBadge } from '@/components/marketplace/ConditionBadge'
-import { printProductLabel } from '@/lib/zebra'
+import { printOrderQrLabels } from '@/lib/zebra'
 import type { Order, OrderItem, CardCondition } from '@/types/database'
 
 const STATUS_STYLES: Record<string, string> = {
@@ -266,10 +266,11 @@ export default function AdminOrderDetailPage() {
               Authenticate Items &rarr;
             </Link>
           )}
-          {/* Always-available reprint of Product QR labels. Useful
-              when intake's print failed mid-batch, a sticker got
-              damaged, or during dev/testing the pack flow without
-              going through the full receive step. */}
+          {/* Always-available reprint of Product QR labels. Printer-
+              agnostic: ZPL fast path for Zebra ZD printers, HTML
+              fallback for ZSB DP12 / AirPrint / any other printer.
+              Useful when intake's print failed mid-batch, a sticker
+              got damaged, or when testing the pack flow. */}
           <button
             type="button"
             onClick={async () => {
@@ -278,22 +279,20 @@ export default function AdminOrderDetailPage() {
                 alert('Order has no items')
                 return
               }
-              const shortId = order.id.slice(0, 8).toUpperCase()
-              let printed = 0
-              let failed = 0
-              for (const item of items) {
-                const r = await printProductLabel(
-                  item.id,
-                  item.card_name || item.card_id,
-                  shortId,
-                )
-                if (r.success) printed++
-                else failed++
+              const { method, count } = await printOrderQrLabels(
+                order.id,
+                items.map(i => ({ id: i.id, card_name: i.card_name || i.card_id })),
+                order.id.slice(0, 8).toUpperCase(),
+              )
+              if (method === 'zpl') {
+                alert(`Printed ${count} label${count === 1 ? '' : 's'} to the Zebra.`)
               }
-              alert(`Printed ${printed} label${printed === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}.`)
+              // For the HTML path a new tab opened with the print
+              // dialog — no alert needed (an alert would steal focus
+              // from the print window).
             }}
             className="text-sm font-medium text-zinc-500 hover:text-zinc-700"
-            title="Reprint Product QR labels for every item — useful for testing pack flow"
+            title="Reprint Product QR labels for every item (works on any printer)"
           >
             Print Labels
           </button>

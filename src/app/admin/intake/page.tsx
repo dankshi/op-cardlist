@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { getPrinterStatus, printProductLabel, printTriageLabel } from '@/lib/zebra'
+import { getPrinterStatus, printTriageLabel, printOrderQrLabels } from '@/lib/zebra'
 import type { Order, OrderItem, IntakeIssue, IntakeIssueType, TriagePackage, TrackingMatchType } from '@/types/database'
 
 // ============================================
@@ -544,20 +544,33 @@ function IntakePageContent() {
 // ============================================
 
 function PrinterStatusBadge({ status }: { status: string }) {
+  // Non-ready states are amber, not red — labels still print via the
+  // PDF/HTML fallback on any printer (ZSB DP12, AirPrint, inkjet), so
+  // "no Zebra" isn't a blocker. Phrasing it "PDF mode" keeps a DP12
+  // operator from thinking they're stuck.
   const styles: Record<string, string> = {
     ready: 'bg-green-100 text-green-700',
-    offline: 'bg-red-100 text-red-700',
-    error: 'bg-red-100 text-red-700',
+    offline: 'bg-amber-100 text-amber-700',
+    error: 'bg-amber-100 text-amber-700',
     checking: 'bg-zinc-100 text-zinc-500',
   }
   const labels: Record<string, string> = {
-    ready: 'Printer Ready',
-    offline: 'Printer Offline',
-    error: 'Printer Error',
+    ready: 'Zebra Ready',
+    offline: 'PDF Mode',
+    error: 'PDF Mode',
     checking: 'Checking...',
   }
+  const titles: Record<string, string> = {
+    ready: 'Zebra detected — labels print directly via BrowserPrint',
+    offline: 'No Zebra detected — labels open as a printable PDF for any printer',
+    error: 'No Zebra detected — labels open as a printable PDF for any printer',
+    checking: 'Checking for a Zebra printer…',
+  }
   return (
-    <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${styles[status] || styles.offline}`}>
+    <span
+      className={`text-xs px-3 py-1.5 rounded-full font-medium ${styles[status] || styles.offline}`}
+      title={titles[status] || ''}
+    >
       {labels[status] || 'Unknown'}
     </span>
   )
@@ -623,11 +636,15 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
       }
     }
 
-    // 2. Print product QR labels for each item
-    if (order.items) {
-      for (const item of order.items) {
-        await printProductLabel(item.id, item.card_name, order.id.slice(0, 8).toUpperCase())
-      }
+    // 2. Print product QR labels for each item. Printer-agnostic:
+    //    ZPL fast path for the team's Zebra ZD printers, HTML
+    //    fallback for ZSB DP12 / AirPrint / any other printer.
+    if (order.items && order.items.length > 0) {
+      await printOrderQrLabels(
+        order.id,
+        order.items.map(i => ({ id: i.id, card_name: i.card_name })),
+        order.id.slice(0, 8).toUpperCase(),
+      )
     }
 
     // 3. Refresh order data and move to details
@@ -715,7 +732,7 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
             </button>
           )}
           {!printerReady && !alreadyReceived && (
-            <p className="text-xs text-red-500 self-center">Printer offline — labels will queue</p>
+            <p className="text-xs text-amber-600 self-center">No Zebra — labels open as a PDF to print</p>
           )}
         </div>
       </div>
@@ -995,8 +1012,12 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, onReset, sho
   }
 
   const handlePrintItemLabel = async (item: OrderItem) => {
-    await printProductLabel(item.id, item.card_name, order.id.slice(0, 8).toUpperCase())
-    showSuccess('Label printed')
+    const { method } = await printOrderQrLabels(
+      order.id,
+      [{ id: item.id, card_name: item.card_name }],
+      order.id.slice(0, 8).toUpperCase(),
+    )
+    showSuccess(method === 'zpl' ? 'Label printed' : 'Label opened for printing')
   }
 
   const verifiedCount = order.items?.filter(i => i.intake_status === 'verified' || i.intake_status === 'resolved').length || 0

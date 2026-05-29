@@ -27,15 +27,21 @@ Four admin screens, all live and wired end-to-end. We've pre-seeded four test or
 - **USB barcode scanner** plugged in via USB.
 - A workstation running **Chrome or Edge** (Firefox works too but BrowserPrint is best-tested on Chromium).
 
-### 2. Install Zebra BrowserPrint
+### 2. Printer setup — two paths
 
-Free agent app that lets the browser talk to the printer.
+**Path A — Zebra ZD-series printer (ZPL via BrowserPrint):**
+- Download the agent: https://www.zebra.com/us/en/support-downloads/printer-software/by-request-software.html
+- Run the installer, open the BrowserPrint tray icon, confirm your Zebra is listed and **default**.
+- Load **2"×1"** direct-thermal labels for QR stickers; a second printer with **4"×6"** rolls for shipping labels if you have one.
+- Admin screens show a green **"Zebra ready"** pill and print instantly, no dialog.
 
-- Download: https://www.zebra.com/us/en/support-downloads/printer-software/by-request-software.html
-- Run the installer for your OS.
-- Open the BrowserPrint tray icon → confirm your Zebra is listed and marked **default**.
-- Load a roll of **2"×1" direct-thermal labels** for QR stickers (we'll print a few during testing).
-- If you have a second printer with **4"×6" rolls**, set up that one too — outbound shipping labels print to it.
+**Path B — any other printer (ZSB DP12, AirPrint, regular inkjet/laser):**
+- **You do NOT need BrowserPrint.** Skip Path A entirely.
+- Admin screens detect there's no Zebra and switch to **"PDF mode"** automatically — you'll see an amber pill saying so. **This is normal, not an error.**
+- When you print a QR label or shipping label, a new browser tab opens with the label and the print dialog fires automatically. Pick your printer + label size, print.
+- For the **DP12**: if it's set up as an AirPrint / system printer, it shows up in the print dialog directly. If you only have the ZSB app, save the opened PDF/image and import it into ZSB Designer to print.
+
+Either path works — the system adapts to whatever printer it finds. We'll note where the two differ in the scenarios below.
 
 ### 3. Verify the scanner
 
@@ -53,7 +59,9 @@ https://nomimarket.com/admin
 
 ### 5. Confirm the printer indicator
 
-Open `/admin/pack` — there's a **"Printer ready"** pill in the header. Green = good. Amber = BrowserPrint can't see the printer (revisit step 2 or 3).
+Open `/admin/pack` — there's a printer pill in the header.
+- **Green "Zebra ready"** → Path A, labels print directly.
+- **Amber "PDF mode"** → Path B, labels open as a printable PDF. **This is expected if you're not on a Zebra — not a problem.**
 
 ---
 
@@ -82,14 +90,15 @@ You can also see all four at `/admin/orders` — they'll be grouped by status.
 4. Verify the order details look right (buyer name, items list).
 5. Click **"Receive Package & Print Labels"**. Two things should happen:
    - The order's status flips to `received` (you'll see this on the order detail page).
-   - One Product QR sticker prints for each item on the Zebra.
-6. Pick up the printed stickers. Each should have a QR code on the left and the card name + order ID on the right. Stick one on a physical card (any card — a real card from a binder works, or a printed mockup).
+   - **Path A (Zebra):** one Product QR sticker prints for each item, instantly.
+   - **Path B (DP12/other):** a new tab opens with all the QR labels + the print dialog. Pick your printer and label size, print.
+6. Pick up the printed stickers/labels. Each has a QR code + the card name + order ID. Stick one on a physical card (any card — a real card from a binder works, or a printed mockup).
 7. Move on to Scenario B with the labels in hand.
 
-**Expected:** Order A is now in `received` status. Stickers are physically printed and stuck on cards.
+**Expected:** Order A is now in `received` status. Labels are printed and stuck on cards.
 
 **If it fails:**
-- "Printer offline" — re-check BrowserPrint is running.
+- Nothing printed on Path A — re-check BrowserPrint is running, or just let it fall back (it should open the PDF tab if no Zebra is found).
 - "Order not found" — paste the order's UUID instead of the tracking number.
 - Tell Henry exactly what error appeared.
 
@@ -135,7 +144,7 @@ This requires that Scenario A was completed (you should have a physical card wit
 - Walk Order A through Scenario B too (full clean pass) so it lands in `authenticated`, then pack it; OR
 - Use the pre-seeded Order C — go to `/admin/orders/[C's id]` and click **"Print Labels"** at the top of the items section. That reprints fresh QR stickers for Order C; stick one on a card.
 
-1. Go to **`/admin/pack`**. The scan input is auto-focused. Printer indicator should be green.
+1. Go to **`/admin/pack`**. The scan input is auto-focused. Printer pill shows green "Zebra ready" or amber "PDF mode" — either is fine.
 2. Squeeze the scanner at the QR sticker.
 3. The lookup fires automatically. A preview card appears with:
    - Buyer name + shipping address
@@ -143,11 +152,12 @@ This requires that Scenario A was completed (you should have a physical card wit
    - The card you scanned is highlighted with an orange ring
 4. Verify it's the right order, then click **"Generate + Print Label"** (or press Enter).
 5. **What should happen, in order:**
-   - Shipping label prints on your Zebra (or 4"×6" printer if you have a second one)
+   - Shipping label: **Path A (Zebra)** prints directly; **Path B (DP12/other)** opens the 4"×6" label PDF in a new tab with the print dialog
    - Order's status flips to `shipped_to_buyer`
-   - A new browser tab opens with the buyer-facing packing slip → browser print dialog pops automatically
+   - A second new tab opens with the buyer-facing packing slip → print dialog pops automatically
    - Pack screen shows "Shipped ✓" with carrier + tracking
    - After ~2.5 seconds, screen auto-resets for next scan
+   - (On Path B you'll get two print dialogs — one for the shipping label, one for the packing slip. That's expected.)
 6. Print the packing slip (Cmd+P or click Print in the print dialog).
 7. Confirm the buyer receives the "your card has shipped" email.
 
