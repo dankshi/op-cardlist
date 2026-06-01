@@ -101,10 +101,6 @@ type VerifyHistoryEntry = {
   flaggedCount: number
 }
 
-// What the most recent implicit-verify commit touched, so we can offer a
-// one-tap Undo before the operator gets too far down the next package.
-type UndoToast = { orderId: string; shortId: string; itemIds: string[]; count: number }
-
 // Session history is persisted to localStorage so it survives reloads on
 // the warehouse machine. Cleared via the Clear button in the panel.
 const INTAKE_HISTORY_KEY = 'nomi.intake.sessionHistory'
@@ -145,19 +141,15 @@ function IntakePageContent() {
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
 
-  // Implicit-verify session state. History fills up under the workspace as
-  // packages are committed; the toast offers a one-tap Undo on the last one.
+  // Session history fills up under the workspace as packages are received.
   const [sessionHistory, setSessionHistory] = useState<VerifyHistoryEntry[]>([])
-  const [undoToast, setUndoToast] = useState<UndoToast | null>(null)
-  // Mirror currentStep in a ref so handleScan can commit the order the
-  // operator is leaving without taking currentStep as a dependency (which
-  // would rebuild the scan handler on every step change).
-  const stepRef = useRef<IntakeStep>(currentStep)
-  stepRef.current = currentStep
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Guards the save effect from clobbering stored history with [] before
-  // the initial load runs.
-  const historyHydratedRef = useRef(false)
+  // Guards the save effect from clobbering stored history before the load
+  // runs. This is STATE, not a ref, on purpose: state updates are batched,
+  // so the save effect on the initial commit still sees `false` and skips
+  // — a ref set synchronously in the load effect would read `true` in the
+  // same commit and persist the empty initial [] over the stored list
+  // (StrictMode's double-mount in dev then re-reads the wiped value).
+  const [historyReady, setHistoryReady] = useState(false)
 
   // Load persisted history once on mount (after first paint, so server and
   // client initial render match — avoids a hydration mismatch).
@@ -166,18 +158,45 @@ function IntakePageContent() {
       const raw = localStorage.getItem(INTAKE_HISTORY_KEY)
       if (raw) setSessionHistory(JSON.parse(raw))
     } catch { /* ignore corrupt/oversized cache */ }
-    historyHydratedRef.current = true
+    setHistoryReady(true)
   }, [])
 
-  // Persist on every change (capped so it can't grow unbounded).
+  // Persist on every change (capped so it can't grow unbounded). Waits for
+  // the load to finish so it never overwrites the stored list with [].
   useEffect(() => {
-    if (!historyHydratedRef.current) return
+    if (!historyReady) return
     try {
       localStorage.setItem(INTAKE_HISTORY_KEY, JSON.stringify(sessionHistory.slice(0, 200)))
     } catch { /* ignore quota errors */ }
-  }, [sessionHistory])
+  }, [sessionHistory, historyReady])
 
   const clearHistory = useCallback(() => setSessionHistory([]), [])
+
+  // Record (or update) a package in the session history. Called when an
+  // order is received (items already verified) and again after any flag /
+  // refresh, so the row always reflects the order's current item states.
+  const upsertHistory = useCallback((order: OrderWithIntake) => {
+    const items = (order.items || []).map(i => ({
+      id: i.id, card_name: i.card_name, card_id: i.card_id, status: i.intake_status,
+    }))
+    const snapshot = {
+      orderId: order.id,
+      shortId: order.id.slice(0, 8).toUpperCase(),
+      sellerName: (order.seller as { display_name?: string })?.display_name || 'Unknown',
+      items,
+      verifiedCount: items.filter(i => i.status === 'verified' || i.status === 'resolved').length,
+      flaggedCount: items.filter(i => i.status === 'flagged').length,
+    }
+    setSessionHistory(h => {
+      const idx = h.findIndex(e => e.orderId === order.id)
+      if (idx >= 0) {
+        const copy = [...h]
+        copy[idx] = { ...snapshot, at: h[idx].at } // keep original receive time
+        return copy
+      }
+      return [{ ...snapshot, at: new Date().toISOString() }, ...h]
+    })
+  }, [])
 
   // Auth check
   useEffect(() => {
@@ -246,85 +265,6 @@ function IntakePageContent() {
   }
 
   // ============================================
-  // Implicit verify — commit the order being left
-  // ============================================
-  // Verify-by-exception: when the operator moves on (scans the next
-  // package or hits Next Package), everything they DIDN'T flag on the
-  // current order is marked verified, the package is pushed to the session
-  // history, and a one-tap Undo toast appears. No-op unless we're actually
-  // sitting on an order's detail view.
-  const commitActiveOrder = useCallback(async () => {
-    const step = stepRef.current
-    if (step.step !== 'order_details') return
-    const order = step.order
-    const items = order.items || []
-
-    let verifiedItemIds: string[] = []
-    try {
-      const res = await fetch('/api/admin/intake/verify-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id }),
-      })
-      if (res.ok) verifiedItemIds = (await res.json()).verifiedItemIds || []
-    } catch { /* best-effort — history still records the snapshot */ }
-
-    const verifiedSet = new Set(verifiedItemIds)
-    const histItems = items.map(i => ({
-      id: i.id,
-      card_name: i.card_name,
-      card_id: i.card_id,
-      status: verifiedSet.has(i.id) ? 'verified' : i.intake_status,
-    }))
-    const entry: VerifyHistoryEntry = {
-      orderId: order.id,
-      shortId: order.id.slice(0, 8).toUpperCase(),
-      sellerName: (order.seller as { display_name?: string })?.display_name || 'Unknown',
-      at: new Date().toISOString(),
-      items: histItems,
-      verifiedCount: histItems.filter(i => i.status === 'verified' || i.status === 'resolved').length,
-      flaggedCount: histItems.filter(i => i.status === 'flagged').length,
-    }
-    setSessionHistory(h => [entry, ...h])
-
-    if (verifiedItemIds.length > 0) {
-      setUndoToast({ orderId: order.id, shortId: entry.shortId, itemIds: verifiedItemIds, count: verifiedItemIds.length })
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-      undoTimerRef.current = setTimeout(() => setUndoToast(null), 8000)
-    }
-  }, [])
-
-  const handleUndo = useCallback(async () => {
-    const toast = undoToast
-    if (!toast) return
-    setUndoToast(null)
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    try {
-      await fetch('/api/admin/intake/unverify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderItemIds: toast.itemIds }),
-      })
-    } catch { /* ignore */ }
-    // Drop the most-recent history entry for this order.
-    setSessionHistory(h => {
-      const i = h.findIndex(e => e.orderId === toast.orderId)
-      if (i < 0) return h
-      const copy = [...h]
-      copy.splice(i, 1)
-      return copy
-    })
-    // Re-open the order so the operator can correct it.
-    try {
-      const res = await fetch(`/api/admin/intake/scan?orderId=${encodeURIComponent(toast.orderId)}`)
-      if (res.ok) {
-        const d = await res.json()
-        if (d.orders?.[0]) setCurrentStep({ step: 'order_details', order: d.orders[0], source: 'undo' })
-      }
-    } catch { /* ignore */ }
-  }, [undoToast])
-
-  // ============================================
   // Scan handler — detects input type and routes
   // ============================================
   const handleScan = useCallback(async (input?: string) => {
@@ -332,9 +272,6 @@ function IntakePageContent() {
     if (!raw) return
     setScanLoading(true)
     setError('')
-
-    // Moving on commits the order we're leaving (implicit verify).
-    await commitActiveOrder()
 
     try {
       // 1. Triage QR code: starts with "TRIAGE:"
@@ -410,7 +347,7 @@ function IntakePageContent() {
 
     setScanInput('')
     setScanLoading(false)
-  }, [scanInput, commitActiveOrder])
+  }, [scanInput])
 
   // Deep-link: if /admin/intake?orderId=XXX, auto-jump to that order's details.
   // Mirrors what handleScan does for a UUID scan (the "Verify Items First"
@@ -504,9 +441,10 @@ function IntakePageContent() {
           trackingNumber={currentStep.trackingNumber}
           printerReady={printerStatus === 'ready'}
           onReceived={(order) => {
-            // No success toast here — the order card shows its own green
-            // "Package received" notification, so a second message under
-            // the scan box would just shift the layout.
+            // Items were verified during receive; record the package in the
+            // session history now (no success toast — the order card shows
+            // its own green "received & verified" notification).
+            upsertHistory(order)
             setCurrentStep({ step: 'order_details', order, source: 'tracking_scan' })
           }}
           onSkipToDetails={(order) => {
@@ -655,6 +593,8 @@ function IntakePageContent() {
             if (res.ok) {
               const data = await res.json()
               if (data.orders?.[0]) {
+                // Keep the session-history row in sync (e.g. after a flag).
+                upsertHistory(data.orders[0])
                 setCurrentStep({ step: 'order_details', order: data.orders[0], source: currentStep.source })
               }
             }
@@ -708,7 +648,7 @@ function IntakePageContent() {
         />
       )}
 
-      {/* Session history — fills up as packages are committed */}
+      {/* Session history — fills up as packages are received */}
       <SessionHistory entries={sessionHistory} onClear={clearHistory} />
 
       {/* Success messages float as a fixed toast so they never push the
@@ -718,9 +658,6 @@ function IntakePageContent() {
           {successMessage}
         </div>
       )}
-
-      {/* Undo toast for the last implicit-verify commit */}
-      {undoToast && <UndoToastBar toast={undoToast} onUndo={handleUndo} onDismiss={() => setUndoToast(null)} />}
     </div>
   )
 }
@@ -820,21 +757,6 @@ function SessionHistory({ entries, onClear }: { entries: VerifyHistoryEntry[]; o
   )
 }
 
-function UndoToastBar({ toast, onUndo, onDismiss }: { toast: UndoToast; onUndo: () => void; onDismiss: () => void }) {
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="flex items-center gap-4 bg-zinc-900 text-white rounded-xl shadow-xl px-4 py-3">
-        <span className="text-sm">
-          <span className="text-emerald-400 font-bold">✓</span> Order <span className="font-mono">#{toast.shortId}</span> auto-verified
-          <span className="text-zinc-400"> · {toast.count} item{toast.count === 1 ? '' : 's'}</span>
-        </span>
-        <button onClick={onUndo} className="text-sm font-semibold text-indigo-300 hover:text-indigo-200 cursor-pointer">Undo</button>
-        <button onClick={onDismiss} className="text-zinc-500 hover:text-white cursor-pointer" aria-label="Dismiss">✕</button>
-      </div>
-    </div>
-  )
-}
-
 // ============================================
 // Step: Scan Welcome
 // ============================================
@@ -899,7 +821,20 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
       }
     }
 
-    // 2. Print product QR labels for each item. Printer-agnostic:
+    // 2. Verify all items right now. Intake verifies on receipt and only
+    //    flags exceptions — intake isn't the authenticity gate (that's
+    //    /admin/authenticate), so there's no reason to defer it. This is
+    //    what makes the flow "scan → done": no separate verify step, and
+    //    the last package of a session can't get stranded as pending.
+    try {
+      await fetch('/api/admin/intake/verify-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id }),
+      })
+    } catch { /* best-effort; flag flow still works */ }
+
+    // 3. Print product QR labels for each item. Printer-agnostic:
     //    ZPL fast path for the team's Zebra ZD printers, HTML
     //    fallback for ZSB DP12 / AirPrint / any other printer.
     if (order.items && order.items.length > 0) {
@@ -909,7 +844,7 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
       )
     }
 
-    // 3. Refresh order data and move to verification
+    // 4. Refresh order data (now shows items verified) and move on
     const refreshRes = await fetch(`/api/admin/intake/scan?orderId=${encodeURIComponent(order.id)}`)
     if (refreshRes.ok) {
       const data = await refreshRes.json()
@@ -950,7 +885,7 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
           )}
           <div className="min-w-0 flex-1">
             <p className={`text-sm font-semibold ${receiving ? 'text-indigo-800' : 'text-emerald-800'}`}>
-              {receiving ? 'Receiving package & printing labels…' : alreadyReceived ? 'Already received' : 'Package received — labels printed'}
+              {receiving ? 'Receiving & verifying — printing labels…' : alreadyReceived ? 'Already received' : 'Package received & verified — labels printed'}
             </p>
             <p className="text-xs text-zinc-500 mt-0.5">
               Tracking <span className="font-mono">{trackingNumber}</span> → Order
@@ -1287,9 +1222,8 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, showSuccess 
   const [addItemModal, setAddItemModal] = useState(false)
   const [damageModal, setDamageModal] = useState<{ item: OrderItem } | null>(null)
 
-  // No explicit "Verify" — intake verifies by exception. Operators only
-  // flag problems here; everything unflagged is auto-verified when they
-  // move on (see commitActiveOrder on the page).
+  // No explicit "Verify" — items are verified on receipt (see
+  // handleReceiveAndPrint). Operators only flag exceptions here.
   const handlePrintItemLabel = async (item: OrderItem) => {
     const { method } = await printOrderQrLabels(
       order.id,
@@ -1351,7 +1285,7 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, showSuccess 
             {totalCount} item{totalCount === 1 ? '' : 's'}
             {flaggedCount > 0 && <span className="text-red-500"> · {flaggedCount} flagged</span>}
           </span>
-          <span className="text-xs text-zinc-400">Flag any problems — the rest auto-verify when you move to the next package.</span>
+          <span className="text-xs text-zinc-400">Verified on receipt — flag any problems below.</span>
         </div>
 
         {/* Items — line view */}
