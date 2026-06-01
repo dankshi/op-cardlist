@@ -188,9 +188,16 @@ function IntakePageContent() {
         return
       }
 
-      // 2. UUID format (36 chars with dashes): treat as PON / order ID scan
+      // 2. UUID format (36 chars with dashes): treat as PON / order ID scan.
+      // The fallback catches a typed/scanned order-ID *prefix* (hex chars),
+      // but it MUST contain a hex letter (a–f) or a dash. Digits 0–9 are
+      // also valid hex, so a purely-numeric string is a carrier tracking
+      // number (USPS/FedEx are all digits), NOT an order ID — those fall
+      // through to the tracking lookup below. Without the /[a-f-]/ guard a
+      // 22-digit USPS tracking matched here and 404'd as "Order not found".
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      if (uuidRegex.test(raw) || (raw.length >= 8 && raw.length <= 36 && /^[0-9a-f-]+$/i.test(raw))) {
+      const looksLikeOrderId = raw.length >= 8 && raw.length <= 36 && /^[0-9a-f-]+$/i.test(raw) && /[a-f-]/i.test(raw)
+      if (uuidRegex.test(raw) || looksLikeOrderId) {
         const res = await fetch(`/api/admin/intake/scan?orderId=${encodeURIComponent(raw)}`)
         if (!res.ok) {
           setError('Order not found')
