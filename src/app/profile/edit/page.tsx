@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { FormInput, SubmitButton, AuthError } from '@/components/auth/AuthForm'
+import { SubmitButton, AuthError } from '@/components/auth/AuthForm'
+import { US_STATES } from '@/lib/us-states'
 import type { Profile } from '@/types/database'
 
 export default function EditProfilePage() {
@@ -46,14 +47,26 @@ export default function EditProfilePage() {
     setError('')
 
     const formData = new FormData(e.currentTarget)
+    const zip = ((formData.get('zip') as string) || '').replace(/\D/g, '').slice(0, 5)
     const updates = {
       display_name: formData.get('displayName') as string,
       username: (formData.get('username') as string)?.toLowerCase().trim() || null,
       bio: (formData.get('bio') as string) || null,
+      shipping_street1: ((formData.get('street') as string) || '').trim() || null,
+      shipping_city: ((formData.get('city') as string) || '').trim() || null,
+      shipping_state: (formData.get('state') as string) || null,
+      shipping_zip: zip || null,
+      shipping_phone: ((formData.get('phone') as string) || '').trim() || null,
     }
 
     if (updates.username && !/^[a-z0-9_-]{3,30}$/.test(updates.username)) {
       setError('Username must be 3-30 characters, lowercase letters, numbers, hyphens and underscores only')
+      setPending(false)
+      return
+    }
+
+    if (updates.shipping_zip && updates.shipping_zip.length !== 5) {
+      setError('Please enter a valid 5-digit ZIP code')
       setPending(false)
       return
     }
@@ -147,6 +160,93 @@ export default function EditProfilePage() {
               placeholder="Tell buyers about yourself..."
               className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors resize-none"
             />
+          </div>
+
+          <div className="pt-2 border-t border-zinc-200">
+            <h2 className="text-lg font-semibold text-zinc-900 mt-4 mb-1">Address &amp; phone</h2>
+            <p className="text-sm text-zinc-500 mb-4">
+              Used for shipping and order contact. Sellers also use this as their return address.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="street" className="block text-sm font-medium text-zinc-600 mb-1.5">
+                  Street address
+                </label>
+                <input
+                  id="street"
+                  name="street"
+                  type="text"
+                  defaultValue={profile.shipping_street1 || ''}
+                  placeholder="123 Main St"
+                  autoComplete="street-address"
+                  className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-6 gap-3">
+                <div className="col-span-3">
+                  <label htmlFor="city" className="block text-sm font-medium text-zinc-600 mb-1.5">
+                    City
+                  </label>
+                  <input
+                    id="city"
+                    name="city"
+                    type="text"
+                    defaultValue={profile.shipping_city || ''}
+                    placeholder="City"
+                    autoComplete="address-level2"
+                    className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label htmlFor="state" className="block text-sm font-medium text-zinc-600 mb-1.5">
+                    State
+                  </label>
+                  <select
+                    id="state"
+                    name="state"
+                    defaultValue={profile.shipping_state || ''}
+                    className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                  >
+                    <option value="">Select</option>
+                    {US_STATES.map(s => (
+                      <option key={s.value} value={s.value}>{s.value}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  <label htmlFor="zip" className="block text-sm font-medium text-zinc-600 mb-1.5">
+                    ZIP
+                  </label>
+                  <input
+                    id="zip"
+                    name="zip"
+                    type="text"
+                    inputMode="numeric"
+                    defaultValue={profile.shipping_zip || ''}
+                    placeholder="00000"
+                    autoComplete="postal-code"
+                    className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-zinc-600 mb-1.5">
+                  Phone number
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  defaultValue={profile.shipping_phone || ''}
+                  placeholder="(555) 555-5555"
+                  autoComplete="tel"
+                  className="w-full px-4 py-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-3">
