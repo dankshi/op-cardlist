@@ -96,32 +96,44 @@ export async function GET(
   <title>QR Labels — Order ${shortId}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; }
+    /* Monospace throughout for a clean, technical label look. */
+    body {
+      font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, 'Courier New', monospace;
+      padding: 24px; color: #18181b; background: #fafafa;
+    }
 
-    .toolbar { margin-bottom: 20px; display: flex; gap: 8px; }
+    .toolbar { margin-bottom: 20px; display: flex; gap: 8px; align-items: center; }
     .toolbar button {
       padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;
-      font-size: 14px; font-weight: 600;
+      font-family: inherit; font-size: 13px; font-weight: 600;
     }
-    .toolbar .print { background: #f97316; color: #fff; }
+    .toolbar .print { background: #4f46e5; color: #fff; }
     .toolbar .close { background: #fff; color: #71717a; border: 1px solid #e4e4e7; }
+    .toolbar .hint { font-size: 12px; color: #a1a1aa; margin-left: 4px; }
 
     .label {
-      display: flex; align-items: center; gap: 14px;
+      display: flex; align-items: center; gap: 16px;
       width: 3.5in; height: 1.25in;
-      border: 1px dashed #9ca3af; border-radius: 4px;
-      padding: 8px 12px; margin-bottom: 8px;
+      border: 1px dashed #d4d4d8; border-radius: 6px;
+      padding: 10px 14px; margin-bottom: 10px; background: #fff;
       page-break-inside: avoid;
     }
-    .label .qr { width: 1.05in; height: 1.05in; flex-shrink: 0; }
-    .label .meta { min-width: 0; }
-    .label .name { font-size: 18px; font-weight: 700; color: #111; line-height: 1.2; word-break: break-word; }
-    .label .pid { font-size: 14px; color: #444; font-family: ui-monospace, monospace; margin-top: 4px; letter-spacing: 0.02em; }
+    /* pixelated keeps the QR crisp (no blurry resampling) so it scans cleanly. */
+    .label .qr { width: 1.05in; height: 1.05in; flex-shrink: 0; image-rendering: pixelated; }
+    .label .meta { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 7px; }
+    .label .name {
+      font-size: 16px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .label .pid {
+      font-size: 15px; font-weight: 600; color: #3f3f46;
+      letter-spacing: 0.12em; text-transform: uppercase;
+    }
 
     @media print {
-      body { padding: 0; }
+      body { padding: 0; background: #fff; }
       .no-print { display: none !important; }
-      .label { border-color: #ccc; }
+      .label { border: 1px dashed #cbd5e1; background: #fff; }
       /* Tighter margins for label rolls. The operator picks the
          paper size in the print dialog (3.5"×1.25" roll, or Letter). */
       @page { margin: 0.1in; }
@@ -132,9 +144,7 @@ export async function GET(
   <div class="toolbar no-print">
     <button class="print" onclick="window.print()">Print ${items.length} label${items.length === 1 ? '' : 's'}</button>
     <button class="close" onclick="window.close()">Close</button>
-    <span style="font-size:13px;color:#71717a;align-self:center;margin-left:8px;">
-      Pick your printer + a 3.5&quot;×1.25&quot; label size (or Letter to cut) in the print dialog.
-    </span>
+    <span class="hint">Pick your printer + a 3.5&quot;×1.25&quot; label size (or Letter to cut) in the print dialog.</span>
   </div>
 
   ${labelBlocks.join('\n')}
