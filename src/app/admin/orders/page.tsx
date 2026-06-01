@@ -1,66 +1,30 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
 import type { Order, OrderItem } from '@/types/database'
-
-const STATUS_STYLES: Record<string, string> = {
-  pending_payment: 'bg-zinc-200 text-zinc-600',
-  under_review: 'bg-amber-500/10 text-amber-600',
-  paid: 'bg-yellow-500/10 text-yellow-600',
-  seller_shipped: 'bg-blue-500/10 text-blue-600',
-  received: 'bg-purple-500/10 text-purple-600',
-  exception_review: 'bg-amber-500/15 text-amber-700',
-  authenticated: 'bg-emerald-500/10 text-emerald-600',
-  shipped_to_buyer: 'bg-indigo-500/10 text-indigo-600',
-  shipped: 'bg-blue-500/10 text-blue-600',
-  delivered: 'bg-green-500/10 text-green-600',
-  cancelled: 'bg-red-500/10 text-red-600',
-  refunded: 'bg-zinc-200 text-zinc-500',
-  disputed: 'bg-rose-500/10 text-rose-600',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  pending_payment: 'Pending Payment',
-  under_review: 'Under Review',
-  paid: 'Paid — Awaiting Ship',
-  seller_shipped: 'Seller Shipped',
-  received: 'Received — Awaiting Authentication',
-  exception_review: 'Exception Review',
-  authenticated: 'Authenticated',
-  shipped_to_buyer: 'Shipped to Buyer',
-  shipped: 'Shipped (legacy)',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-  refunded: 'Refunded',
-  disputed: 'Disputed',
-}
-
-// Ordered top-to-bottom by where the admin needs to take action soonest.
-// Active states (things waiting on us) come first; terminal/historical
-// states sit at the bottom and start collapsed. exception_review goes
-// at the very top — flagged items need resolution before anything else
-// can progress, and a stuck exception_review order is the loudest "ops
-// debt is accumulating" signal we have.
-const STATUS_ORDER: { key: string; defaultOpen: boolean }[] = [
-  { key: 'exception_review', defaultOpen: true },
-  { key: 'under_review', defaultOpen: true },
-  { key: 'paid', defaultOpen: true },
-  { key: 'seller_shipped', defaultOpen: true },
-  { key: 'received', defaultOpen: true },
-  { key: 'authenticated', defaultOpen: true },
-  { key: 'shipped_to_buyer', defaultOpen: false },
-  { key: 'delivered', defaultOpen: false },
-  { key: 'disputed', defaultOpen: false },
-  { key: 'cancelled', defaultOpen: false },
-  { key: 'refunded', defaultOpen: false },
-  { key: 'pending_payment', defaultOpen: false },
-]
+import { STATUS_ORDER, STATUS_STYLES, STATUS_LABELS, statusLabel, statusStyle } from '@/lib/admin/orderStatus'
 
 export default function AdminOrdersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-20 text-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      }
+    >
+      <OrdersInner />
+    </Suspense>
+  )
+}
+
+function OrdersInner() {
+  const searchParams = useSearchParams()
+  const statusFilter = searchParams.get('status')
+
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -68,8 +32,6 @@ export default function AdminOrdersPage() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     () => Object.fromEntries(STATUS_ORDER.map(s => [s.key, s.defaultOpen]))
   )
-  const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     let cancelled = false
@@ -90,41 +52,22 @@ export default function AdminOrdersPage() {
   const fetchOrders = useCallback(async () => {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
+    if (statusFilter) params.set('status', statusFilter)
     params.set('limit', '200')
 
     const res = await fetch(`/api/admin/orders?${params}`)
     if (res.status === 403) {
-      router.push('/')
+      window.location.href = '/'
       return
     }
     const data = await res.json()
     setOrders(data.orders || [])
-  }, [search, router])
+  }, [search, statusFilter])
 
   useEffect(() => {
-    async function init() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { router.push('/auth/sign-in'); return }
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single()
-        if (!profile?.is_admin) { router.push('/'); return }
-        await fetchOrders()
-      } catch (err) {
-        console.error('[admin/orders] init failed', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    init()
-  }, [supabase, router, fetchOrders])
-
-  useEffect(() => {
-    if (!loading) fetchOrders()
-  }, [search, fetchOrders, loading])
+    setLoading(true)
+    fetchOrders().finally(() => setLoading(false))
+  }, [fetchOrders])
 
   const grouped = useMemo(() => {
     const groups: Record<string, Order[]> = {}
@@ -134,24 +77,32 @@ export default function AdminOrdersPage() {
     return groups
   }, [orders])
 
-  if (loading) {
-    return (
-      <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-3xl font-bold text-zinc-900">Orders</h1>
-        <Link
-          href="/admin/risk"
-          className="text-sm font-medium text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
-        >
-          Risk Review &rarr;
-        </Link>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-zinc-900">Orders</h1>
+          {statusFilter && (
+            <span className={`text-xs px-2 py-0.5 rounded font-medium ${statusStyle(statusFilter)}`}>
+              {statusLabel(statusFilter)}
+            </span>
+          )}
+        </div>
+        {statusFilter ? (
+          <Link
+            href="/admin/orders"
+            className="text-sm font-medium text-zinc-500 hover:text-zinc-800"
+          >
+            Clear filter — show all &rarr;
+          </Link>
+        ) : (
+          <Link
+            href="/admin/orders?status=under_review"
+            className="text-sm font-medium text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
+          >
+            Risk Review &rarr;
+          </Link>
+        )}
       </div>
 
       <div className="mb-6">
@@ -160,13 +111,32 @@ export default function AdminOrdersPage() {
           placeholder="Search by order ID..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full max-w-md px-4 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+          className="w-full max-w-md px-4 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-900 placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         />
       </div>
 
-      {orders.length === 0 ? (
-        <p className="text-zinc-500 text-center py-8">No orders found.</p>
+      {loading ? (
+        <div className="py-20 text-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      ) : orders.length === 0 ? (
+        <p className="text-zinc-500 text-center py-8">
+          {statusFilter ? `No orders in "${statusLabel(statusFilter)}".` : 'No orders found.'}
+        </p>
+      ) : statusFilter ? (
+        // Filtered: a single flat list — the dropdown already named the status.
+        <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-zinc-100 text-sm text-zinc-500">
+            {orders.length} order{orders.length === 1 ? '' : 's'}
+          </div>
+          <div className="divide-y divide-zinc-100">
+            {orders.map(order => (
+              <OrderRow key={order.id} order={order} cardImages={cardImages} />
+            ))}
+          </div>
+        </div>
       ) : (
+        // Unfiltered: grouped accordion by status.
         <div className="space-y-4">
           {STATUS_ORDER.map(({ key }) => {
             const list = grouped[key] || []
@@ -268,7 +238,7 @@ function OrderRow({ order, cardImages }: { order: Order; cardImages: Record<stri
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-zinc-900 group-hover:text-orange-500 transition-colors">
+          <span className="font-medium text-zinc-900 group-hover:text-indigo-600 transition-colors">
             #{order.id.slice(0, 8)}
           </span>
           {flaggedCount > 0 && (
