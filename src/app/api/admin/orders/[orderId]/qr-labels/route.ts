@@ -65,13 +65,14 @@ export async function GET(
 
   const shortId = orderId.slice(0, 8).toUpperCase()
 
-  // One label block per item. QR encodes the raw item id (matches
-  // the ZPL payload). Each block is sized 2"×1" at 96dpi (192×96px)
-  // plus padding, with a dashed border for cut guidance.
+  // One label block per item. QR encodes the raw item id (matches the ZPL
+  // payload). Human-readable text is the product: card name + card_id
+  // (e.g. OP03-080) — no order id (not a useful per-card reference). Each
+  // block is sized 3.5"×1.25" with a dashed border for cut guidance.
   const labelBlocks = await Promise.all(
     items.map(async (item) => {
       const qrDataUrl = await QRCode.toDataURL(item.id, {
-        width: 150,
+        width: 220,
         margin: 1,
         errorCorrectionLevel: 'M',
       })
@@ -81,8 +82,7 @@ export async function GET(
           <img class="qr" src="${qrDataUrl}" alt="QR" />
           <div class="meta">
             <div class="name">${escapeHtml(displayName)}</div>
-            <div class="order">Order ${shortId}</div>
-            <div class="iid">${item.id.slice(0, 8)}</div>
+            <div class="pid">${escapeHtml(item.card_id || '')}</div>
           </div>
         </div>
       `
@@ -107,24 +107,23 @@ export async function GET(
     .toolbar .close { background: #fff; color: #71717a; border: 1px solid #e4e4e7; }
 
     .label {
-      display: flex; align-items: center; gap: 10px;
-      width: 2.1in; min-height: 1in;
+      display: flex; align-items: center; gap: 14px;
+      width: 3.5in; height: 1.25in;
       border: 1px dashed #9ca3af; border-radius: 4px;
-      padding: 6px 8px; margin-bottom: 8px;
+      padding: 8px 12px; margin-bottom: 8px;
       page-break-inside: avoid;
     }
-    .label .qr { width: 0.85in; height: 0.85in; flex-shrink: 0; }
+    .label .qr { width: 1.05in; height: 1.05in; flex-shrink: 0; }
     .label .meta { min-width: 0; }
-    .label .name { font-size: 12px; font-weight: 700; color: #111; line-height: 1.2; word-break: break-word; }
-    .label .order { font-size: 10px; color: #555; margin-top: 3px; }
-    .label .iid { font-size: 9px; color: #999; font-family: ui-monospace, monospace; margin-top: 1px; }
+    .label .name { font-size: 18px; font-weight: 700; color: #111; line-height: 1.2; word-break: break-word; }
+    .label .pid { font-size: 14px; color: #444; font-family: ui-monospace, monospace; margin-top: 4px; letter-spacing: 0.02em; }
 
     @media print {
       body { padding: 0; }
       .no-print { display: none !important; }
       .label { border-color: #ccc; }
       /* Tighter margins for label rolls. The operator picks the
-         paper size in the print dialog (2"×1" roll, or Letter). */
+         paper size in the print dialog (3.5"×1.25" roll, or Letter). */
       @page { margin: 0.1in; }
     }
   </style>
@@ -134,7 +133,7 @@ export async function GET(
     <button class="print" onclick="window.print()">Print ${items.length} label${items.length === 1 ? '' : 's'}</button>
     <button class="close" onclick="window.close()">Close</button>
     <span style="font-size:13px;color:#71717a;align-self:center;margin-left:8px;">
-      Pick your printer + a 2&quot;×1&quot; label size (or Letter to cut) in the print dialog.
+      Pick your printer + a 3.5&quot;×1.25&quot; label size (or Letter to cut) in the print dialog.
     </span>
   </div>
 

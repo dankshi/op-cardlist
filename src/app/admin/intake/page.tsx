@@ -6,19 +6,47 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { getPrinterStatus, printTriageLabel, printOrderQrLabels } from '@/lib/zebra'
+import { CopyButton } from '@/components/admin/ui/CopyButton'
 import type { Order, OrderItem, IntakeIssue, IntakeIssueType, TriagePackage, TrackingMatchType } from '@/types/database'
+
+/** Intake status pill. "Received" (pending) and verified/resolved read as
+ *  green + check so it's unmistakable the package is in hand; problems are
+ *  red/rose. */
+function IntakeStatusPill({ status }: { status: string }) {
+  const received = status === 'pending'
+  const ok = received || status === 'verified' || status === 'resolved'
+  const label =
+    received ? 'Received' :
+    status === 'verified' ? 'Verified' :
+    status === 'resolved' ? 'Resolved' :
+    status === 'flagged' ? 'Flagged' :
+    status === 'rejected' ? 'Rejected' : status
+  const cls = ok ? 'bg-emerald-100 text-emerald-700' : status === 'flagged' ? 'bg-red-100 text-red-700' : 'bg-rose-100 text-rose-700'
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>
+      {ok && (
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      )}
+      {label}
+    </span>
+  )
+}
+
+/** Inline monospace ID + copy chip — used across the intake reference UI. */
+function CopyableId({ value }: { value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 min-w-0">
+      <span className="font-mono text-xs text-zinc-700 truncate">{value}</span>
+      <CopyButton value={value} />
+    </span>
+  )
+}
 
 // ============================================
 // Constants
 // ============================================
-
-const INTAKE_STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-zinc-200 text-zinc-600',
-  verified: 'bg-green-500/10 text-green-500',
-  flagged: 'bg-red-500/10 text-red-500',
-  resolved: 'bg-blue-500/10 text-blue-500',
-  rejected: 'bg-red-500/10 text-red-700',
-}
 
 /** Build an image URL for a card. Uses snapshot_photo_url if present, otherwise
  *  falls back to our R2 CDN using the card_id. */
@@ -60,6 +88,27 @@ type IntakeStep =
   | { step: 'triage_identify'; triagePackage: TriagePackage }
   | { step: 'triage_search'; triagePackage: TriagePackage; cardType: 'raw' | 'slab'; certNumber?: string; nomiInput?: string }
 
+// A package the operator finished this session — pushed to the on-page
+// history when they move on (implicit verify commit). Snapshots the
+// per-item outcome so the list survives later edits / re-scans.
+type VerifyHistoryEntry = {
+  orderId: string
+  shortId: string
+  sellerName: string
+  at: string
+  items: { id: string; card_name: string; card_id: string; status: string }[]
+  verifiedCount: number
+  flaggedCount: number
+}
+
+// What the most recent implicit-verify commit touched, so we can offer a
+// one-tap Undo before the operator gets too far down the next package.
+type UndoToast = { orderId: string; shortId: string; itemIds: string[]; count: number }
+
+// Session history is persisted to localStorage so it survives reloads on
+// the warehouse machine. Cleared via the Clear button in the panel.
+const INTAKE_HISTORY_KEY = 'nomi.intake.sessionHistory'
+
 // ============================================
 // Main Page
 // ============================================
@@ -68,7 +117,7 @@ export default function IntakePage() {
   return (
     <Suspense fallback={
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     }>
       <IntakePageContent />
@@ -95,6 +144,40 @@ function IntakePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
+
+  // Implicit-verify session state. History fills up under the workspace as
+  // packages are committed; the toast offers a one-tap Undo on the last one.
+  const [sessionHistory, setSessionHistory] = useState<VerifyHistoryEntry[]>([])
+  const [undoToast, setUndoToast] = useState<UndoToast | null>(null)
+  // Mirror currentStep in a ref so handleScan can commit the order the
+  // operator is leaving without taking currentStep as a dependency (which
+  // would rebuild the scan handler on every step change).
+  const stepRef = useRef<IntakeStep>(currentStep)
+  stepRef.current = currentStep
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Guards the save effect from clobbering stored history with [] before
+  // the initial load runs.
+  const historyHydratedRef = useRef(false)
+
+  // Load persisted history once on mount (after first paint, so server and
+  // client initial render match — avoids a hydration mismatch).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(INTAKE_HISTORY_KEY)
+      if (raw) setSessionHistory(JSON.parse(raw))
+    } catch { /* ignore corrupt/oversized cache */ }
+    historyHydratedRef.current = true
+  }, [])
+
+  // Persist on every change (capped so it can't grow unbounded).
+  useEffect(() => {
+    if (!historyHydratedRef.current) return
+    try {
+      localStorage.setItem(INTAKE_HISTORY_KEY, JSON.stringify(sessionHistory.slice(0, 200)))
+    } catch { /* ignore quota errors */ }
+  }, [sessionHistory])
+
+  const clearHistory = useCallback(() => setSessionHistory([]), [])
 
   // Auth check
   useEffect(() => {
@@ -163,6 +246,85 @@ function IntakePageContent() {
   }
 
   // ============================================
+  // Implicit verify — commit the order being left
+  // ============================================
+  // Verify-by-exception: when the operator moves on (scans the next
+  // package or hits Next Package), everything they DIDN'T flag on the
+  // current order is marked verified, the package is pushed to the session
+  // history, and a one-tap Undo toast appears. No-op unless we're actually
+  // sitting on an order's detail view.
+  const commitActiveOrder = useCallback(async () => {
+    const step = stepRef.current
+    if (step.step !== 'order_details') return
+    const order = step.order
+    const items = order.items || []
+
+    let verifiedItemIds: string[] = []
+    try {
+      const res = await fetch('/api/admin/intake/verify-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id }),
+      })
+      if (res.ok) verifiedItemIds = (await res.json()).verifiedItemIds || []
+    } catch { /* best-effort — history still records the snapshot */ }
+
+    const verifiedSet = new Set(verifiedItemIds)
+    const histItems = items.map(i => ({
+      id: i.id,
+      card_name: i.card_name,
+      card_id: i.card_id,
+      status: verifiedSet.has(i.id) ? 'verified' : i.intake_status,
+    }))
+    const entry: VerifyHistoryEntry = {
+      orderId: order.id,
+      shortId: order.id.slice(0, 8).toUpperCase(),
+      sellerName: (order.seller as { display_name?: string })?.display_name || 'Unknown',
+      at: new Date().toISOString(),
+      items: histItems,
+      verifiedCount: histItems.filter(i => i.status === 'verified' || i.status === 'resolved').length,
+      flaggedCount: histItems.filter(i => i.status === 'flagged').length,
+    }
+    setSessionHistory(h => [entry, ...h])
+
+    if (verifiedItemIds.length > 0) {
+      setUndoToast({ orderId: order.id, shortId: entry.shortId, itemIds: verifiedItemIds, count: verifiedItemIds.length })
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+      undoTimerRef.current = setTimeout(() => setUndoToast(null), 8000)
+    }
+  }, [])
+
+  const handleUndo = useCallback(async () => {
+    const toast = undoToast
+    if (!toast) return
+    setUndoToast(null)
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    try {
+      await fetch('/api/admin/intake/unverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderItemIds: toast.itemIds }),
+      })
+    } catch { /* ignore */ }
+    // Drop the most-recent history entry for this order.
+    setSessionHistory(h => {
+      const i = h.findIndex(e => e.orderId === toast.orderId)
+      if (i < 0) return h
+      const copy = [...h]
+      copy.splice(i, 1)
+      return copy
+    })
+    // Re-open the order so the operator can correct it.
+    try {
+      const res = await fetch(`/api/admin/intake/scan?orderId=${encodeURIComponent(toast.orderId)}`)
+      if (res.ok) {
+        const d = await res.json()
+        if (d.orders?.[0]) setCurrentStep({ step: 'order_details', order: d.orders[0], source: 'undo' })
+      }
+    } catch { /* ignore */ }
+  }, [undoToast])
+
+  // ============================================
   // Scan handler — detects input type and routes
   // ============================================
   const handleScan = useCallback(async (input?: string) => {
@@ -170,6 +332,9 @@ function IntakePageContent() {
     if (!raw) return
     setScanLoading(true)
     setError('')
+
+    // Moving on commits the order we're leaving (implicit verify).
+    await commitActiveOrder()
 
     try {
       // 1. Triage QR code: starts with "TRIAGE:"
@@ -245,7 +410,7 @@ function IntakePageContent() {
 
     setScanInput('')
     setScanLoading(false)
-  }, [scanInput])
+  }, [scanInput, commitActiveOrder])
 
   // Deep-link: if /admin/intake?orderId=XXX, auto-jump to that order's details.
   // Mirrors what handleScan does for a UUID scan (the "Verify Items First"
@@ -261,7 +426,7 @@ function IntakePageContent() {
   if (loading) {
     return (
       <div className="py-20 text-center">
-        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     )
   }
@@ -315,18 +480,17 @@ function IntakePageContent() {
             onChange={e => setScanInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleScan() }}
             autoFocus
-            className="w-full px-5 py-4 rounded-xl bg-white border-2 border-zinc-200 text-zinc-900 placeholder-zinc-400 text-lg font-mono focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+            className="w-full px-5 py-4 rounded-xl bg-white border-2 border-zinc-200 text-zinc-900 placeholder-zinc-400 text-lg font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
           />
           <button
             onClick={() => handleScan()}
             disabled={scanLoading}
-            className="absolute right-3 top-1/2 -translate-y-1/2 px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold text-sm hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer"
+            className="absolute right-3 top-1/2 -translate-y-1/2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-50 cursor-pointer"
           >
             {scanLoading ? 'Searching…' : 'Look Up'}
           </button>
         </div>
         {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
-        {successMessage && <p className="text-emerald-600 text-sm mt-2 font-medium">{successMessage}</p>}
       </div>
 
       {/* Step content */}
@@ -340,7 +504,9 @@ function IntakePageContent() {
           trackingNumber={currentStep.trackingNumber}
           printerReady={printerStatus === 'ready'}
           onReceived={(order) => {
-            showSuccess('Package received — labels printed')
+            // No success toast here — the order card shows its own green
+            // "Package received" notification, so a second message under
+            // the scan box would just shift the layout.
             setCurrentStep({ step: 'order_details', order, source: 'tracking_scan' })
           }}
           onSkipToDetails={(order) => {
@@ -493,7 +659,6 @@ function IntakePageContent() {
               }
             }
           }}
-          onReset={resetToScan}
           showSuccess={showSuccess}
         />
       )}
@@ -542,6 +707,20 @@ function IntakePageContent() {
           onReset={resetToScan}
         />
       )}
+
+      {/* Session history — fills up as packages are committed */}
+      <SessionHistory entries={sessionHistory} onClear={clearHistory} />
+
+      {/* Success messages float as a fixed toast so they never push the
+          page layout around (the old inline message made it jump). */}
+      {successMessage && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium shadow-lg">
+          {successMessage}
+        </div>
+      )}
+
+      {/* Undo toast for the last implicit-verify commit */}
+      {undoToast && <UndoToastBar toast={undoToast} onUndo={handleUndo} onDismiss={() => setUndoToast(null)} />}
     </div>
   )
 }
@@ -584,6 +763,79 @@ function PrinterStatusBadge({ status }: { status: string }) {
 }
 
 // ============================================
+// Session History (fills up under the workspace)
+// ============================================
+
+function SessionHistory({ entries, onClear }: { entries: VerifyHistoryEntry[]; onClear: () => void }) {
+  if (entries.length === 0) return null
+  const totalVerified = entries.reduce((s, e) => s + e.verifiedCount, 0)
+  const totalFlagged = entries.reduce((s, e) => s + e.flaggedCount, 0)
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-zinc-700">This session</h2>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-zinc-400">
+            {entries.length} package{entries.length === 1 ? '' : 's'} · {totalVerified} verified
+            {totalFlagged > 0 && <span className="text-red-500"> · {totalFlagged} flagged</span>}
+          </span>
+          <button
+            onClick={() => { if (confirm('Clear this session’s history? This only clears the on-screen list.')) onClear() }}
+            className="text-xs text-zinc-400 hover:text-zinc-700 cursor-pointer"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+      <div className="bg-white border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
+        {entries.map((e, idx) => (
+          <Link
+            key={`${e.orderId}-${idx}`}
+            href={`/admin/orders/${e.orderId}`}
+            className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 transition-colors group"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-sm font-medium text-zinc-900 group-hover:text-indigo-600 transition-colors">#{e.shortId}</span>
+                <span className="text-xs text-zinc-400">{e.sellerName}</span>
+                {e.verifiedCount > 0 && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium">{e.verifiedCount} verified</span>
+                )}
+                {e.flaggedCount > 0 && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 font-medium">{e.flaggedCount} flagged</span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-500 truncate mt-0.5">{e.items.map(i => i.card_name).join(', ')}</p>
+            </div>
+            <span className="text-xs text-zinc-400 flex-shrink-0">
+              {new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <svg className="w-4 h-4 text-zinc-300 group-hover:text-zinc-500 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function UndoToastBar({ toast, onUndo, onDismiss }: { toast: UndoToast; onUndo: () => void; onDismiss: () => void }) {
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+      <div className="flex items-center gap-4 bg-zinc-900 text-white rounded-xl shadow-xl px-4 py-3">
+        <span className="text-sm">
+          <span className="text-emerald-400 font-bold">✓</span> Order <span className="font-mono">#{toast.shortId}</span> auto-verified
+          <span className="text-zinc-400"> · {toast.count} item{toast.count === 1 ? '' : 's'}</span>
+        </span>
+        <button onClick={onUndo} className="text-sm font-semibold text-indigo-300 hover:text-indigo-200 cursor-pointer">Undo</button>
+        <button onClick={onDismiss} className="text-zinc-500 hover:text-white cursor-pointer" aria-label="Dismiss">✕</button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // Step: Scan Welcome
 // ============================================
 
@@ -622,9 +874,13 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
   onReceived: (order: OrderWithIntake) => void
   onSkipToDetails: (order: OrderWithIntake) => void
 }) {
-  const [receiving, setReceiving] = useState(false)
+  const alreadyReceived = order.status === 'received'
+  const [receiving, setReceiving] = useState(!alreadyReceived)
+  // Auto-fire guard: effects double-invoke under React Strict Mode and we
+  // must only receive + print once per scanned order.
+  const autoFiredRef = useRef(false)
 
-  const handleReceiveAndPrint = async () => {
+  const handleReceiveAndPrint = useCallback(async () => {
     setReceiving(true)
 
     // 1. Mark as received
@@ -649,12 +905,11 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
     if (order.items && order.items.length > 0) {
       await printOrderQrLabels(
         order.id,
-        order.items.map(i => ({ id: i.id, card_name: i.card_name })),
-        order.id.slice(0, 8).toUpperCase(),
+        order.items.map(i => ({ id: i.id, card_name: i.card_name, card_id: i.card_id })),
       )
     }
 
-    // 3. Refresh order data and move to details
+    // 3. Refresh order data and move to verification
     const refreshRes = await fetch(`/api/admin/intake/scan?orderId=${encodeURIComponent(order.id)}`)
     if (refreshRes.ok) {
       const data = await refreshRes.json()
@@ -663,57 +918,86 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
       onReceived(order)
     }
     setReceiving(false)
-  }
+  }, [order, onReceived])
+
+  // Auto-receive + auto-print the moment the order is found — saves the
+  // operator a click. The label print popup (HTML fallback path) may be
+  // blocked by the browser when fired outside a direct click; allow popups
+  // for this site on the warehouse machine, or use the Zebra ZPL path
+  // (no popup). Already-received orders skip straight to verification.
+  useEffect(() => {
+    if (autoFiredRef.current) return
+    autoFiredRef.current = true
+    if (alreadyReceived) return
+    handleReceiveAndPrint()
+  }, [alreadyReceived, handleReceiveAndPrint])
 
   const sellerName = (order.seller as { display_name?: string })?.display_name || 'Unknown'
   const buyerName = (order.buyer as { display_name?: string })?.display_name || 'Unknown'
-  const alreadyReceived = order.status === 'received'
 
   return (
-    <div className="bg-white border-2 border-green-200 rounded-xl overflow-hidden">
-      <div className="p-5 bg-green-50 border-b border-green-100">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">✅</span>
-          <div>
-            <h2 className="text-lg font-bold text-green-800">
-              {alreadyReceived ? 'Order Already Received' : 'Order Found — Ready to Receive'}
-            </h2>
-            <p className="text-sm text-green-600">
-              Tracking {trackingNumber} matched to Order #{order.id.slice(0, 8).toUpperCase()}
+    <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+      <div className="p-3 border-b border-zinc-100">
+        <div className={`flex items-center gap-3 rounded-lg px-3 py-2.5 ${receiving ? 'bg-indigo-50' : 'bg-emerald-50'}`}>
+          {receiving ? (
+            <span className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          ) : (
+            <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-semibold ${receiving ? 'text-indigo-800' : 'text-emerald-800'}`}>
+              {receiving ? 'Receiving package & printing labels…' : alreadyReceived ? 'Already received' : 'Package received — labels printed'}
+            </p>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Tracking <span className="font-mono">{trackingNumber}</span> → Order
+              <span className="font-mono ml-1">#{order.id.slice(0, 8).toUpperCase()}</span>
             </p>
           </div>
+          {!printerReady && !receiving && (
+            <span className="text-xs text-amber-600 flex-shrink-0">PDF mode</span>
+          )}
         </div>
       </div>
 
       <div className="p-5">
-        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-          <div><span className="text-zinc-500">Seller:</span> <span className="font-medium text-zinc-900">{sellerName}</span></div>
-          <div><span className="text-zinc-500">Buyer:</span> <span className="font-medium text-zinc-900">{buyerName}</span></div>
-          <div><span className="text-zinc-500">Total:</span> <span className="font-medium text-zinc-900">${Number(order.total).toFixed(2)}</span></div>
-          <div><span className="text-zinc-500">Items:</span> <span className="font-medium text-zinc-900">{order.items?.length || 0}</span></div>
-        </div>
+        {/* Order reference */}
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 mb-5">
+          <RefField label="Order ID" mono copy={order.id}>{order.id}</RefField>
+          <RefField label="Seller">{sellerName}</RefField>
+          <RefField label="Buyer">{buyerName}</RefField>
+          <RefField label="Total">${Number(order.total).toFixed(2)}</RefField>
+        </dl>
 
-        {/* Item cards with large images */}
+        {/* Items with images + reference IDs */}
         {order.items && order.items.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {order.items.map((item, i) => {
               const imgUrl = cardImageUrl(item)
               return (
-                <div key={item.id} className="bg-zinc-50 rounded-xl border border-zinc-200 overflow-hidden">
-                  <div className="relative aspect-[63/88] bg-zinc-100">
+                <div key={item.id} className="flex gap-3 rounded-lg border border-zinc-200 p-3">
+                  <div className="relative w-16 aspect-[63/88] bg-zinc-100 rounded flex-shrink-0 overflow-hidden">
                     {imgUrl ? (
                       <Image src={imgUrl} alt={item.card_name} fill className="object-cover" unoptimized />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-zinc-300 text-4xl">🃏</div>
+                      <div className="absolute inset-0 flex items-center justify-center text-zinc-300 text-2xl">🃏</div>
                     )}
-                    <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center text-xs font-bold">{i + 1}</span>
-                    {item.quantity > 1 && (
-                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-orange-500 text-white text-xs font-bold">x{item.quantity}</span>
-                    )}
+                    <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center text-[10px] font-bold">{i + 1}</span>
                   </div>
-                  <div className="p-2 text-center">
-                    <p className="text-xs font-semibold text-zinc-800 truncate">{item.card_name}</p>
-                    <p className="text-xs text-zinc-400">${Number(item.unit_price).toFixed(2)}</p>
+                  <div className="min-w-0 flex-1 text-xs">
+                    <p className="font-semibold text-zinc-900 text-sm leading-tight truncate">{item.card_name}</p>
+                    <p className="text-zinc-500 mt-0.5">
+                      ${Number(item.unit_price).toFixed(2)} · {item.condition === 'near_mint' ? 'NM' : item.condition}
+                      {item.quantity > 1 && <span className="ml-1 text-indigo-600 font-semibold">×{item.quantity}</span>}
+                    </p>
+                    <div className="mt-1.5 space-y-0.5">
+                      <RefId label="Product" value={item.card_id} />
+                      <RefId label="Item ID" value={item.id} />
+                      <RefId label="Listing" value={item.listing_id} />
+                    </div>
                   </div>
                 </div>
               )
@@ -721,28 +1005,45 @@ function OrderFoundStep({ order, trackingNumber, printerReady, onReceived, onSki
           </div>
         )}
 
-        <div className="flex gap-3">
-          {!alreadyReceived ? (
-            <button
-              onClick={handleReceiveAndPrint}
-              disabled={receiving}
-              className="flex-1 py-3 bg-green-500 text-white text-sm font-bold rounded-xl hover:bg-green-600 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {receiving ? 'Receiving & Printing Labels...' : `Receive Package & Print ${order.items?.length || 0} Label(s)`}
-            </button>
-          ) : (
-            <button
-              onClick={() => onSkipToDetails(order)}
-              className="flex-1 py-3 bg-orange-500 text-white text-sm font-bold rounded-xl hover:bg-orange-600 transition-colors cursor-pointer"
-            >
-              Continue to Item Verification
-            </button>
-          )}
-          {!printerReady && !alreadyReceived && (
-            <p className="text-xs text-amber-600 self-center">No Zebra — labels open as a PDF to print</p>
-          )}
-        </div>
+        {alreadyReceived && (
+          <button
+            onClick={() => onSkipToDetails(order)}
+            className="mt-5 w-full py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
+          >
+            Continue to Item Verification →
+          </button>
+        )}
       </div>
+    </div>
+  )
+}
+
+/** Compact label/value cell for the intake reference grid. */
+function RefField({ label, children, mono, copy }: { label: string; children: React.ReactNode; mono?: boolean; copy?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] uppercase tracking-wide text-zinc-400 font-medium">{label}</dt>
+      <dd className={`mt-0.5 text-sm text-zinc-800 truncate ${mono ? 'font-mono text-xs' : ''}`}>
+        {copy ? <CopyableId value={copy} /> : children}
+      </dd>
+    </div>
+  )
+}
+
+/** One "label: id [copy]" row inside an item card. */
+function RefId({ label, value }: { label: string; value: string | null }) {
+  if (!value || value === 'admin-added') {
+    return (
+      <div className="flex items-center gap-1.5 text-zinc-400">
+        <span className="w-12 flex-shrink-0 text-[10px] uppercase tracking-wide">{label}</span>
+        <span>—</span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="w-12 flex-shrink-0 text-[10px] uppercase tracking-wide text-zinc-400">{label}</span>
+      <CopyableId value={value} />
     </div>
   )
 }
@@ -975,61 +1276,30 @@ function PonScanStep({ context, trackingNumber, onOrderFound, onAlreadyReceived,
 // Step: Order Details (verify / flag items)
 // ============================================
 
-function OrderDetailsStep({ order, source, printerReady, onRefresh, onReset, showSuccess }: {
+function OrderDetailsStep({ order, source, printerReady, onRefresh, showSuccess }: {
   order: OrderWithIntake
   source: string
   printerReady: boolean
   onRefresh: (orderId: string) => void
-  onReset: () => void
   showSuccess: (msg: string) => void
 }) {
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [flagModal, setFlagModal] = useState<{ item: OrderItem; orderId: string } | null>(null)
   const [addItemModal, setAddItemModal] = useState(false)
   const [damageModal, setDamageModal] = useState<{ item: OrderItem } | null>(null)
 
-  const handleVerify = async (itemId: string) => {
-    setActionLoading(itemId)
-    const res = await fetch('/api/admin/intake/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderItemId: itemId }),
-    })
-    if (res.ok) {
-      showSuccess('Item verified')
-      onRefresh(order.id)
-    }
-    setActionLoading(null)
-  }
-
-  const handleVerifyAll = async () => {
-    if (!order.items) return
-    const pending = order.items.filter(i => i.intake_status === 'pending')
-    setActionLoading('all')
-    for (const item of pending) {
-      await fetch('/api/admin/intake/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderItemId: item.id }),
-      })
-    }
-    showSuccess(`${pending.length} items verified`)
-    onRefresh(order.id)
-    setActionLoading(null)
-  }
-
+  // No explicit "Verify" — intake verifies by exception. Operators only
+  // flag problems here; everything unflagged is auto-verified when they
+  // move on (see commitActiveOrder on the page).
   const handlePrintItemLabel = async (item: OrderItem) => {
     const { method } = await printOrderQrLabels(
       order.id,
-      [{ id: item.id, card_name: item.card_name }],
-      order.id.slice(0, 8).toUpperCase(),
+      [{ id: item.id, card_name: item.card_name, card_id: item.card_id }],
     )
     showSuccess(method === 'zpl' ? 'Label printed' : 'Label opened for printing')
   }
 
-  const verifiedCount = order.items?.filter(i => i.intake_status === 'verified' || i.intake_status === 'resolved').length || 0
   const totalCount = order.items?.length || 0
-  const allDone = totalCount > 0 && verifiedCount === totalCount
+  const flaggedCount = order.items?.filter(i => i.intake_status === 'flagged').length || 0
   const sellerName = (order.seller as { display_name?: string })?.display_name || 'Unknown'
   const buyerName = (order.buyer as { display_name?: string })?.display_name || 'Unknown'
 
@@ -1044,7 +1314,16 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, onReset, sho
                 <h2 className="text-lg font-bold text-zinc-900">
                   Order #{order.id.slice(0, 8).toUpperCase()}
                 </h2>
-                <span className="text-xs px-2 py-0.5 rounded bg-zinc-200 text-zinc-600">{order.status}</span>
+                {order.status === 'received' ? (
+                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Received
+                  </span>
+                ) : (
+                  <span className="text-xs px-2 py-0.5 rounded bg-zinc-200 text-zinc-600">{order.status}</span>
+                )}
               </div>
               <div className="flex items-center gap-3 mt-1 text-sm text-zinc-500">
                 <span>Seller: {sellerName}</span>
@@ -1053,148 +1332,115 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, onReset, sho
                 <span>&middot;</span>
                 <span>${Number(order.total).toFixed(2)}</span>
               </div>
+              <div className="flex items-center gap-1.5 mt-1.5 text-xs text-zinc-400">
+                <span className="uppercase tracking-wide">Order ID</span>
+                <CopyableId value={order.id} />
+              </div>
               {order.seller_tracking_number && (
                 <p className="text-xs text-zinc-400 mt-1">
                   Tracking: {order.seller_tracking_carrier && `${order.seller_tracking_carrier} — `}{order.seller_tracking_number}
                 </p>
               )}
             </div>
-            <button onClick={onReset} className="text-sm text-zinc-400 hover:text-orange-500 cursor-pointer">
-              Next Package →
-            </button>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="px-5 py-3 border-b border-zinc-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-zinc-700">
-              Intake Progress: {verifiedCount}/{totalCount} items
-            </span>
-            {allDone && (
-              <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">All verified</span>
-            )}
-          </div>
-          <div className="w-full bg-zinc-100 rounded-full h-2">
-            <div
-              className={`h-2 rounded-full transition-all ${allDone ? 'bg-green-500' : 'bg-orange-500'}`}
-              style={{ width: `${totalCount > 0 ? (verifiedCount / totalCount) * 100 : 0}%` }}
-            />
-          </div>
+        {/* Verify-by-exception hint */}
+        <div className="px-5 py-2.5 border-b border-zinc-100 flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-sm text-zinc-600">
+            {totalCount} item{totalCount === 1 ? '' : 's'}
+            {flaggedCount > 0 && <span className="text-red-500"> · {flaggedCount} flagged</span>}
+          </span>
+          <span className="text-xs text-zinc-400">Flag any problems — the rest auto-verify when you move to the next package.</span>
         </div>
 
-        {/* Items — large card image grid */}
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Items — line view */}
+        <div className="divide-y divide-zinc-100">
           {order.items?.map((item, index) => {
             const imgUrl = cardImageUrl(item)
-            const isPending = item.intake_status === 'pending'
             const isFlagged = item.intake_status === 'flagged'
             const isDone = item.intake_status === 'verified' || item.intake_status === 'resolved'
 
             return (
               <div
                 key={item.id}
-                className={`rounded-xl border-2 overflow-hidden transition-colors ${
-                  isDone ? 'border-green-300 bg-green-50/30' :
-                  isFlagged ? 'border-red-300 bg-red-50/30' :
-                  'border-zinc-200 bg-white'
-                }`}
+                className={`flex items-center gap-3 px-4 py-3 ${isFlagged ? 'bg-red-50/40' : isDone ? 'bg-emerald-50/30' : ''}`}
               >
-                {/* Large card image */}
-                <div className="relative aspect-[63/88] bg-zinc-100">
+                <span className="text-xs text-zinc-300 w-4 text-right flex-shrink-0 tabular-nums">{index + 1}</span>
+                <div className="relative w-10 h-[3.5rem] bg-zinc-100 rounded overflow-hidden flex-shrink-0">
                   {imgUrl ? (
                     <Image src={imgUrl} alt={item.card_name} fill className="object-cover" unoptimized />
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-zinc-300 text-6xl">🃏</div>
+                    <div className="absolute inset-0 flex items-center justify-center text-zinc-300 text-xl">🃏</div>
                   )}
-                  {/* Overlays */}
-                  <span className="absolute top-2 left-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center text-sm font-bold">{index + 1}</span>
-                  <span className={`absolute top-2 right-2 text-xs px-2 py-1 rounded-full font-semibold ${INTAKE_STATUS_STYLES[item.intake_status] || 'bg-zinc-200 text-zinc-600'}`}>
-                    {item.intake_status}
-                  </span>
                   {item.quantity > 1 && (
-                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-orange-500 text-white text-xs font-bold">x{item.quantity}</span>
-                  )}
-                  {isDone && (
-                    <div className="absolute inset-0 bg-green-500/10 flex items-center justify-center">
-                      <span className="text-5xl">✅</span>
-                    </div>
+                    <span className="absolute bottom-0.5 left-0.5 px-1 rounded bg-indigo-600 text-white text-[10px] font-bold">×{item.quantity}</span>
                   )}
                 </div>
 
-                {/* Card info */}
-                <div className="p-3">
-                  <p className="font-semibold text-zinc-900 text-sm leading-tight">{item.card_name}</p>
-                  <div className="flex items-center gap-2 text-xs text-zinc-500 mt-1">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-zinc-900 text-sm leading-tight truncate">{item.card_name}</p>
+                  <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5 flex-wrap">
                     <span>${Number(item.unit_price).toFixed(2)}</span>
-                    <span>&middot;</span>
+                    <span className="text-zinc-300">·</span>
                     <span>{item.condition === 'near_mint' ? 'NM' : item.condition}</span>
                     {item.card_id && item.card_id !== 'admin-added' && (
-                      <><span>&middot;</span><span className="font-mono text-zinc-400">{item.card_id}</span></>
+                      <>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-mono text-zinc-400">{item.card_id}</span>
+                      </>
                     )}
+                  </div>
+                  {/* Reference IDs (QR encodes the Item ID) */}
+                  <div className="flex items-center gap-x-4 gap-y-0.5 mt-1 flex-wrap text-xs">
+                    <RefId label="Item" value={item.id} />
+                    <RefId label="Listing" value={item.listing_id} />
                   </div>
                   {item.intake_notes && <p className="text-xs text-zinc-400 mt-1 italic">{item.intake_notes}</p>}
                   {item.is_damaged && (
-                    <div className="mt-2 flex items-start gap-1.5 px-2 py-1.5 rounded-md bg-amber-50 border border-amber-200">
+                    <div className="mt-1.5 inline-flex items-start gap-1.5 px-2 py-1 rounded-md bg-amber-50 border border-amber-200">
                       <span className="text-amber-600 text-xs font-bold leading-tight flex-shrink-0">⚠ DAMAGED</span>
                       {item.damage_notes && <span className="text-xs text-amber-700 leading-tight">— {item.damage_notes}</span>}
                     </div>
                   )}
+                </div>
 
-                  {/* Action buttons */}
-                  <div className="flex gap-2 mt-3 flex-wrap">
-                    {isPending && (
-                      <>
-                        <button
-                          onClick={() => handleVerify(item.id)}
-                          disabled={actionLoading === item.id}
-                          className="flex-1 py-2 bg-green-500 text-white text-sm font-bold rounded-lg hover:bg-green-600 disabled:opacity-50 cursor-pointer"
-                        >
-                          {actionLoading === item.id ? '...' : 'Verify'}
-                        </button>
-                        <button
-                          onClick={() => setFlagModal({ item, orderId: order.id })}
-                          className="flex-1 py-2 bg-red-500 text-white text-sm font-bold rounded-lg hover:bg-red-600 cursor-pointer"
-                        >
-                          Flag
-                        </button>
-                        <button
-                          onClick={() => handlePrintItemLabel(item)}
-                          className="py-2 px-3 bg-zinc-200 text-zinc-600 text-sm rounded-lg hover:bg-zinc-300 cursor-pointer"
-                          title="Reprint label"
-                        >
-                          🏷️
-                        </button>
-                      </>
-                    )}
+                <div className="flex-shrink-0">
+                  <IntakeStatusPill status={item.intake_status} />
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {isFlagged ? (
                     <button
-                      onClick={() => setDamageModal({ item })}
-                      className={`py-1.5 px-3 text-xs font-semibold rounded-lg cursor-pointer ${
-                        item.is_damaged
-                          ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                          : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
-                      }`}
+                      onClick={() => setFlagModal({ item, orderId: order.id })}
+                      className="py-1.5 px-3 bg-red-100 text-red-700 text-xs font-semibold rounded-lg hover:bg-red-200 cursor-pointer"
                     >
-                      {item.is_damaged ? '⚠ Edit Damage' : 'Mark Damaged'}
+                      View Issue
                     </button>
-                    {isFlagged && (
-                      <button
-                        onClick={() => setFlagModal({ item, orderId: order.id })}
-                        className="flex-1 py-2 bg-red-100 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-200 cursor-pointer"
-                      >
-                        View Issue
-                      </button>
-                    )}
-                    {isDone && (
-                      <button
-                        onClick={() => handlePrintItemLabel(item)}
-                        className="py-1.5 px-3 bg-zinc-100 text-zinc-400 text-xs rounded-lg hover:bg-zinc-200 cursor-pointer"
-                        title="Reprint label"
-                      >
-                        🏷️ Reprint
-                      </button>
-                    )}
-                  </div>
+                  ) : (
+                    <button
+                      onClick={() => setFlagModal({ item, orderId: order.id })}
+                      className="py-1.5 px-3 bg-white border border-red-200 text-red-600 text-xs font-semibold rounded-lg hover:bg-red-50 cursor-pointer"
+                    >
+                      Flag
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setDamageModal({ item })}
+                    className={`py-1.5 px-2.5 text-xs font-semibold rounded-lg cursor-pointer ${
+                      item.is_damaged ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
+                    }`}
+                    title={item.is_damaged ? 'Edit damage' : 'Mark damaged'}
+                  >
+                    {item.is_damaged ? '⚠' : 'Damage'}
+                  </button>
+                  <button
+                    onClick={() => handlePrintItemLabel(item)}
+                    className="py-1.5 px-2.5 bg-zinc-100 text-zinc-500 text-xs rounded-lg hover:bg-zinc-200 cursor-pointer"
+                    title="Reprint label"
+                  >
+                    🏷️
+                  </button>
                 </div>
               </div>
             )
@@ -1203,15 +1449,6 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, onReset, sho
 
         {/* Actions Footer */}
         <div className="p-4 border-t border-zinc-100 bg-zinc-50 flex items-center gap-3">
-          {order.items?.some(i => i.intake_status === 'pending') && (
-            <button
-              onClick={handleVerifyAll}
-              disabled={actionLoading === 'all'}
-              className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 cursor-pointer"
-            >
-              {actionLoading === 'all' ? 'Verifying...' : 'Verify All Items'}
-            </button>
-          )}
           <button
             onClick={() => setFlagModal({
               item: { id: '', order_id: order.id, card_name: '', listing_id: '', card_id: '', quantity: 0, unit_price: 0, condition: 'near_mint', snapshot_photo_url: null, intake_status: 'pending', intake_verified_at: null, intake_verified_by: null, intake_notes: null, is_damaged: false, damage_notes: null, auth_decision: 'pending', auth_condition: null, exception_types: [], exception_details: {}, auth_decided_at: null, auth_decided_by: null, created_at: '' },
@@ -1226,9 +1463,6 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, onReset, sho
             className="px-4 py-2 bg-blue-100 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-200 cursor-pointer"
           >
             Add Item
-          </button>
-          <button onClick={onReset} className="ml-auto px-4 py-2 bg-orange-100 text-orange-700 text-sm font-semibold rounded-lg hover:bg-orange-200 cursor-pointer">
-            Next Package →
           </button>
         </div>
 

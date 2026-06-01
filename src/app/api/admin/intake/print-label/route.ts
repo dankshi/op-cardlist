@@ -28,27 +28,30 @@ export async function POST(request: Request) {
   let zpl: string
 
   if (type === 'product') {
-    // Product QR code label — encodes the order item ID
-    const { orderItemId, cardName, shortOrderId } = data || {}
+    // Product QR code label — QR encodes the order item ID (scanned at
+    // pack-out). Human-readable text is the product: card name + card_id
+    // (e.g. OP03-080). The order ID was removed — one order can hold many
+    // cards, so it isn't a useful per-sticker reference.
+    const { orderItemId, cardName, cardId } = data || {}
     if (!orderItemId) {
       return NextResponse.json({ error: 'orderItemId is required for product labels' }, { status: 400 })
     }
 
-    const displayName = (cardName || 'Unknown Card').slice(0, 30)
-    const orderId = shortOrderId || orderItemId.slice(0, 8).toUpperCase()
+    const displayName = (cardName || 'Unknown Card').slice(0, 28)
+    const productId = (cardId || '').slice(0, 24)
 
-    // 2" x 1" label at 203 DPI (406 x 203 dots)
+    // 3.5" x 1.25" landscape label at 203 DPI (710 x 254 dots).
     zpl = [
       '^XA',
+      '^PW710',
+      '^LL254',
       '^CF0,24',
-      // QR code on the left
-      `^FO20,20^BQN,2,4^FDMA,${orderItemId}^FS`,
-      // Card name on the right
-      `^FO180,25^A0N,24,24^FD${escapeZpl(displayName)}^FS`,
-      // Order ID below
-      `^FO180,55^A0N,20,20^FDOrder: ${escapeZpl(orderId)}^FS`,
-      // Item ID small at bottom
-      `^FO180,80^A0N,14,14^FD${orderItemId.slice(0, 8)}^FS`,
+      // QR code on the left, vertically centered-ish
+      `^FO24,52^BQN,2,6^FDMA,${orderItemId}^FS`,
+      // Product name on the right, large
+      `^FO250,60^A0N,44,44^FD${escapeZpl(displayName)}^FS`,
+      // Product ID (card_id) below the name
+      `^FO250,128^A0N,32,32^FD${escapeZpl(productId)}^FS`,
       '^XZ',
     ].join('\n')
   } else if (type === 'triage_no_order') {

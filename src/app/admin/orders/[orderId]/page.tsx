@@ -177,8 +177,7 @@ export default function AdminOrderDetailPage() {
             if (items.length === 0) { alert('Order has no items'); return }
             const { method, count } = await printOrderQrLabels(
               order.id,
-              items.map(i => ({ id: i.id, card_name: i.card_name || i.card_id })),
-              order.id.slice(0, 8).toUpperCase(),
+              items.map(i => ({ id: i.id, card_name: i.card_name || i.card_id, card_id: i.card_id })),
             )
             if (method === 'zpl') alert(`Printed ${count} label${count === 1 ? '' : 's'} to the Zebra.`)
           }}

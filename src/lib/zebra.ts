@@ -91,14 +91,14 @@ export async function printZpl(zpl: string): Promise<boolean> {
 export async function printProductLabel(
   orderItemId: string,
   cardName: string,
-  shortOrderId: string,
+  cardId: string,
 ): Promise<{ success: boolean; zpl?: string; error?: string }> {
   const res = await fetch('/api/admin/intake/print-label', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       type: 'product',
-      data: { orderItemId, cardName, shortOrderId },
+      data: { orderItemId, cardName, cardId },
     }),
   })
 
@@ -129,15 +129,14 @@ export async function printProductLabel(
  */
 export async function printOrderQrLabels(
   orderId: string,
-  items: { id: string; card_name: string }[],
-  shortOrderId: string,
+  items: { id: string; card_name: string; card_id: string }[],
 ): Promise<{ method: 'zpl' | 'html'; count: number }> {
   const status = await getPrinterStatus()
 
   if (status === 'ready') {
     let printed = 0
     for (const item of items) {
-      const r = await printProductLabel(item.id, item.card_name, shortOrderId)
+      const r = await printProductLabel(item.id, item.card_name, item.card_id)
       if (r.success) printed++
     }
     // If the ZPL printer was "ready" but every print silently failed
