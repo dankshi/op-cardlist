@@ -7,6 +7,7 @@ import { OfferModal } from './OfferModal'
 import { AcceptOfferModal } from './AcceptOfferModal'
 import { ListModal } from './ListModal'
 import { createClient } from '@/lib/supabase/client'
+import { useAdminMarketData } from '@/lib/useAdminMarketData'
 import type { CardCondition } from '@/types/database'
 
 interface AskInput {
@@ -60,6 +61,7 @@ export function CardMainPanel({
   bids,
   sales,
   currentUserId,
+  isAdmin,
 }: {
   cardId: string
   cardName: string
@@ -72,6 +74,12 @@ export function CardMainPanel({
   /** ID of the currently-logged-in user (null if signed out). Used to
    *  tag the buyer's own offers in the Offers tab. */
   currentUserId: string | null
+  /** Whether the viewer is an admin. The market-data drawer (and its
+   *  "View market data" link) is admin-only for now — the marketplace is
+   *  still seeding, so an empty Listings/Offers/Sales section would read
+   *  as broken to a regular user. Admins can hide it via the profile
+   *  dropdown toggle; non-admins never receive it at all. */
+  isAdmin: boolean
 }) {
   // Local mirror of server-passed bids + listings so inline mutations
   // (cancel / quick-action update / new placements) reflect in the UI
@@ -95,6 +103,10 @@ export function CardMainPanel({
 
   const [selectedKey, setSelectedKey] = useState(initialKey)
   const [open, setOpen] = useState(false)
+  // Admin gate + per-admin toggle for the market-data drawer. Non-admins
+  // never see it; admins can hide it from the profile dropdown.
+  const [marketDataVisible] = useAdminMarketData()
+  const showMarket = isAdmin && marketDataVisible
   const [offerOpen, setOfferOpen] = useState(false)
   const [acceptOpen, setAcceptOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
@@ -184,6 +196,7 @@ export function CardMainPanel({
         priceChangePercent={priceChangePercent}
         selectedKey={selectedKey}
         onSelect={setSelectedKey}
+        showMarketLink={showMarket}
         onViewMarketData={() => setOpen(true)}
         onOfferClick={() => setOfferOpen(true)}
         onAcceptOfferClick={() => setAcceptOpen(true)}
@@ -261,7 +274,7 @@ export function CardMainPanel({
         }}
       />
 
-      <div id="market" className="mt-4">
+      {showMarket && <div id="market" className="mt-4">
         <button
           onClick={() => setOpen(o => !o)}
           className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border-2 border-zinc-200 bg-white hover:border-zinc-400 transition-colors cursor-pointer"
@@ -350,7 +363,7 @@ export function CardMainPanel({
             />
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

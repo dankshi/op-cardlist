@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAdminDebug } from '@/lib/useAdminDebug'
+import { useAdminMarketData } from '@/lib/useAdminMarketData'
 import type { User } from '@supabase/supabase-js'
 
 export default function AuthButton() {
@@ -18,6 +19,7 @@ export default function AuthButton() {
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
   const [debugVisible, setDebugVisible] = useAdminDebug()
+  const [marketDataVisible, setMarketDataVisible] = useAdminMarketData()
 
   function cancelClose() {
     if (closeTimerRef.current) {
@@ -206,6 +208,26 @@ export default function AuthButton() {
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         debugVisible ? 'translate-x-4' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMarketDataVisible(!marketDataVisible)}
+                  className="flex items-center justify-between w-full px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 cursor-pointer"
+                >
+                  <span>Market data</span>
+                  <span
+                    role="switch"
+                    aria-checked={marketDataVisible}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      marketDataVisible ? 'bg-purple-500' : 'bg-zinc-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        marketDataVisible ? 'translate-x-4' : 'translate-x-0.5'
                       }`}
                     />
                   </span>

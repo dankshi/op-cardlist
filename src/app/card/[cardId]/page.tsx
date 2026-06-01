@@ -422,6 +422,7 @@ export default async function CardPage({ params }: PageProps) {
               bids={bidsForPanel}
               sales={combinedSales}
               currentUserId={userRes.data.user?.id ?? null}
+              isAdmin={isAdmin}
             />
           </div>
 

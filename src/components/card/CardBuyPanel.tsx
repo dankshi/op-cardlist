@@ -79,6 +79,7 @@ export function CardBuyPanel({
   priceChangePercent,
   selectedKey: controlledKey,
   onSelect,
+  showMarketLink = true,
   onViewMarketData,
   onOfferClick,
   onAcceptOfferClick,
@@ -95,6 +96,11 @@ export function CardBuyPanel({
    *  can render with the same filter. */
   selectedKey?: string
   onSelect?: (key: string) => void
+  /** Whether to render the "View market data" link at all. The market
+   *  drawer is admin-only while the marketplace seeds, so the parent
+   *  suppresses the link for users who can't see the drawer. Defaults to
+   *  true so standalone usage (e.g. /market) keeps the link. */
+  showMarketLink?: boolean
   /** Called when the user clicks the "View market data" link, so the
    *  parent can scroll/expand its inline drawer instead of navigating. */
   onViewMarketData?: () => void
@@ -372,7 +378,7 @@ export function CardBuyPanel({
             ← Buy now{selected.lowestListingPrice != null && <> for <span className="tabular-nums">${selected.lowestListingPrice.toFixed(2)}</span></>}
           </button>
         )}
-        {onViewMarketData ? (
+        {showMarketLink && (onViewMarketData ? (
           <a
             href="#market"
             onClick={(e) => {
@@ -394,7 +400,7 @@ export function CardBuyPanel({
           >
             View market data
           </Link>
-        )}
+        ))}
       </div>
     </div>
   )
