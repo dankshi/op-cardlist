@@ -1,8 +1,6 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Card, CardDatabase } from '../src/types/card';
+import type { Card, CardSet, CardDatabase, CardType, CardColor, Rarity, Attribute, ArtStyle } from '../src/types/card';
 import { SET_NAME_MAP } from '../src/lib/set-names';
 
 dotenv.config({ path: '.env.local' });
@@ -253,49 +251,237 @@ function findMatchingProduct(card: Card, products: TCGPlayerProduct[], debug: bo
   return result || null;
 }
 
-// Fetch the most recent sale for a product from TCGPlayer
-async function fetchLastSoldPrice(productId: number): Promise<{ price: number; date: string } | null> {
+interface SaleRecord {
+  price: number;
+  date: string;
+  condition: string | null;
+  variant: string | null;
+  language: string | null;
+  listingType: string | null;
+  shippingPrice: number | null;
+  customListingId: string | null;
+  quantity: number;
+}
+
+// Module-level counters so the caller can surface rate-limit pressure at the end.
+const fetchStats = {
+  ok: 0,
+  rateLimited: 0,
+  giveUp: 0,
+  error: 0,
+  // Cookie health: did we ever hit a "looks like an authed response" page?
+  authedPages: 0,
+  pagesWith25: 0,    // signal that auth is working — anon caps at 5
+};
+
+type FetchPage =
+  | { kind: 'ok'; sales: SaleRecord[]; hasMore: boolean; totalResults: number }
+  | { kind: 'rate_limited' }
+  | { kind: 'error'; message: string };
+
+const TCG_AUTH_COOKIE = process.env.TCGPLAYER_AUTH_COOKIE;
+const PAGE_SIZE = 25;
+// Cap at 6 pages (150 sales) per product. Covers 90 days for nearly every card
+// and limits how far we paginate on the rare high-volume chase card.
+const MAX_PAGES_PER_PRODUCT = 6;
+const CUTOFF_DAYS = 90;
+// Polite per-page delay inside a product's pagination loop. A real seller
+// scrolling the Sales History modal would have a similar gap between page-2
+// and page-3 fetches.
+const INTER_PAGE_DELAY_MS = [400, 900];
+
+async function fetchSalesPage(
+  productId: number,
+  offset: number,
+  snapshotTime: number,
+): Promise<FetchPage> {
   try {
     const res = await fetch(`https://mpapi.tcgplayer.com/v2/product/${productId}/latestsales`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Origin': 'https://www.tcgplayer.com',
+        'Referer': 'https://www.tcgplayer.com/',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+        ...(TCG_AUTH_COOKIE
+          ? { Cookie: `TCGAuthTicket_Production=${TCG_AUTH_COOKIE}` }
+          : {}),
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        conditions: [],
+        languages: [],
+        variants: [],
+        listingType: 'All',
+        offset,
+        limit: PAGE_SIZE,
+        time: snapshotTime,
+      }),
     });
 
-    if (!res.ok) return null;
+    if (res.status === 429 || res.status === 403) return { kind: 'rate_limited' };
+    if (!res.ok) return { kind: 'error', message: `HTTP ${res.status}` };
 
     const text = await res.text();
-    if (text.startsWith('<')) return null; // HTML = rate limited
+    if (text.startsWith('<')) return { kind: 'rate_limited' };
 
     const data = JSON.parse(text);
-    const sales = data.data || data;
-    if (Array.isArray(sales) && sales.length > 0) {
-      return { price: sales[0].purchasePrice, date: sales[0].orderDate };
-    }
-    return null;
-  } catch {
-    return null;
+    const sales = data.data;
+    if (!Array.isArray(sales)) return { kind: 'error', message: 'unexpected response shape' };
+
+    return {
+      kind: 'ok',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sales: sales.map((s: any) => ({
+        price: s.purchasePrice,
+        date: s.orderDate,
+        condition: s.condition ?? null,
+        variant: s.variant ?? null,
+        language: s.language ?? null,
+        listingType: s.listingType ?? null,
+        shippingPrice: s.shippingPrice ?? null,
+        customListingId: s.customListingId ?? null,
+        quantity: s.quantity ?? 1,
+      })),
+      hasMore: data.nextPage === 'Yes',
+      totalResults: Number(data.totalResults ?? sales.length),
+    };
+  } catch (err) {
+    return { kind: 'error', message: err instanceof Error ? err.message : String(err) };
   }
+}
+
+// Single attempt wrapped in exponential-backoff retry on rate-limit / 403.
+async function fetchSalesPageWithRetry(
+  productId: number,
+  offset: number,
+  snapshotTime: number,
+): Promise<FetchPage> {
+  const MAX_ATTEMPTS = 4;
+  let backoffMs = 2000;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const result = await fetchSalesPage(productId, offset, snapshotTime);
+    if (result.kind === 'ok' || result.kind === 'error') return result;
+    // rate_limited
+    fetchStats.rateLimited++;
+    if (attempt === MAX_ATTEMPTS) {
+      fetchStats.giveUp++;
+      return { kind: 'rate_limited' };
+    }
+    const jitter = Math.random() * 1000;
+    await sleep(backoffMs + jitter);
+    backoffMs *= 2;
+  }
+  return { kind: 'rate_limited' };
+}
+
+// Paginated fetch — walks pages until no more, hits MAX_PAGES, or sales reach
+// the 90-day cutoff. Returns [] on persistent failure.
+async function fetchSales(productId: number): Promise<SaleRecord[]> {
+  const all: SaleRecord[] = [];
+  const snapshotTime = Date.now();
+  const cutoff = Date.now() - CUTOFF_DAYS * 86_400_000;
+
+  for (let page = 0; page < MAX_PAGES_PER_PRODUCT; page++) {
+    if (page > 0) {
+      const [lo, hi] = INTER_PAGE_DELAY_MS;
+      await sleep(lo + Math.random() * (hi - lo));
+    }
+    const offset = page * PAGE_SIZE;
+    const result = await fetchSalesPageWithRetry(productId, offset, snapshotTime);
+
+    if (result.kind !== 'ok') {
+      if (result.kind === 'error' && fetchStats.error <= 5) {
+        console.warn(`  ⚠ fetchSales(${productId}): ${result.message}`);
+      }
+      if (result.kind === 'error') fetchStats.error++;
+      // On rate-limit we return what we already have rather than nothing.
+      return all;
+    }
+
+    fetchStats.ok++;
+    if (result.sales.length === PAGE_SIZE) fetchStats.pagesWith25++;
+    if (TCG_AUTH_COOKIE && result.totalResults > 5) fetchStats.authedPages++;
+
+    all.push(...result.sales);
+
+    // Stop if no next page, or oldest sale on this page is older than cutoff.
+    const oldest = result.sales[result.sales.length - 1];
+    const oldestMs = oldest ? new Date(oldest.date).getTime() : Infinity;
+    if (!result.hasMore || oldestMs < cutoff) break;
+  }
+
+  return all;
 }
 
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function main() {
-  const cardsPath = path.join(process.cwd(), 'data', 'cards.json');
+async function loadCardDatabaseFromSupabase(supabase: SupabaseClient): Promise<CardDatabase> {
+  // Pull all sets + all cards from the DB and reassemble the CardDatabase
+  // shape the rest of this script expects. Paginate cards to defeat the
+  // 1000-row default cap.
+  const { data: setRows, error: setErr } = await supabase
+    .from('card_sets')
+    .select('*')
+    .order('release_date', { ascending: false });
+  if (setErr) throw new Error(`card_sets fetch: ${setErr.message}`);
 
-  if (!fs.existsSync(cardsPath)) {
-    console.error('cards.json not found. Run the card scraper first.');
-    process.exit(1);
+  const cardRows: Record<string, unknown>[] = [];
+  const PAGE = 1000;
+  for (let f = 0; ; f += PAGE) {
+    const { data, error } = await supabase.from('cards').select('*').order('id').range(f, f + PAGE - 1);
+    if (error) throw new Error(`cards fetch (offset ${f}): ${error.message}`);
+    if (!data || data.length === 0) break;
+    cardRows.push(...data);
+    if (data.length < PAGE) break;
   }
 
-  const database: CardDatabase = JSON.parse(fs.readFileSync(cardsPath, 'utf-8'));
+  const cardsBySet = new Map<string, Card[]>();
+  for (const row of cardRows) {
+    const card: Card = {
+      id: row.id as string,
+      baseId: row.base_id as string,
+      name: row.name as string,
+      type: (row.type as CardType) ?? 'CHARACTER',
+      colors: (row.colors as CardColor[]) ?? [],
+      rarity: (row.rarity as Rarity) ?? 'C',
+      cost: (row.cost as number) ?? null,
+      power: (row.power as number) ?? null,
+      counter: (row.counter as number) ?? null,
+      life: (row.life as number) ?? null,
+      attribute: (row.attribute as Attribute) ?? null,
+      traits: (row.traits as string[]) ?? [],
+      effect: (row.effect as string) ?? '',
+      trigger: (row.trigger_text as string) ?? null,
+      imageUrl: (row.image_url as string) ?? '',
+      setId: row.set_id as string,
+      variant: (row.variant as string) ?? undefined,
+      // Derived from variant. The DB no longer carries a separate
+      // is_parallel column — variant suffix on the ID is the signal.
+      isParallel: row.variant != null,
+      artStyle: (row.art_style as ArtStyle) ?? 'standard',
+    };
+    const list = cardsBySet.get(card.setId);
+    if (list) list.push(card);
+    else cardsBySet.set(card.setId, [card]);
+  }
 
+  const sets: CardSet[] = (setRows ?? []).map((s: Record<string, unknown>) => ({
+    id: s.id as string,
+    name: s.name as string,
+    seriesId: (s.series_id as string) ?? '',
+    releaseDate: (s.release_date as string) ?? '',
+    cardCount: (s.card_count as number) ?? 0,
+    cards: cardsBySet.get(s.id as string) ?? [],
+  }));
+
+  return { sets, lastUpdated: new Date().toISOString() };
+}
+
+async function main() {
   // Connect to Supabase (required)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -308,22 +494,40 @@ async function main() {
   const supabase = createClient(supabaseUrl, supabaseKey);
   console.log('Connected to Supabase');
 
-  // Fetch manually-mapped cards from Supabase (their product IDs are protected)
-  const manualMappings = new Map<string, number>(); // card_id → tcgplayer_product_id
-  const { data: manualData, error: manualError } = await supabase
-    .from('card_prices')
-    .select('card_id, tcgplayer_product_id')
-    .eq('manually_mapped', true);
+  console.log('Loading card catalog from cards + card_sets tables...');
+  const database = await loadCardDatabaseFromSupabase(supabase);
+  console.log(`Loaded ${database.sets.length} sets, ${database.sets.reduce((s, set) => s + set.cards.length, 0)} cards.`);
 
-  if (manualError) {
-    console.error('Error fetching manual mappings:', manualError);
-  } else if (manualData) {
-    for (const row of manualData) {
+  // Fetch existing card_id → tcgplayer_product_id mappings from
+  // card_tcgplayer_mapping — the single source of truth for the card↔product
+  // link (the old card_prices / tcgplayer_card_prices tables were dropped in
+  // migration 20260537). ALL mappings here are protected: the price scraper
+  // never changes them (that's auto-map-tcgplayer.ts's job); it only refreshes
+  // prices into tcgplayer_card_price_history.
+  const manualMappings = new Map<string, number>(); // card_id → tcgplayer_product_id
+  {
+    const PAGE = 1000;
+    const all: { card_id: string; tcgplayer_product_id: number | null; source: string }[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('card_tcgplayer_mapping')
+        .select('card_id, tcgplayer_product_id, source')
+        .order('card_id')
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error('Error fetching card_tcgplayer_mapping:', error);
+        break;
+      }
+      if (!data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < PAGE) break;
+    }
+    for (const row of all) {
       if (row.tcgplayer_product_id) {
         manualMappings.set(row.card_id, row.tcgplayer_product_id);
       }
     }
-    console.log(`Loaded ${manualMappings.size} manually-mapped cards (product IDs protected)`);
+    console.log(`Loaded ${manualMappings.size} card_tcgplayer_mapping rows (product IDs protected from scraper rewrite)`);
   }
 
   const args = process.argv.slice(2);
@@ -353,7 +557,7 @@ async function main() {
   }
 
   console.log('Starting TCGPlayer price scrape (set-based)...');
-  console.log('Writing to: Supabase card_prices');
+  console.log('Writing to: Supabase tcgplayer_card_price_history');
   console.log(`Total cards to process: ${totalCards}`);
   if (setFilter) console.log(`Filtering to set: ${setFilter}`);
   if (cardFilter) console.log(`Filtering to card: ${cardFilter}`);
@@ -388,17 +592,18 @@ async function main() {
 
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD for history snapshots
 
-  // Collect rows per set for batch upsert to Supabase
-  interface CardPriceRow {
+  // After the 20260537 consolidation, scrape-prices no longer writes a
+  // per-card price row. Current prices live in tcgplayer_card_price_history
+  // (keyed by product_id + date) and readers go through the
+  // tcgplayer_current_prices view via card_tcgplayer_mapping. We still
+  // discover-and-write new mappings (the auto-mapper is canonical, but
+  // this is a fallback for sets it hasn't covered yet).
+  interface MappingRow {
     card_id: string;
     tcgplayer_product_id: number;
-    tcgplayer_product_name: string | null;
     tcgplayer_url: string;
-    market_price: number | null;
-    lowest_price: number | null;
-    median_price: number | null;
-    total_listings: number | null;
-    manually_mapped: boolean;
+    tcgplayer_name: string;
+    source: 'auto';
   }
 
   for (const set of database.sets) {
@@ -421,7 +626,7 @@ async function main() {
       continue;
     }
 
-    const setRows: CardPriceRow[] = [];
+    const newMappings: MappingRow[] = [];
     const historyRows: { tcgplayer_product_id: number; recorded_date: string; market_price: number | null; lowest_price: number | null; median_price: number | null; total_listings: number | null }[] = [];
 
     // Match each of our cards to TCGPlayer products
@@ -444,21 +649,13 @@ async function main() {
         isManual = true;
 
         if (!product) {
-          // Manual product not in this set's products — likely a wrong-set mapping.
-          // Upsert with null prices so the missing price serves as a visible signal.
-          setRows.push({
-            card_id: card.id,
-            tcgplayer_product_id: manualProductId,
-            tcgplayer_product_name: null,
-            tcgplayer_url: `https://www.tcgplayer.com/product/${manualProductId}`,
-            market_price: null,
-            lowest_price: null,
-            median_price: null,
-            total_listings: null,
-            manually_mapped: true,
-          });
+          // Manual product not in this set's products — likely a wrong-set
+          // mapping. We don't write any history row (no price to record).
+          // The next set the scraper hits will see this same product if
+          // the mapping is correct after all; otherwise the gap is the
+          // visible signal that something needs fixing.
           matchedProductIds.push({ cardId: card.id, productId: manualProductId });
-          console.log('[manual, not in set] (prices cleared — check mapping)');
+          console.log('[manual, not in set] (skipped — check mapping)');
           totalManualPreserved++;
           totalProcessed++;
           continue;
@@ -471,17 +668,20 @@ async function main() {
       }
 
       if (product) {
-        setRows.push({
-          card_id: card.id,
-          tcgplayer_product_id: product.productId,
-          tcgplayer_product_name: product.productName,
-          tcgplayer_url: `https://www.tcgplayer.com/product/${product.productId}/${product.productUrlName}`,
-          market_price: product.marketPrice,
-          lowest_price: product.lowestPrice,
-          median_price: product.medianPrice,
-          total_listings: product.totalListings,
-          manually_mapped: isManual,
-        });
+        // If this is a fresh discovery (not already in card_tcgplayer_mapping),
+        // record the mapping. Existing entries (manual or earlier auto)
+        // are left alone — the auto-mapper script is the canonical
+        // discovery path; scrape-prices just covers the gap for new sets
+        // that haven't been re-auto-mapped yet.
+        if (!isManual && !manualMappings.has(card.id)) {
+          newMappings.push({
+            card_id: card.id,
+            tcgplayer_product_id: product.productId,
+            tcgplayer_url: `https://www.tcgplayer.com/product/${product.productId}/${product.productUrlName}`,
+            tcgplayer_name: product.productName,
+            source: 'auto',
+          });
+        }
 
         historyRows.push({
           tcgplayer_product_id: product.productId,
@@ -506,24 +706,18 @@ async function main() {
       totalProcessed++;
     }
 
-    // Batch upsert this set's rows to Supabase
-    if (setRows.length > 0) {
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < setRows.length; i += BATCH_SIZE) {
-        const batch = setRows.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase
-          .from('card_prices')
-          .upsert(batch, {
-            onConflict: 'card_id',
-            // Don't overwrite manually_mapped=true with false
-            ignoreDuplicates: false,
-          });
-
-        if (error) {
-          console.error(`  Supabase upsert error for ${set.id}:`, error.message);
-        }
+    // Persist any newly-discovered mappings to card_tcgplayer_mapping.
+    // auto-map-tcgplayer.ts is the canonical discovery path; this is a
+    // fallback for sets where the auto-mapper hasn't been re-run.
+    if (newMappings.length > 0) {
+      const { error } = await supabase
+        .from('card_tcgplayer_mapping')
+        .upsert(newMappings, { onConflict: 'card_id' });
+      if (error) {
+        console.error(`  Mapping upsert error for ${set.id}:`, error.message);
+      } else if (debug) {
+        console.log(`  Recorded ${newMappings.length} new mappings`);
       }
-      if (debug) console.log(`  Upserted ${setRows.length} rows to Supabase`);
     }
 
     // Snapshot today's prices into history (deduplicate by product ID, keep last seen)
@@ -533,7 +727,7 @@ async function main() {
       for (let i = 0; i < uniqueHistory.length; i += HIST_BATCH) {
         const batch = uniqueHistory.slice(i, i + HIST_BATCH);
         const { error } = await supabase
-          .from('card_price_history')
+          .from('tcgplayer_card_price_history')
           .upsert(batch, { onConflict: 'tcgplayer_product_id,recorded_date', ignoreDuplicates: false });
         if (error) {
           console.error(`  History upsert error for ${set.id}:`, error.message);
@@ -543,50 +737,185 @@ async function main() {
     }
   }
 
-  // Fetch last sold prices for all matched products
+  // Fetch sales history for matched products on a staleness rotation —
+  // touch only the N most-stale products per run so traffic looks natural
+  // and we stay under TCGPlayer's anti-bot threshold. Full coverage in
+  // ~ceil(matchedProductIds.length / ROTATION_LIMIT) days.
+  const ROTATION_LIMIT = process.env.SCRAPE_ALL_PRODUCTS
+    ? matchedProductIds.length
+    : 300;
+
   if (matchedProductIds.length > 0) {
-    console.log(`\nFetching last sold prices for ${matchedProductIds.length} products...`);
+    // Order by sales_scraped_at NULLS FIRST so unseen + stalest products
+    // come first. After the 20260537 consolidation, sales_scraped_at lives
+    // on tcgplayer_products (keyed by product_id) — the rotation is now
+    // product-side, which is the right grain (multiple cards mapped to
+    // the same product share one scrape).
+    const matchedProdIds = Array.from(new Set(matchedProductIds.map(m => m.productId)));
+    const { data: staleness } = await supabase
+      .from('tcgplayer_products')
+      .select('product_id, sales_scraped_at')
+      .in('product_id', matchedProdIds)
+      .order('sales_scraped_at', { ascending: true, nullsFirst: true });
+
+    const orderedProducts = new Map(
+      (staleness ?? []).map((r, i) => [r.product_id as number, i]),
+    );
+    matchedProductIds.sort((a, b) => {
+      const ia = orderedProducts.get(a.productId) ?? Number.MAX_SAFE_INTEGER;
+      const ib = orderedProducts.get(b.productId) ?? Number.MAX_SAFE_INTEGER;
+      return ia - ib;
+    });
+
+    const targets = matchedProductIds.slice(0, ROTATION_LIMIT);
+    const skipped = matchedProductIds.length - targets.length;
+    console.log(
+      `\nFetching sales for ${targets.length} stalest products${skipped > 0 ? ` (skipping ${skipped} fresh ones)` : ''}...`,
+    );
+
     let lastSoldFound = 0;
-    const lastSoldRows: { card_id: string; last_sold_price: number; last_sold_date: string }[] = [];
-    const batchSize = 5;
-    for (let i = 0; i < matchedProductIds.length; i += batchSize) {
-      const batch = matchedProductIds.slice(i, i + batchSize);
+    let totalSalesStored = 0;
+    // last_sold_* and sales_scraped_at live on tcgplayer_products now
+    // (keyed by product_id). Multiple cards mapped to the same product
+    // share one product-level entry — dedupe on the way in.
+    let pendingLastSold: { product_id: number; last_sold_price: number; last_sold_date: string }[] = [];
+    let pendingSalesScraped: { product_id: number; sales_scraped_at: string }[] = [];
+    let pendingSales: {
+      tcgplayer_product_id: number;
+      sold_at: string;
+      price: number;
+      condition: string | null;
+      variant: string | null;
+      language: string | null;
+      listing_type: string | null;
+      shipping_price: number | null;
+      custom_listing_id: string | null;
+      quantity: number;
+    }[] = [];
+    const FLUSH_SIZE = 500;
+    // Lower concurrency for stealth — 2 simultaneous fetches with longer
+    // jitter between batches is harder to fingerprint as a bot.
+    const batchSize = 2;
+
+    async function flushPending() {
+      if (pendingLastSold.length > 0) {
+        // Dedupe by product_id (multiple cards may map to the same
+        // product; we only want one product row updated per product).
+        const byProduct = new Map(pendingLastSold.map(r => [r.product_id, r]));
+        const { error } = await supabase
+          .from('tcgplayer_products')
+          .upsert(Array.from(byProduct.values()), { onConflict: 'product_id' });
+        if (error) console.error(`  Supabase last sold upsert error:`, error.message);
+        pendingLastSold = [];
+      }
+      if (pendingSalesScraped.length > 0) {
+        // Update sales_scraped_at in parallel so rotation tracking is fast.
+        // Dedupe by product_id for the same reason as pendingLastSold.
+        const byProduct = new Map(pendingSalesScraped.map(r => [r.product_id, r]));
+        const updates = await Promise.all(
+          Array.from(byProduct.values()).map(row =>
+            supabase
+              .from('tcgplayer_products')
+              .update({ sales_scraped_at: row.sales_scraped_at })
+              .eq('product_id', row.product_id),
+          ),
+        );
+        const failures = updates.filter(r => r.error);
+        if (failures.length > 0) {
+          console.error(
+            `  sales_scraped_at: ${failures.length}/${byProduct.size} updates failed; first error: ${failures[0].error?.message}`,
+          );
+        }
+        pendingSalesScraped = [];
+      }
+      if (pendingSales.length > 0) {
+        const { error } = await supabase
+          .from('card_sales')
+          .upsert(pendingSales, {
+            onConflict: 'tcgplayer_product_id,sold_at,price,condition,variant,language',
+            ignoreDuplicates: true,
+          });
+        if (error) {
+          console.error(`  Supabase card_sales upsert error:`, error.message);
+        } else {
+          totalSalesStored += pendingSales.length;
+        }
+        pendingSales = [];
+      }
+    }
+
+    for (let i = 0; i < targets.length; i += batchSize) {
+      const batch = targets.slice(i, i + batchSize);
       const results = await Promise.all(
-        batch.map(({ productId }) => fetchLastSoldPrice(productId))
+        batch.map(({ productId }) => fetchSales(productId))
       );
+      const now = new Date().toISOString();
       for (let j = 0; j < batch.length; j++) {
-        const { cardId } = batch[j];
-        const sale = results[j];
-        if (sale) {
-          lastSoldRows.push({
-            card_id: cardId,
-            last_sold_price: sale.price,
-            last_sold_date: sale.date,
+        const { productId } = batch[j];
+        const sales = results[j];
+        // Always mark as attempted so rotation moves on, even if no sales returned.
+        pendingSalesScraped.push({
+          product_id: productId,
+          sales_scraped_at: now,
+        });
+        if (sales.length > 0) {
+          pendingLastSold.push({
+            product_id: productId,
+            last_sold_price: sales[0].price,
+            last_sold_date: sales[0].date,
           });
           lastSoldFound++;
+
+          for (const sale of sales) {
+            pendingSales.push({
+              tcgplayer_product_id: productId,
+              sold_at: sale.date,
+              price: sale.price,
+              condition: sale.condition,
+              variant: sale.variant,
+              language: sale.language,
+              listing_type: sale.listingType,
+              shipping_price: sale.shippingPrice,
+              custom_listing_id: sale.customListingId,
+              quantity: sale.quantity,
+            });
+          }
         }
       }
+
+      // Flush to DB every FLUSH_SIZE sales
+      if (pendingSales.length >= FLUSH_SIZE) {
+        await flushPending();
+      }
+
       if (i % 50 === 0 && i > 0) {
-        process.stdout.write(`  ${i}/${matchedProductIds.length}\r`);
+        process.stdout.write(
+          `  ${i}/${targets.length} (${totalSalesStored} sales stored, ${fetchStats.rateLimited} 429s)\r`,
+        );
       }
-      await sleep(100); // Rate limit between batches
+      // Polite inter-batch jitter — 2 concurrent × pagination (~3-5 reqs) every
+      // 1.5-3s averages out to ~1-2 req/sec, well under any sane rate limit.
+      await sleep(1500 + Math.random() * 1500);
     }
-    console.log(`  Found last sold price for ${lastSoldFound}/${matchedProductIds.length} products`);
 
-    // Update last sold prices in Supabase
-    if (lastSoldRows.length > 0) {
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < lastSoldRows.length; i += BATCH_SIZE) {
-        const batch = lastSoldRows.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase
-          .from('card_prices')
-          .upsert(batch, { onConflict: 'card_id' });
-
-        if (error) {
-          console.error(`  Supabase last sold upsert error:`, error.message);
-        }
-      }
-      console.log(`  Updated ${lastSoldRows.length} last sold prices in Supabase`);
+    // Flush remaining
+    await flushPending();
+    console.log(`  Found sales for ${lastSoldFound}/${targets.length} products (${totalSalesStored} total sales stored)`);
+    console.log(
+      `  fetchSales: ok-pages=${fetchStats.ok}  rate-limited-retries=${fetchStats.rateLimited}  gave-up=${fetchStats.giveUp}  hard-errors=${fetchStats.error}`,
+    );
+    console.log(
+      `  cookie: pages-with-25=${fetchStats.pagesWith25}  authed-pages=${fetchStats.authedPages}  ${TCG_AUTH_COOKIE ? '(cookie present)' : '(NO COOKIE — anon mode, capped at 5 sales/product)'}`,
+    );
+    if (TCG_AUTH_COOKIE && fetchStats.authedPages === 0 && fetchStats.ok > 0) {
+      console.warn(
+        `  ⚠ Cookie is set but every authed response looked anonymous (totalResults <= 5). Cookie has likely expired — refresh TCGPLAYER_AUTH_COOKIE.`,
+      );
+    }
+    if (fetchStats.giveUp > targets.length * 0.05) {
+      console.warn(
+        `  ⚠ ${fetchStats.giveUp} products gave up after retries — TCGPlayer is rate-limiting hard. Consider lowering ROTATION_LIMIT or running from a residential IP.`,
+      );
     }
   }
 
@@ -597,7 +926,7 @@ async function main() {
   console.log(`  Found: ${totalFound} (${((totalFound / totalProcessed) * 100).toFixed(1)}%)`);
   console.log(`  Manual preserved: ${totalManualPreserved}`);
   console.log(`  Not found: ${totalNotFound}`);
-  console.log(`  Saved to: Supabase card_prices`);
+  console.log(`  Saved to: Supabase tcgplayer_card_price_history`);
 }
 
 main().catch(console.error);
