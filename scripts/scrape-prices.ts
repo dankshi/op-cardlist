@@ -809,13 +809,27 @@ async function main() {
 
     async function flushPending() {
       if (pendingLastSold.length > 0) {
-        // Dedupe by product_id (multiple cards may map to the same
-        // product; we only want one product row updated per product).
+        // Dedupe by product_id (multiple cards may map to the same product;
+        // we only want one product row updated per product). UPDATE, not
+        // upsert: these products already exist (we just priced them), and a
+        // partial-column upsert would try to INSERT {product_id, last_sold_*}
+        // with a NULL product_name — Postgres checks that NOT NULL constraint
+        // on the proposed insert row before ON CONFLICT can turn it into an
+        // UPDATE, so it always fails. (Mirrors the sales_scraped_at block below.)
         const byProduct = new Map(pendingLastSold.map(r => [r.product_id, r]));
-        const { error } = await supabase
-          .from('tcgplayer_products')
-          .upsert(Array.from(byProduct.values()), { onConflict: 'product_id' });
-        if (error) { console.error(`  Supabase last sold upsert error:`, error.message); dbWriteErrors++; }
+        const updates = await Promise.all(
+          Array.from(byProduct.values()).map(row =>
+            supabase
+              .from('tcgplayer_products')
+              .update({ last_sold_price: row.last_sold_price, last_sold_date: row.last_sold_date })
+              .eq('product_id', row.product_id),
+          ),
+        );
+        const failures = updates.filter(r => r.error);
+        if (failures.length > 0) {
+          console.error(`  last sold: ${failures.length}/${byProduct.size} updates failed; first error: ${failures[0].error?.message}`);
+          dbWriteErrors += failures.length;
+        }
         pendingLastSold = [];
       }
       if (pendingSalesScraped.length > 0) {
