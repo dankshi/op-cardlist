@@ -7,6 +7,14 @@ dotenv.config({ path: '.env.local' });
 
 const TCGPLAYER_SEARCH_URL = 'https://mp-search-api.tcgplayer.com/v1/search/request';
 
+// Count of database write errors across the whole run. Supabase upsert/update
+// errors are logged but not thrown (so one bad batch doesn't abort the rest),
+// then tallied here and turned into a non-zero exit at the end of main(). This
+// is what makes a schema break — e.g. a dropped/renamed table — fail the nightly
+// job LOUDLY instead of exiting 0. (A silent card_prices write to a dropped
+// table is exactly what froze prices site-wide for ~12 days in May 2026.)
+let dbWriteErrors = 0;
+
 interface TCGPlayerProduct {
   productId: number;
   productName: string;
@@ -715,6 +723,7 @@ async function main() {
         .upsert(newMappings, { onConflict: 'card_id' });
       if (error) {
         console.error(`  Mapping upsert error for ${set.id}:`, error.message);
+        dbWriteErrors++;
       } else if (debug) {
         console.log(`  Recorded ${newMappings.length} new mappings`);
       }
@@ -731,6 +740,7 @@ async function main() {
           .upsert(batch, { onConflict: 'tcgplayer_product_id,recorded_date', ignoreDuplicates: false });
         if (error) {
           console.error(`  History upsert error for ${set.id}:`, error.message);
+          dbWriteErrors++;
         }
       }
       if (debug) console.log(`  Saved ${uniqueHistory.length} history rows for ${today}`);
@@ -805,7 +815,7 @@ async function main() {
         const { error } = await supabase
           .from('tcgplayer_products')
           .upsert(Array.from(byProduct.values()), { onConflict: 'product_id' });
-        if (error) console.error(`  Supabase last sold upsert error:`, error.message);
+        if (error) { console.error(`  Supabase last sold upsert error:`, error.message); dbWriteErrors++; }
         pendingLastSold = [];
       }
       if (pendingSalesScraped.length > 0) {
@@ -825,6 +835,7 @@ async function main() {
           console.error(
             `  sales_scraped_at: ${failures.length}/${byProduct.size} updates failed; first error: ${failures[0].error?.message}`,
           );
+          dbWriteErrors += failures.length;
         }
         pendingSalesScraped = [];
       }
@@ -837,6 +848,7 @@ async function main() {
           });
         if (error) {
           console.error(`  Supabase card_sales upsert error:`, error.message);
+          dbWriteErrors++;
         } else {
           totalSalesStored += pendingSales.length;
         }
@@ -927,6 +939,19 @@ async function main() {
   console.log(`  Manual preserved: ${totalManualPreserved}`);
   console.log(`  Not found: ${totalNotFound}`);
   console.log(`  Saved to: Supabase tcgplayer_card_price_history`);
+
+  // Fail the run if any DB write errored. The scraper deliberately logs-and-
+  // continues per batch (so one bad row doesn't lose the whole scrape), but a
+  // run that couldn't persist its prices must NOT report success — otherwise a
+  // schema break (dropped/renamed table or column) shows up as a green nightly
+  // job that silently writes nothing.
+  if (dbWriteErrors > 0) {
+    console.error(`\n✗ ${dbWriteErrors} database write error(s) during this run — exiting non-zero so the schedule surfaces it.`);
+    process.exit(1);
+  }
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
