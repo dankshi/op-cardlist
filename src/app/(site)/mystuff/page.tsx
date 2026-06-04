@@ -299,12 +299,20 @@ function MyStuffPageInner() {
           </p>
         </div>
         {isSeller ? (
-          <Link
-            href="/sell"
-            className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
-          >
-            + Add a Card
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/sellerhub"
+              className="px-4 py-2 rounded-lg border border-orange-500 text-orange-600 hover:bg-orange-50 font-semibold transition-colors"
+            >
+              Open Seller Hub →
+            </Link>
+            <Link
+              href="/sell"
+              className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-500 text-white font-semibold transition-colors"
+            >
+              + Add a Card
+            </Link>
+          </div>
         ) : (
           <Link
             href="/seller/apply"

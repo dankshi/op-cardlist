@@ -11,6 +11,7 @@ import type { User } from '@supabase/supabase-js'
 export default function AuthButton() {
   const [user, setUser] = useState<User | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isSeller, setIsSeller] = useState(false)
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -49,13 +50,15 @@ export default function AuthButton() {
         if (session?.user) {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('is_admin')
+            .select('is_admin, is_seller, seller_approved')
             .eq('id', session.user.id)
             .single()
           if (profileError) console.error('[AuthButton] auth-change profile fetch failed', JSON.stringify(profileError))
           setIsAdmin(profile?.is_admin || false)
+          setIsSeller((profile?.is_seller && profile?.seller_approved) || false)
         } else {
           setIsAdmin(false)
+          setIsSeller(false)
         }
       } catch (err) {
         console.error('[AuthButton] auth-change threw', err)
@@ -75,11 +78,12 @@ export default function AuthButton() {
           if (user) {
             const { data: profile, error: profileError } = await supabase
               .from('profiles')
-              .select('is_admin')
+              .select('is_admin, is_seller, seller_approved')
               .eq('id', user.id)
               .single()
             if (profileError) console.error('[AuthButton] profile fetch failed', JSON.stringify(profileError))
             setIsAdmin(profile?.is_admin || false)
+            setIsSeller((profile?.is_seller && profile?.seller_approved) || false)
           }
         } catch (err) {
           console.error('[AuthButton] init threw', err)
@@ -176,6 +180,15 @@ export default function AuthButton() {
             Wallet
           </Link>
           <div className="border-t border-zinc-200 mt-1 pt-1">
+            {isSeller && (
+              <Link
+                href="/sellerhub"
+                onClick={() => setMenuOpen(false)}
+                className="block px-4 py-2 text-sm font-medium text-orange-500 hover:bg-zinc-50"
+              >
+                Seller Hub
+              </Link>
+            )}
             <Link
               href="/sell"
               onClick={() => setMenuOpen(false)}

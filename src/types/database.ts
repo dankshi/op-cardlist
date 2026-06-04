@@ -18,6 +18,10 @@ export interface Profile {
   rating_count: number
   total_sales: number
   balance: number
+  // Tier-aware pricing (migration 20260538). seller_tier drives the
+  // marketplace % in calculatePayout(); seller_gmv is lifetime GMV.
+  seller_tier: SellerTier
+  seller_gmv: number
   shipping_street1: string | null
   shipping_city: string | null
   shipping_state: string | null
@@ -46,6 +50,12 @@ export const GRADING_SCALES: Record<GradingCompany, string[]> = {
 }
 
 export type ListingStatus = 'active' | 'sold' | 'reserved' | 'delisted'
+
+/** Seller pricing tier (migration 20260538). Mirrors TierId in src/lib/fees.ts. */
+export type SellerTier = 'basic' | 'silver' | 'pearl' | 'gold' | 'diamond' | 'elite'
+
+/** How a listed card reaches the buyer (migration 20260538). */
+export type FulfillmentMethod = 'ship' | 'drop' | 'p2p'
 
 export type OrderStatus =
   | 'pending_payment'
@@ -80,6 +90,7 @@ export interface Listing {
   status: ListingStatus
   grading_company: GradingCompany | null
   grade: string | null
+  fulfillment_method: FulfillmentMethod
   tcgplayer_product_id: number | null
   created_at: string
   updated_at: string
@@ -96,6 +107,13 @@ export interface Order {
   subtotal: number
   shipping_cost: number
   platform_fee: number
+  // Per-component fee breakdown (migration 20260538). platform_fee stays
+  // the rolled-up total (seller_fee + marketplace_fee); these expose the
+  // split for seller-facing dashboards. Legacy orders default to 0.
+  seller_fee: number
+  marketplace_fee: number
+  processing_fee: number
+  seller_tier_at_sale: SellerTier | null
   total: number
   credits_applied: number
   stripe_payment_intent_id: string | null
