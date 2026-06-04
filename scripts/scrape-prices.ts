@@ -7,6 +7,14 @@ dotenv.config({ path: '.env.local' });
 
 const TCGPLAYER_SEARCH_URL = 'https://mp-search-api.tcgplayer.com/v1/search/request';
 
+// Count of database write errors across the whole run. Supabase upsert/update
+// errors are logged but not thrown (so one bad batch doesn't abort the rest),
+// then tallied here and turned into a non-zero exit at the end of main(). This
+// is what makes a schema break — e.g. a dropped/renamed table — fail the nightly
+// job LOUDLY instead of exiting 0. (A silent card_prices write to a dropped
+// table is exactly what froze prices site-wide for ~12 days in May 2026.)
+let dbWriteErrors = 0;
+
 interface TCGPlayerProduct {
   productId: number;
   productName: string;
@@ -498,13 +506,12 @@ async function main() {
   const database = await loadCardDatabaseFromSupabase(supabase);
   console.log(`Loaded ${database.sets.length} sets, ${database.sets.reduce((s, set) => s + set.cards.length, 0)} cards.`);
 
-  // Fetch existing card_id → tcgplayer_product_id mappings from the new
-  // single-source-of-truth table. Previously this read card_prices with
-  // manually_mapped=true; now ALL mappings in card_tcgplayer_mapping are
-  // protected (the scraper never auto-changes them — that's auto-map-
-  // tcgplayer.ts's job). The `manually_mapped` flag below is kept for
-  // backwards-compat with the card_prices writes; will be removed once
-  // those columns are dropped.
+  // Fetch existing card_id → tcgplayer_product_id mappings from
+  // card_tcgplayer_mapping — the single source of truth for the card↔product
+  // link (the old card_prices / tcgplayer_card_prices tables were dropped in
+  // migration 20260537). ALL mappings here are protected: the price scraper
+  // never changes them (that's auto-map-tcgplayer.ts's job); it only refreshes
+  // prices into tcgplayer_card_price_history.
   const manualMappings = new Map<string, number>(); // card_id → tcgplayer_product_id
   {
     const PAGE = 1000;
@@ -558,7 +565,7 @@ async function main() {
   }
 
   console.log('Starting TCGPlayer price scrape (set-based)...');
-  console.log('Writing to: Supabase card_prices');
+  console.log('Writing to: Supabase tcgplayer_card_price_history');
   console.log(`Total cards to process: ${totalCards}`);
   if (setFilter) console.log(`Filtering to set: ${setFilter}`);
   if (cardFilter) console.log(`Filtering to card: ${cardFilter}`);
@@ -716,6 +723,7 @@ async function main() {
         .upsert(newMappings, { onConflict: 'card_id' });
       if (error) {
         console.error(`  Mapping upsert error for ${set.id}:`, error.message);
+        dbWriteErrors++;
       } else if (debug) {
         console.log(`  Recorded ${newMappings.length} new mappings`);
       }
@@ -732,6 +740,7 @@ async function main() {
           .upsert(batch, { onConflict: 'tcgplayer_product_id,recorded_date', ignoreDuplicates: false });
         if (error) {
           console.error(`  History upsert error for ${set.id}:`, error.message);
+          dbWriteErrors++;
         }
       }
       if (debug) console.log(`  Saved ${uniqueHistory.length} history rows for ${today}`);
@@ -800,13 +809,27 @@ async function main() {
 
     async function flushPending() {
       if (pendingLastSold.length > 0) {
-        // Dedupe by product_id (multiple cards may map to the same
-        // product; we only want one product row updated per product).
+        // Dedupe by product_id (multiple cards may map to the same product;
+        // we only want one product row updated per product). UPDATE, not
+        // upsert: these products already exist (we just priced them), and a
+        // partial-column upsert would try to INSERT {product_id, last_sold_*}
+        // with a NULL product_name — Postgres checks that NOT NULL constraint
+        // on the proposed insert row before ON CONFLICT can turn it into an
+        // UPDATE, so it always fails. (Mirrors the sales_scraped_at block below.)
         const byProduct = new Map(pendingLastSold.map(r => [r.product_id, r]));
-        const { error } = await supabase
-          .from('tcgplayer_products')
-          .upsert(Array.from(byProduct.values()), { onConflict: 'product_id' });
-        if (error) console.error(`  Supabase last sold upsert error:`, error.message);
+        const updates = await Promise.all(
+          Array.from(byProduct.values()).map(row =>
+            supabase
+              .from('tcgplayer_products')
+              .update({ last_sold_price: row.last_sold_price, last_sold_date: row.last_sold_date })
+              .eq('product_id', row.product_id),
+          ),
+        );
+        const failures = updates.filter(r => r.error);
+        if (failures.length > 0) {
+          console.error(`  last sold: ${failures.length}/${byProduct.size} updates failed; first error: ${failures[0].error?.message}`);
+          dbWriteErrors += failures.length;
+        }
         pendingLastSold = [];
       }
       if (pendingSalesScraped.length > 0) {
@@ -826,6 +849,7 @@ async function main() {
           console.error(
             `  sales_scraped_at: ${failures.length}/${byProduct.size} updates failed; first error: ${failures[0].error?.message}`,
           );
+          dbWriteErrors += failures.length;
         }
         pendingSalesScraped = [];
       }
@@ -838,6 +862,7 @@ async function main() {
           });
         if (error) {
           console.error(`  Supabase card_sales upsert error:`, error.message);
+          dbWriteErrors++;
         } else {
           totalSalesStored += pendingSales.length;
         }
@@ -927,7 +952,20 @@ async function main() {
   console.log(`  Found: ${totalFound} (${((totalFound / totalProcessed) * 100).toFixed(1)}%)`);
   console.log(`  Manual preserved: ${totalManualPreserved}`);
   console.log(`  Not found: ${totalNotFound}`);
-  console.log(`  Saved to: Supabase card_prices`);
+  console.log(`  Saved to: Supabase tcgplayer_card_price_history`);
+
+  // Fail the run if any DB write errored. The scraper deliberately logs-and-
+  // continues per batch (so one bad row doesn't lose the whole scrape), but a
+  // run that couldn't persist its prices must NOT report success — otherwise a
+  // schema break (dropped/renamed table or column) shows up as a green nightly
+  // job that silently writes nothing.
+  if (dbWriteErrors > 0) {
+    console.error(`\n✗ ${dbWriteErrors} database write error(s) during this run — exiting non-zero so the schedule surfaces it.`);
+    process.exit(1);
+  }
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
