@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCardById, getParallelCards, isHiddenCard } from "@/lib/cards";
-import { getCardSales, getCardGradedSales, getCardPopulations, getCardPsaInfo, calculatePriceChange } from "@/lib/price-history";
+import { getCardSales, getCardGradedSales, getCardPopulations, getCardPsaInfo } from "@/lib/price-history";
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
@@ -11,11 +11,8 @@ import { ManualUrlAssign } from "@/components/admin/ManualUrlAssign";
 import { AdminDebugSection } from "@/components/admin/AdminDebugSection";
 import { CardThumbnail } from "@/components/card/CardThumbnail";
 import { RecentSales } from "@/components/card/RecentSales";
-import { PriceChangeBadge } from "@/components/PriceChangeBadge";
-import { ShareButtons } from "@/components/ShareButtons";
 import { type VariantData } from "@/components/card/CardBuyPanel";
 import { CardMainPanel } from "@/components/card/CardMainPanel";
-import { TrustBadges } from "@/components/card/TrustBadges";
 import type { PopulationBucket, GradeCompany } from "@/lib/price-history";
 
 // Ordering for the variant chip row: Raw first, then by grading company,
@@ -188,12 +185,11 @@ export default async function CardPage({ params }: PageProps) {
   }
 
   const supabase = await createClient();
-  const [sales, gradedSales, populations, psaInfo, priceChange, listingAgg, bidsAgg, userRes] = await Promise.all([
+  const [sales, gradedSales, populations, psaInfo, listingAgg, bidsAgg, userRes] = await Promise.all([
     getCardSales(card.id, 90),
     getCardGradedSales(card.id, 90),
     getCardPopulations(card.id),
     getCardPsaInfo(card.id),
-    calculatePriceChange(card.id, card.price?.marketPrice ?? null, 7),
     // All active listings — used both for the variant chips (raw + each
     // graded company×grade) and for the inline market-data drawer's Asks
     // tab (with seller info). One fetch serves both. Asc by price so the
@@ -303,7 +299,6 @@ export default async function CardPage({ params }: PageProps) {
   // theirs and sell it). Either source qualifies — that's why the chip row
   // shows both "buyable now" and "open to offers" variants together.
   const variants = buildVariants(allListings, populations);
-  const totalActiveListings = allListings.length;
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
   // Drop self + any hidden variants (base C/UC/R/P/SR standards we don't
   // sell). The current card stays visible even if hidden, since the user
@@ -332,27 +327,33 @@ export default async function CardPage({ params }: PageProps) {
         <span className="text-zinc-900">{card.name}</span>
       </nav>
 
-      {/* Two-Column Layout: Image + Details. Uses the full root-layout
-          width so on wide displays the chip row + trust band have room to
-          breathe rather than collapsing into a narrow center column. */}
-      <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] gap-10 mb-12">
-        {/* Left: Card Image */}
-        <div className="flex justify-center md:sticky md:top-24 md:self-start">
+      {/* Shopping region: card image + borderless action column, with the
+          full-width grade ladder below. CardMainPanel owns the two-column
+          layout + the shared grade selection so the chip, buy box, ladder,
+          and market drawer all stay in sync. Image / debug / share are
+          server-rendered here and passed in as slots. */}
+      <CardMainPanel
+        cardId={card.id}
+        cardName={card.name}
+        variants={variants}
+        marketPrice={marketPrice}
+        asks={asksForPanel}
+        bids={bidsForPanel}
+        sales={combinedSales}
+        currentUserId={userRes.data.user?.id ?? null}
+        isAdmin={isAdmin}
+        image={
           <Card3DPreview
             card={card}
             className="w-[300px] h-[420px] md:w-[360px] md:h-[504px]"
             priority
           />
-        </div>
-
-        {/* Right: Details + Market */}
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 mb-3">{card.name}</h1>
-
+        }
+        debug={isAdmin && (
+          <AdminDebugSection>
           {/* Debug: per-source field dump styled like a VSCode editor.
               Gated to admins server-side (no HTML shipped to other users)
               and toggleable client-side via the profile-dropdown switch. */}
-          {isAdmin && <AdminDebugSection>
           <pre className="mb-3 text-xs font-mono bg-[#1e1e1e] border border-zinc-800 rounded-md px-3 py-2 overflow-x-auto leading-relaxed text-zinc-300">
             <span className="text-emerald-400"># debug: data sources</span>{'\n'}
             <span className="text-sky-400">cards</span>{'\n'}
@@ -370,7 +371,7 @@ export default async function CardPage({ params }: PageProps) {
               <span className="italic text-zinc-600">unknown set</span>
             )}{'\n'}
             {'\n'}
-            <span className="text-sky-400">card_prices</span>{'\n'}
+            <span className="text-sky-400">card_tcgplayer_mapping</span>{'\n'}
             <span className="text-zinc-500">{'  tcg_name    '}</span><span className="text-orange-300">{card.price?.tcgplayerProductName ?? <span className="italic text-zinc-600">none</span>}</span>{'\n'}
             <span className="text-zinc-500">{'  tcg_url     '}</span>
             {card.price?.tcgplayerUrl ? (
@@ -405,36 +406,9 @@ export default async function CardPage({ params }: PageProps) {
               <span className="italic text-zinc-600">  unmapped</span>
             )}
           </pre>
-          </AdminDebugSection>}
-
-          {/* Buy/Offer panel + inline market-data drawer. The wrapper
-              shares the selected-variant state between them so clicking
-              a chip on the buy panel filters the asks/bids/sales tables
-              below to that variant. */}
-          <div className="mb-4">
-            <CardMainPanel
-              cardId={card.id}
-              cardName={card.name}
-              variants={variants}
-              marketPrice={marketPrice}
-              priceChangePercent={priceChange?.changePercent ?? null}
-              asks={asksForPanel}
-              bids={bidsForPanel}
-              sales={combinedSales}
-              currentUserId={userRes.data.user?.id ?? null}
-              isAdmin={isAdmin}
-            />
-          </div>
-
-          {/* Trust band — three reassurances above the fold so a buyer
-              doesn't have to scroll to learn what they're committing to. */}
-          <TrustBadges />
-
-          <div className="mt-4 flex justify-end">
-            <ShareButtons card={card} />
-          </div>
-        </div>
-      </div>
+          </AdminDebugSection>
+        )}
+      />
 
       {/* Other Versions — promoted above sales. Full width so on wide
           displays we get more cards per row instead of leaving large

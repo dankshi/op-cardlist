@@ -1,84 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { BuyNowButton } from '@/components/marketplace/BuyNowButton'
-import { PriceChangeBadge } from '@/components/PriceChangeBadge'
-import { gradingStyle } from '@/lib/gradingStyle'
+import { buildChips, type ChipData, type VariantData } from './variantChips'
 
-export interface VariantData {
-  /** Stable variant key: 'raw' or '<company>-<grade>' (e.g. 'PSA-10'). */
-  key: string
-  /** Display label: 'Raw' or '<company> <grade>'. */
-  label: string
-  company: string | null
-  grade: string | null
-  /** Population count for this graded variant (0 for raw / no data). */
-  population: number
-  lowestListingId: string | null
-  lowestListingPrice: number | null
-  /** How many units of the lowest listing the seller still has. Drives
-   *  the qty selector on Buy Now — capped at this value. Always 1 for
-   *  graded slabs (each is a unique physical card). */
-  lowestListingQuantityAvailable: number
-  listingCount: number
-}
-
-type CompanyKey = 'PSA' | 'BGS' | 'CGC' | 'TAG'
-
-interface VariantDef {
-  company: CompanyKey
-  grade: string
-  display: string // short label shown on the chip
-  /** True if this chip is shown by default; false if it's behind the
-   *  "+N more" expander. Order in this array is the render order — when
-   *  expanded, secondary chips appear adjacent to their primary siblings
-   *  (e.g. PSA 9 sits right after PSA 10 instead of jumping to the end). */
-  primary: boolean
-}
-
-/** Canonical ordering for the chip row. Grouped by company so when the
- *  user expands the row, lower grades sit next to their company's top
- *  grade rather than being lumped together at the end. */
-const ALL_VARIANTS: VariantDef[] = [
-  { company: 'PSA', grade: '10',              display: '10',       primary: true  },
-  { company: 'PSA', grade: '9',               display: '9',        primary: false },
-  { company: 'BGS', grade: 'Black Label 10',  display: 'BL',       primary: true  },
-  { company: 'BGS', grade: '10',              display: '10',       primary: true  },
-  { company: 'BGS', grade: '9.5',             display: '9.5',      primary: false },
-  { company: 'BGS', grade: '9',               display: '9',        primary: false },
-  { company: 'CGC', grade: 'Pristine 10',     display: 'Pristine', primary: false },
-  { company: 'CGC', grade: '10',              display: '10',       primary: false },
-  { company: 'CGC', grade: '9.5',             display: '9.5',      primary: false },
-  { company: 'CGC', grade: '9',               display: '9',        primary: false },
-  { company: 'TAG', grade: '10',              display: '10',       primary: false },
-  { company: 'TAG', grade: '9.5',             display: '9.5',      primary: false },
-  { company: 'TAG', grade: '9',               display: '9',        primary: false },
-]
-
-interface ChipData {
-  key: string
-  label: string                    // long label for the panel header
-  companyKey: CompanyKey | null
-  /** Actual grade string (e.g. "Black Label 10") — fed to gradingStyle()
-   *  so the chip can render the correct slab-label color treatment. */
-  grade: string | null
-  display: string | null           // short grade text on the chip face
-  population: number
-  lowestListingId: string | null
-  lowestListingPrice: number | null
-  /** Cap for the multi-quantity Buy Now selector. 0 when no listing. */
-  lowestListingQuantityAvailable: number
-  listingCount: number
-}
+export type { VariantData } from './variantChips'
 
 export function CardBuyPanel({
   cardId,
   variants,
-  marketPrice,
-  priceChangePercent,
-  selectedKey: controlledKey,
-  onSelect,
+  selectedKey,
   showMarketLink = true,
   onViewMarketData,
   onOfferClick,
@@ -89,13 +21,10 @@ export function CardBuyPanel({
 }: {
   cardId: string
   variants: VariantData[]
-  marketPrice: number | null
-  priceChangePercent: number | null
-  /** When provided, the panel becomes controlled — parent owns the
-   *  selected variant so a sibling (e.g. the inline market-data drawer)
-   *  can render with the same filter. */
-  selectedKey?: string
-  onSelect?: (key: string) => void
+  /** Variant the buy box acts on. Owned by the parent (CardMainPanel),
+   *  which lifts the selection up so the GradeSelector ladder and the
+   *  market-data drawer all stay in sync with one source of truth. */
+  selectedKey: string
   /** Whether to render the "View market data" link at all. The market
    *  drawer is admin-only while the marketplace seeds, so the parent
    *  suppresses the link for users who can't see the drawer. Defaults to
@@ -125,65 +54,11 @@ export function CardBuyPanel({
    *  Offers tab to find the matching bid. */
   topOfferPrice?: number | null
 }) {
-  const variantByKey = useMemo(() => {
-    const m = new Map<string, VariantData>()
-    for (const v of variants) m.set(v.key, v)
-    return m
-  }, [variants])
+  // Build the full chip ladder once. The buy box only renders the *selected*
+  // chip; the grade ladder (GradeSelector) renders the rest. Both share
+  // buildChips() so the selected key always resolves to the same variant.
+  const allChips = useMemo<ChipData[]>(() => buildChips(variants), [variants])
 
-  type RenderableChip = ChipData & { primary: boolean }
-
-  const allChips = useMemo<RenderableChip[]>(() => {
-    const raw = variantByKey.get('raw')
-    const rawChip: RenderableChip = {
-      key: 'raw',
-      label: 'Ungraded NM',
-      companyKey: null,
-      grade: null,
-      display: null,
-      population: 0,
-      lowestListingId: raw?.lowestListingId ?? null,
-      lowestListingPrice: raw?.lowestListingPrice ?? null,
-      lowestListingQuantityAvailable: raw?.lowestListingQuantityAvailable ?? 0,
-      listingCount: raw?.listingCount ?? 0,
-      primary: true,
-    }
-    const graded: RenderableChip[] = ALL_VARIANTS.map(def => {
-      const key = `${def.company}-${def.grade}`
-      const v = variantByKey.get(key)
-      return {
-        key,
-        label: `${def.company} ${def.grade}`,
-        companyKey: def.company,
-        grade: def.grade,
-        display: def.display,
-        population: v?.population ?? 0,
-        lowestListingId: v?.lowestListingId ?? null,
-        lowestListingPrice: v?.lowestListingPrice ?? null,
-        lowestListingQuantityAvailable: v?.lowestListingQuantityAvailable ?? 0,
-        listingCount: v?.listingCount ?? 0,
-        primary: def.primary,
-      }
-    })
-    return [rawChip, ...graded]
-  }, [variantByKey])
-
-  const secondaryCount = useMemo(
-    () => allChips.filter(c => !c.primary).length,
-    [allChips],
-  )
-
-  // Cheapest variant with a listing — drives both the initial selection
-  // and whether we auto-expand the secondary row (if the cheapest sits
-  // there, expanding keeps it visible from the first paint).
-  const cheapestKey = useMemo(() => {
-    const listed = allChips.filter(c => c.lowestListingPrice != null)
-    if (listed.length === 0) return 'raw'
-    return listed.sort((a, b) => (a.lowestListingPrice ?? 0) - (b.lowestListingPrice ?? 0))[0].key
-  }, [allChips])
-
-  const cheapestIsSecondary = !allChips.find(c => c.key === cheapestKey)?.primary
-  const [uncontrolledKey, setUncontrolledKey] = useState(cheapestKey)
   // Buy vs Sell perspective toggle (StockX pattern). Default to buy — most
   // users on a card page are shopping. They flip to sell via the contextual
   // footer link, which shows the top-offer price as a teaser.
@@ -193,67 +68,14 @@ export function CardBuyPanel({
     onModeChange?.(next)
   }
 
-  // Controlled when the parent passes `selectedKey`; uncontrolled when it
-  // doesn't. Lets CardBuyPanel keep working standalone (e.g. on /market)
-  // while also slotting into CardMainPanel where state lifts up.
-  const selectedKey = controlledKey ?? uncontrolledKey
-  // Multi-quantity Buy Now state. Reset whenever the variant changes —
-  // what was 4 NM raw isn't valid as 4 of some other variant the user
-  // just clicked into.
-  const [buyQuantity, setBuyQuantity] = useState(1)
-  useEffect(() => { setBuyQuantity(1) }, [selectedKey])
-  const [expanded, setExpanded] = useState(cheapestIsSecondary)
-
   const selected = allChips.find(c => c.key === selectedKey) ?? allChips[0]
-  const isRaw = selected.key === 'raw'
-
-  function pickChip(key: string) {
-    if (onSelect) onSelect(key)
-    else setUncontrolledKey(key)
-    // If the user picked a secondary chip, keep the row expanded so they
-    // can see what's adjacent without it collapsing under them.
-    const picked = allChips.find(c => c.key === key)
-    if (picked && !picked.primary) setExpanded(true)
-  }
-
-  const belowMarket =
-    isRaw && selected.lowestListingPrice != null && marketPrice != null && marketPrice > selected.lowestListingPrice
-      ? marketPrice - selected.lowestListingPrice
-      : 0
-  const belowMarketSignificant = belowMarket >= 1 && belowMarket / (marketPrice || 1) >= 0.03
 
   return (
-    <div className="rounded-xl border-2 border-zinc-200 bg-white p-5">
-      {/* Chip row. Primary row is always visible; "Show all grades"
-          reveals lower grades and the minor companies (CGC, TAG). */}
-      <div className="-mx-1 mb-4">
-        <div className="flex flex-wrap gap-1.5 px-1">
-          {/* Iterate the unified canonical-order list so that when the
-              user expands, secondaries slot in beside their company group
-              (PSA 9 immediately after PSA 10, BGS 9.5/9 after BGS 10, etc.)
-              instead of all appearing in a clump at the end. */}
-          {allChips.filter(c => c.primary || expanded).map(c => (
-            <VariantChip key={c.key} chip={c} isActive={c.key === selectedKey} onClick={() => pickChip(c.key)} />
-          ))}
-          {!expanded ? (
-            <button
-              onClick={() => setExpanded(true)}
-              className="flex-shrink-0 w-[170px] px-3 py-2.5 rounded-lg text-center transition-colors cursor-pointer border-2 border-dashed border-zinc-300 hover:border-zinc-500 text-xs font-bold text-zinc-600 hover:text-zinc-900 inline-flex items-center justify-center gap-1"
-              title="Show CGC, TAG, and lower grades"
-            >
-              <span>+{secondaryCount} more</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setExpanded(false)}
-              className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors"
-            >
-              Show less
-            </button>
-          )}
-        </div>
-      </div>
-
+    /* Borderless action block — sits in the card-detail action column as a
+       clean stack (the selected-grade chip lives just above this, the grade
+       ladder full-width below). No card border so the page reads as one
+       region rather than boxes-in-boxes. */
+    <div>
       {/* Buy/Sell mode toggle. Buy mode (default) is buyer's perspective —
           big price is the lowest ask, primary action is Buy Now. Sell mode
           flips it — big price is the top offer, primary action is Sell Now
@@ -268,54 +90,43 @@ export function CardBuyPanel({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                   Buy now for
                 </span>
-                {selected.listingCount === 1 && selected.lowestListingQuantityAvailable === 1 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 ring-1 ring-rose-200">
-                    Last one
-                  </span>
-                )}
-                {belowMarketSignificant && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
-                    ${belowMarket.toFixed(2)} below market
-                  </span>
-                )}
               </div>
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <p className="text-4xl font-light tabular-nums tracking-tight text-zinc-900 leading-none">
-                    ${(selected.lowestListingPrice * buyQuantity).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${selected.lowestListingPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
-                  {buyQuantity > 1 && (
-                    <p className="text-xs text-zinc-500 mt-1.5 tabular-nums">
-                      {buyQuantity} × ${selected.lowestListingPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Qty selector only for ungraded with multiple units
-                      in stock at the lowest price. Graded slabs are by
-                      definition qty=1 (each is a unique physical card),
-                      and single-unit raw listings don't need a selector. */}
-                  {selected.companyKey === null && selected.lowestListingQuantityAvailable > 1 && (
-                    <QtyStepper
-                      value={buyQuantity}
-                      max={selected.lowestListingQuantityAvailable}
-                      onChange={setBuyQuantity}
-                    />
-                  )}
+                  {/* Single-quantity only for now — buyers purchase one card
+                      at a time. (Multi-qty Buy Now is temporarily disabled.) */}
                   <OfferButton onClick={onOfferClick} cardId={cardId} />
-                  <BuyNowButton listingId={selected.lowestListingId} price={selected.lowestListingPrice} quantity={buyQuantity} size="lg" />
+                  <BuyNowButton listingId={selected.lowestListingId} price={selected.lowestListingPrice} quantity={1} size="lg" />
                 </div>
               </div>
             </div>
           ) : (
+            /* No listing for this variant — keep the SAME layout as the
+               listed state (label row + big line + buttons on the right),
+               only the headline + CTA wording change. */
             <div className="mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Buy now for</p>
-              <p className="text-2xl font-semibold text-zinc-500 mb-3">No listings yet</p>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <OfferButton onClick={onOfferClick} cardId={cardId} />
-                <ListButton onClick={onListClick} cardId={cardId} selected={selected} variant="primary">
-                  List yours
-                </ListButton>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                  Buy now for
+                </span>
+              </div>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-4xl font-light tracking-tight text-zinc-400 leading-none">
+                    No listings yet
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <OfferButton onClick={onOfferClick} cardId={cardId} />
+                  <ListButton onClick={onListClick} cardId={cardId} selected={selected} variant="primary">
+                    List yours
+                  </ListButton>
+                </div>
               </div>
             </div>
           )}
@@ -406,75 +217,6 @@ export function CardBuyPanel({
   )
 }
 
-function VariantChip({ chip, isActive, onClick }: { chip: ChipData; isActive: boolean; onClick: () => void }) {
-  const hasListing = chip.lowestListingPrice != null
-  const isGraded = chip.companyKey !== null
-  const style = isGraded ? gradingStyle(chip.companyKey, chip.grade) : null
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-shrink-0 w-[170px] px-3 py-2.5 rounded-lg text-left transition-colors cursor-pointer border-2 ${
-        isActive
-          ? 'border-orange-500 bg-orange-50'
-          : 'border-zinc-200 bg-white hover:border-zinc-400'
-      }`}
-    >
-      {/* Top row: tier-styled slab pill on the left, POP on the right.
-          The pill itself signals quality at a glance (BGS BL = black/gold,
-          BGS 10 = gold, PSA red, CGC green, etc.). Pop sits next to it so
-          buyers read "BGS BL · Pop 12" without scanning down. */}
-      <div className="flex items-center justify-between gap-2 mb-2">
-        {style ? (
-          <span
-            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ring-1 whitespace-nowrap ${style.pill}`}
-          >
-            {style.isCrownJewel && (
-              <svg className="w-2.5 h-2.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.539 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            )}
-            {style.shortLabel}
-          </span>
-        ) : (
-          /* Ungraded chip: zinc pill (no brand color since it isn't a
-             grading company). The "NM" condition tag mirrors the Pop
-             tag on graded chips — both live on the right side of the
-             top row so the layout reads the same regardless of variant. */
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300">
-            Ungraded
-          </span>
-        )}
-        {isGraded ? (
-          <span className="text-[10px] text-zinc-400 whitespace-nowrap flex-shrink-0 tracking-wider uppercase">
-            Pop <span className="tabular-nums text-zinc-600 normal-case tracking-normal">
-              {chip.population.toLocaleString()}
-            </span>
-          </span>
-        ) : (
-          <span className={`text-[10px] uppercase tracking-wider whitespace-nowrap flex-shrink-0 ${isActive ? 'text-orange-600' : 'text-zinc-500'}`}>
-            NM
-          </span>
-        )}
-      </div>
-
-      {/* Bottom row: lowest listing price. Light weight + comma-grouped
-          numerals + tight tracking borrows the premium-retail (MR PORTER,
-          SSENSE) price treatment — the eye reads "two thousand dollars"
-          as a value rather than a banner. Heavy tier pill on top + thin
-          price on bottom gives the chip a clear visual hierarchy. */}
-      <div>
-        {hasListing ? (
-          <span className={`text-[15px] font-light tabular-nums tracking-tight ${isActive ? 'text-orange-600' : 'text-zinc-900'}`}>
-            ${chip.lowestListingPrice!.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-          </span>
-        ) : (
-          <span className="text-xs text-zinc-400 font-light italic">No listings</span>
-        )}
-      </div>
-    </button>
-  )
-}
-
 /** Offer CTA. Calls onClick when wired up (parent opens modal); falls
  *  back to a Link into the market-data view when used standalone (e.g.
  *  the /card/[id]/market page where the form lives in the Offers tab). */
@@ -502,41 +244,6 @@ function OfferButton({
     <Link href={`/card/${cardId.toLowerCase()}/market#bids`} className={cls}>
       {variant === 'inline' ? 'Offer' : 'Make Offer'}
     </Link>
-  )
-}
-
-/** Compact ±qty stepper for the multi-quantity Buy Now flow. Caps at
- *  `max` (the lowest listing's quantity_available). No keyboard input —
- *  the use case is "buyer wants a playset of 4", not arbitrary numbers,
- *  so two click steps to 4 is fine and avoids a wide number field. */
-function QtyStepper({ value, max, onChange }: { value: number; max: number; onChange: (n: number) => void }) {
-  function clamp(n: number) {
-    return Math.max(1, Math.min(max, n))
-  }
-  return (
-    <div className="inline-flex items-stretch rounded-lg ring-2 ring-zinc-300 overflow-hidden text-base font-bold text-zinc-900 bg-white">
-      <button
-        type="button"
-        onClick={() => onChange(clamp(value - 1))}
-        disabled={value <= 1}
-        aria-label="Decrease quantity"
-        className="px-3 hover:bg-zinc-100 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-      >
-        −
-      </button>
-      <span className="px-3 py-3 min-w-[2.5rem] text-center tabular-nums border-x border-zinc-200">
-        {value}
-      </span>
-      <button
-        type="button"
-        onClick={() => onChange(clamp(value + 1))}
-        disabled={value >= max}
-        aria-label="Increase quantity"
-        className="px-3 hover:bg-zinc-100 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-      >
-        +
-      </button>
-    </div>
   )
 }
 

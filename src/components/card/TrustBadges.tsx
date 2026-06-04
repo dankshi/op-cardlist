@@ -1,55 +1,26 @@
-/** Trust band shown on the card-detail page below the Buy Now CTA.
- *  Three short reassurances that answer the buyer's top-of-mind concerns
- *  before they commit: what happens if it's wrong, what's our role in the
- *  middle, and what's the return path. Server-rendered (no client JS) so
- *  it doesn't add to the page's interactive footprint. */
+/** Trust line shown in the card-detail action column, below the Buy/Offer
+ *  CTAs. Three short reassurances that answer the buyer's top-of-mind
+ *  concerns before they commit. Rendered as a single inline row (not boxed
+ *  cards) so the action column stays a clean borderless stack.
+ *  Server-rendered (no client JS) so it adds nothing to the interactive
+ *  footprint. */
 export function TrustBadges() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <Badge
-        title="Nomi Promise"
-        body="Every card passes through our hands. Authentic, condition-accurate, or your money back — no exceptions."
-        accent="text-orange-600"
-        icon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 2.5l8.5 3v6.5c0 4.7-3.4 8.7-8.5 9.5-5.1-.8-8.5-4.8-8.5-9.5V5.5L12 2.5z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
-          </svg>
-        }
-      />
-      <Badge
-        title="Our Process"
-        body="Seller ships to Nomi → we verify and grade-check → we ship to you. You only pay once we confirm it's real."
-        accent="text-blue-600"
-        icon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h3l3-7 4 14 3-7h5" />
-          </svg>
-        }
-      />
-      <Badge
-        title="Return Policy"
-        body="14 days to return if the card doesn't match its listing. Full refund credited to your wallet within 24 hours."
-        accent="text-emerald-600"
-        icon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 1015-6.7L21 8" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 3v5h-5" />
-          </svg>
-        }
-      />
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs text-zinc-500">
+      <Item accent="text-orange-500" label="Nomi Promise — money-back guarantee" />
+      <Item accent="text-blue-500" label="We verify every card before it ships" />
+      <Item accent="text-emerald-500" label="14-day returns to your wallet" />
     </div>
   )
 }
 
-function Badge({ title, body, icon, accent }: { title: string; body: string; icon: React.ReactNode; accent: string }) {
+function Item({ label, accent }: { label: string; accent: string }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4">
-      <div className={`flex items-center gap-2 mb-2 ${accent}`}>
-        {icon}
-        <span className="text-sm font-bold text-zinc-900">{title}</span>
-      </div>
-      <p className="text-xs text-zinc-500 leading-relaxed">{body}</p>
-    </div>
+    <span className="inline-flex items-center gap-1.5">
+      <svg className={`w-3.5 h-3.5 flex-shrink-0 ${accent}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.1 3.1 6.8-6.8a1 1 0 011.4 0z" clipRule="evenodd" />
+      </svg>
+      {label}
+    </span>
   )
 }

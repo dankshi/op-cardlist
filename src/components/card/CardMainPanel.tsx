@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CardBuyPanel, type VariantData } from './CardBuyPanel'
+import { GradeSelector } from './GradeSelector'
+import { TrustBadges } from './TrustBadges'
 import { MarketTabs } from './MarketTabs'
 import { OfferModal } from './OfferModal'
 import { AcceptOfferModal } from './AcceptOfferModal'
@@ -56,18 +58,18 @@ export function CardMainPanel({
   cardName,
   variants,
   marketPrice,
-  priceChangePercent,
   asks,
   bids,
   sales,
   currentUserId,
   isAdmin,
+  image,
+  debug,
 }: {
   cardId: string
   cardName: string
   variants: VariantData[]
   marketPrice: number | null
-  priceChangePercent: number | null
   asks: AskInput[]
   bids: BidInput[]
   sales: SaleInput[]
@@ -80,6 +82,12 @@ export function CardMainPanel({
    *  as broken to a regular user. Admins can hide it via the profile
    *  dropdown toggle; non-admins never receive it at all. */
   isAdmin: boolean
+  /** Server-rendered card image (Card3DPreview). Passed in so this client
+   *  component can own the two-column layout while the image stays RSC. */
+  image: ReactNode
+  /** Optional admin debug block, rendered in the action column under the
+   *  title. Server-gated upstream — non-admins never receive it. */
+  debug?: ReactNode
 }) {
   // Local mirror of server-passed bids + listings so inline mutations
   // (cancel / quick-action update / new placements) reflect in the UI
@@ -189,21 +197,49 @@ export function CardMainPanel({
 
   return (
     <div>
-      <CardBuyPanel
-        cardId={cardId}
-        variants={variants}
-        marketPrice={marketPrice}
-        priceChangePercent={priceChangePercent}
-        selectedKey={selectedKey}
-        onSelect={setSelectedKey}
-        showMarketLink={showMarket}
-        onViewMarketData={() => setOpen(true)}
-        onOfferClick={() => setOfferOpen(true)}
-        onAcceptOfferClick={() => setAcceptOpen(true)}
-        onListClick={() => setListOpen(true)}
-        onModeChange={setMode}
-        topOfferPrice={topOffer?.price ?? null}
-      />
+      {/* Two-column shopping region. Image left (server-rendered, passed
+          in), borderless action column right. The grade ladder lives inside
+          the action column, below the buy box, so the column reads as one
+          clean, box-free stack. */}
+      <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] gap-10 mb-12">
+        <div className="flex justify-center md:sticky md:top-24 md:self-start">
+          {image}
+        </div>
+
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900">{cardName}</h1>
+
+          {debug && <div className="mt-3">{debug}</div>}
+
+          <div className="mt-5">
+            <CardBuyPanel
+              cardId={cardId}
+              variants={variants}
+              selectedKey={selectedKey}
+              showMarketLink={showMarket}
+              onViewMarketData={() => setOpen(true)}
+              onOfferClick={() => setOfferOpen(true)}
+              onAcceptOfferClick={() => setAcceptOpen(true)}
+              onListClick={() => setListOpen(true)}
+              onModeChange={setMode}
+              topOfferPrice={topOffer?.price ?? null}
+            />
+          </div>
+
+          <div className="mt-6">
+            <TrustBadges />
+          </div>
+
+          {/* Grade ladder — picking a grade here drives the buy box above.
+              Grouped by company and fixed in layout so it reads the same on
+              every card. */}
+          <GradeSelector
+            variants={variants}
+            selectedKey={selectedKey}
+            onSelect={setSelectedKey}
+          />
+        </div>
+      </div>
 
       <OfferModal
         open={offerOpen}
@@ -274,7 +310,7 @@ export function CardMainPanel({
         }}
       />
 
-      {showMarket && <div id="market" className="mt-4">
+      {showMarket && <div id="market" className="mt-8">
         <button
           onClick={() => setOpen(o => !o)}
           className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border-2 border-zinc-200 bg-white hover:border-zinc-400 transition-colors cursor-pointer"
