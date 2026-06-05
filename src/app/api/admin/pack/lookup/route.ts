@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
-/** Resolves a scanned Product QR (raw order_item.id UUID per
+/** Resolves a scanned Product QR (the item's product_id per
  *  intake/print-label/route.ts) into a pack-out preview. Single
  *  round-trip so the screen renders the full preview before the
  *  operator commits. Returns structured reject reasons when the
@@ -12,7 +12,8 @@ import { getSupabaseAdmin } from '@/lib/supabase/admin'
  *  Admin-only. Cheapest rejections first (DB miss → status →
  *  address) so a misfired scan returns fast. */
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// 9-char Crockford Base32 (no I/L/O/U) — see migration 20260606.
+const PRODUCT_ID_RE = /^[0-9ABCDEFGHJKMNPQRSTVWXYZ]{9}$/
 
 interface ShippingAddressShape {
   name?: string
@@ -44,7 +45,9 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null)
-  const rawQr = typeof body?.qr === 'string' ? body.qr.trim() : ''
+  // Crockford Base32 is case-insensitive; normalize to the uppercase form
+  // we store/print so a lowercased scan still resolves.
+  const rawQr = typeof body?.qr === 'string' ? body.qr.trim().toUpperCase() : ''
 
   if (!rawQr) {
     return NextResponse.json({ error: 'qr is required' }, { status: 400 })
@@ -62,11 +65,11 @@ export async function POST(request: Request) {
     })
   }
 
-  if (!UUID_RE.test(rawQr)) {
+  if (!PRODUCT_ID_RE.test(rawQr)) {
     return NextResponse.json({
       ok: false,
       reason: 'malformed',
-      detail: 'QR contents did not decode to a valid order item ID.',
+      detail: 'QR contents did not decode to a valid product ID.',
     })
   }
 
@@ -78,6 +81,7 @@ export async function POST(request: Request) {
     .from('order_items')
     .select(`
       id,
+      product_id,
       order_id,
       card_id,
       card_name,
@@ -96,7 +100,7 @@ export async function POST(request: Request) {
         shipped_to_buyer_at
       )
     `)
-    .eq('id', rawQr)
+    .eq('product_id', rawQr)
     .maybeSingle()
 
   if (!itemRow) {

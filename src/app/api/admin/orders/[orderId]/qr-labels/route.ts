@@ -12,15 +12,15 @@ import QRCode from 'qrcode'
  *  labels as HTML with the QR as an <img> so they print through the
  *  normal OS print dialog / AirPrint / the ZSB app on ANY printer.
  *
- *  Each QR encodes the raw order_item.id UUID — identical payload to
- *  the ZPL label (the ZPL `^FDMA,<id>` decodes to just `<id>`), so a
- *  scan on /admin/pack resolves the same whether the sticker was
+ *  Each QR encodes the item's product_id — identical payload to the ZPL
+ *  label (the ZPL `^FDMA,<product_id>` decodes to just `<product_id>`),
+ *  so a scan on /admin/pack resolves the same whether the sticker was
  *  printed via ZPL or this HTML path.
  *
  *  Auto-fires window.print() on load (gated by ?noprint=1). Labels
- *  flow down the page as 2"×1" blocks with dashed cut guides so they
- *  work on both a 2"×1" label roll (one per feed) and a sheet of
- *  letter paper (cut them out).
+ *  flow down the page as 1.25"×1.25" square blocks with dashed cut
+ *  guides so they work on both a 1.25"×1.25" label roll (one per feed)
+ *  and a sheet of letter paper (cut them out).
  *
  *  Admin-only. */
 export async function GET(
@@ -49,7 +49,7 @@ export async function GET(
 
   let itemsQuery = supabase
     .from('order_items')
-    .select('id, card_name, card_id, quantity')
+    .select('id, product_id, quantity')
     .eq('order_id', orderId)
     .order('created_at', { ascending: true })
   if (itemIdFilter) {
@@ -65,25 +65,20 @@ export async function GET(
 
   const shortId = orderId.slice(0, 8).toUpperCase()
 
-  // One label block per item. QR encodes the raw item id (matches the ZPL
-  // payload). Human-readable text is the product: card name + card_id
-  // (e.g. OP03-080) — no order id (not a useful per-card reference). Each
-  // block is sized 3.5"×1.25" with a dashed border for cut guidance.
+  // One label block per item, sized 1.25"×1.25" square to match the ZPL
+  // label. QR encodes product_id (same payload the scanner resolves at
+  // pack-out); product_id is printed below for ops to read/type.
   const labelBlocks = await Promise.all(
     items.map(async (item) => {
-      const qrDataUrl = await QRCode.toDataURL(item.id, {
+      const qrDataUrl = await QRCode.toDataURL(item.product_id, {
         width: 220,
         margin: 1,
         errorCorrectionLevel: 'M',
       })
-      const displayName = (item.card_name || item.card_id || 'Unknown Card').slice(0, 40)
       return `
         <div class="label">
           <img class="qr" src="${qrDataUrl}" alt="QR" />
-          <div class="meta">
-            <div class="name">${escapeHtml(displayName)}</div>
-            <div class="pid">${escapeHtml(item.card_id || '')}</div>
-          </div>
+          <div class="pid">${escapeHtml(item.product_id || '')}</div>
         </div>
       `
     })
@@ -112,22 +107,17 @@ export async function GET(
     .toolbar .hint { font-size: 12px; color: #a1a1aa; margin-left: 4px; }
 
     .label {
-      display: flex; align-items: center; gap: 16px;
-      width: 3.5in; height: 1.25in;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      width: 1.25in; height: 1.25in;
       border: 1px dashed #d4d4d8; border-radius: 6px;
-      padding: 10px 14px; margin-bottom: 10px; background: #fff;
+      padding: 6px; margin-bottom: 10px; background: #fff;
       page-break-inside: avoid;
     }
     /* pixelated keeps the QR crisp (no blurry resampling) so it scans cleanly. */
-    .label .qr { width: 1.05in; height: 1.05in; flex-shrink: 0; image-rendering: pixelated; }
-    .label .meta { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 7px; }
-    .label .name {
-      font-size: 16px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-    }
+    .label .qr { width: 0.82in; height: 0.82in; flex-shrink: 0; image-rendering: pixelated; }
     .label .pid {
-      font-size: 15px; font-weight: 600; color: #3f3f46;
-      letter-spacing: 0.12em; text-transform: uppercase;
+      font-size: 13px; font-weight: 700; color: #18181b;
+      letter-spacing: 0.1em; text-transform: uppercase;
     }
 
     @media print {
@@ -135,7 +125,7 @@ export async function GET(
       .no-print { display: none !important; }
       .label { border: 1px dashed #cbd5e1; background: #fff; }
       /* Tighter margins for label rolls. The operator picks the
-         paper size in the print dialog (3.5"×1.25" roll, or Letter). */
+         paper size in the print dialog (1.25"×1.25" roll, or Letter). */
       @page { margin: 0.1in; }
     }
   </style>
@@ -144,7 +134,7 @@ export async function GET(
   <div class="toolbar no-print">
     <button class="print" onclick="window.print()">Print ${items.length} label${items.length === 1 ? '' : 's'}</button>
     <button class="close" onclick="window.close()">Close</button>
-    <span class="hint">Pick your printer + a 3.5&quot;×1.25&quot; label size (or Letter to cut) in the print dialog.</span>
+    <span class="hint">Pick your printer + a 1.25&quot;×1.25&quot; label size (or Letter to cut) in the print dialog.</span>
   </div>
 
   ${labelBlocks.join('\n')}

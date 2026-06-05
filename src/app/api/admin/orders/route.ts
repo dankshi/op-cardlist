@@ -36,7 +36,21 @@ export async function GET(request: NextRequest) {
   }
 
   if (search) {
-    query = query.ilike('id', `%${search}%`)
+    const term = search.trim()
+    const ors = [`id.ilike.%${term}%`]
+    // Also match by product_id — the short label/QR code lives on
+    // order_items, so resolve matching codes to their order ids and
+    // fold them into the same filter.
+    const { data: pidItems } = await supabase
+      .from('order_items')
+      .select('order_id')
+      .ilike('product_id', `%${term}%`)
+      .limit(50)
+    const pidOrderIds = [...new Set((pidItems || []).map(i => i.order_id))]
+    if (pidOrderIds.length > 0) {
+      ors.push(`id.in.(${pidOrderIds.join(',')})`)
+    }
+    query = query.or(ors.join(','))
   }
 
   query = query

@@ -228,6 +228,8 @@ export type ExceptionType = 'incorrect_product' | 'fake' | 'conditional' | 'phys
 
 export interface OrderItem {
   id: string
+  // Short unique label/QR code — migration 20260606. Not a FK.
+  product_id: string
   order_id: string
   listing_id: string
   card_id: string

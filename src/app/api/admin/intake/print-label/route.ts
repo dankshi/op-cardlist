@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -28,30 +29,37 @@ export async function POST(request: Request) {
   let zpl: string
 
   if (type === 'product') {
-    // Product QR code label — QR encodes the order item ID (scanned at
-    // pack-out). Human-readable text is the product: card name + card_id
-    // (e.g. OP03-080). The order ID was removed — one order can hold many
-    // cards, so it isn't a useful per-sticker reference.
-    const { orderItemId, cardName, cardId } = data || {}
+    // Product QR label — 1.25" x 1.25" square. QR encodes the item's
+    // product_id (the short, unique label code); the same product_id is
+    // printed beneath it for ops to read/type. Both the scan path
+    // (pack/lookup) and manual search resolve to order_items.product_id.
+    const { orderItemId } = data || {}
     if (!orderItemId) {
       return NextResponse.json({ error: 'orderItemId is required for product labels' }, { status: 400 })
     }
 
-    const displayName = (cardName || 'Unknown Card').slice(0, 28)
-    const productId = (cardId || '').slice(0, 24)
+    // product_id is the source of truth in the DB — look it up by the
+    // item id (admin client; RLS on order_items is buyer/seller-scoped).
+    const { data: itemRow } = await getSupabaseAdmin()
+      .from('order_items')
+      .select('product_id')
+      .eq('id', orderItemId)
+      .maybeSingle()
 
-    // 3.5" x 1.25" landscape label at 203 DPI (710 x 254 dots).
+    const productId = itemRow?.product_id
+    if (!productId) {
+      return NextResponse.json({ error: 'No product_id found for that order item' }, { status: 404 })
+    }
+
+    // 1.25" x 1.25" square at 203 DPI (254 x 254 dots). QR centered near
+    // the top (mag 6 → a 9-char code stays a 21-module v1 QR ≈ 126 dots),
+    // product_id centered below in a readable monospace-ish scalable font.
     zpl = [
       '^XA',
-      '^PW710',
+      '^PW254',
       '^LL254',
-      '^CF0,24',
-      // QR code on the left, vertically centered-ish
-      `^FO24,52^BQN,2,6^FDMA,${orderItemId}^FS`,
-      // Product name on the right, large
-      `^FO250,60^A0N,44,44^FD${escapeZpl(displayName)}^FS`,
-      // Product ID (card_id) below the name
-      `^FO250,128^A0N,32,32^FD${escapeZpl(productId)}^FS`,
+      `^FO64,20^BQN,2,6^FDMA,${escapeZpl(productId)}^FS`,
+      `^FO0,170^A0N,36,36^FB254,1,0,C^FD${escapeZpl(productId)}^FS`,
       '^XZ',
     ].join('\n')
   } else if (type === 'triage_no_order') {
