@@ -293,6 +293,8 @@ export type ReceivedVia = 'tracking_scan' | 'pon_scan' | 'triage_resolution' | '
 
 export interface TriagePackage {
   id: string
+  // Human-readable package code: 'T-' + 8 Crockford chars — migration 20260607.
+  triage_code: string
   triage_type: TriageType
   tracking_number: string | null
   seller_id: string | null

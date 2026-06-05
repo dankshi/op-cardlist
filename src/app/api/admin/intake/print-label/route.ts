@@ -62,42 +62,45 @@ export async function POST(request: Request) {
       `^FO0,170^A0N,36,36^FB254,1,0,C^FD${escapeZpl(productId)}^FS`,
       '^XZ',
     ].join('\n')
-  } else if (type === 'triage_no_order') {
-    // Triage label — no order, just a triage package ID
-    const { triagePackageId, trackingNumber } = data || {}
-    if (!triagePackageId) {
-      return NextResponse.json({ error: 'triagePackageId is required' }, { status: 400 })
-    }
-
-    const qrData = `TRIAGE:${triagePackageId}`
-    const trackingDisplay = trackingNumber ? trackingNumber.slice(-8) : 'N/A'
-
-    zpl = [
-      '^XA',
-      '^CF0,24',
-      `^FO20,20^BQN,2,4^FDMA,${qrData}^FS`,
-      `^FO180,25^A0N,28,28^FDTRIAGE^FS`,
-      `^FO180,55^A0N,20,20^FDNo Order^FS`,
-      `^FO180,80^A0N,14,14^FDTrk: ${escapeZpl(trackingDisplay)}^FS`,
-      '^XZ',
-    ].join('\n')
   } else {
-    // Triage label — user ID known
+    // Triage label (no_order | user_id) — 1.25" x 1.25" square, matching
+    // the product label. QR encodes the package's triage_code (the human
+    // 'T-XXXXXXXX' code); the same code is printed below for ops to
+    // read/type, with a sub-line for the package context (no order, or
+    // the known seller) and the tracking tail.
     const { triagePackageId, sellerName, trackingNumber } = data || {}
     if (!triagePackageId) {
       return NextResponse.json({ error: 'triagePackageId is required' }, { status: 400 })
     }
 
-    const qrData = `TRIAGE:${triagePackageId}`
-    const sellerDisplay = (sellerName || 'Unknown Seller').slice(0, 20)
+    // triage_code is the source of truth — look it up by package id.
+    const { data: pkgRow } = await getSupabaseAdmin()
+      .from('triage_packages')
+      .select('triage_code')
+      .eq('id', triagePackageId)
+      .maybeSingle()
 
+    const triageCode = pkgRow?.triage_code
+    if (!triageCode) {
+      return NextResponse.json({ error: 'No triage_code found for that package' }, { status: 404 })
+    }
+
+    const subLine = type === 'triage_user_id'
+      ? `SELLER: ${(sellerName || 'UNKNOWN').slice(0, 18)}`
+      : 'NO ORDER'
+    const trkTail = trackingNumber ? trackingNumber.slice(-8) : 'N/A'
+
+    // 1.25" x 1.25" square @ 203 DPI (254 x 254 dots). triage_code is
+    // 'T-' + 8 chars (the dash is valid QR alphanumeric), staying a
+    // 21-module v1 QR at mag 5 (≈ 105 dots), centered.
     zpl = [
       '^XA',
-      '^CF0,24',
-      `^FO20,20^BQN,2,4^FDMA,${qrData}^FS`,
-      `^FO180,25^A0N,28,28^FDTRIAGE^FS`,
-      `^FO180,55^A0N,20,20^FDSeller: ${escapeZpl(sellerDisplay)}^FS`,
-      `^FO180,80^A0N,14,14^FDTrk: ${escapeZpl((trackingNumber || 'N/A').slice(-8))}^FS`,
+      '^PW254',
+      '^LL254',
+      `^FO77,12^BQN,2,5^FDMA,${escapeZpl(triageCode)}^FS`,
+      `^FO0,130^A0N,32,32^FB254,1,0,C^FD${escapeZpl(triageCode)}^FS`,
+      `^FO0,172^A0N,22,22^FB254,1,0,C^FD${escapeZpl(subLine)}^FS`,
+      `^FO0,204^A0N,18,18^FB254,1,0,C^FDTRK ${escapeZpl(trkTail)}^FS`,
       '^XZ',
     ].join('\n')
   }

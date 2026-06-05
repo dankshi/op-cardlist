@@ -54,10 +54,11 @@ export async function POST(request: Request) {
   }
 
   // Triage labels share the print pipeline but encode a different
-  // payload (TRIAGE:<id>) — refuse those explicitly so the operator
-  // gets a clear "wrong label type" hint rather than a generic
-  // not-found.
-  if (rawQr.startsWith('TRIAGE:')) {
+  // payload — the 'T-…' triage_code (or legacy 'TRIAGE:<id>'). Refuse
+  // those explicitly so the operator gets a clear "wrong label type"
+  // hint rather than a generic not-found. ('T-' can't be a product_id —
+  // the dash isn't in the Crockford alphabet.)
+  if (rawQr.startsWith('T-') || rawQr.startsWith('TRIAGE:')) {
     return NextResponse.json({
       ok: false,
       reason: 'wrong_label',

@@ -274,10 +274,14 @@ function IntakePageContent() {
     setError('')
 
     try {
-      // 1. Triage QR code: starts with "TRIAGE:"
-      if (raw.startsWith('TRIAGE:')) {
-        const triageId = raw.replace('TRIAGE:', '')
-        const res = await fetch(`/api/admin/intake/triage?id=${encodeURIComponent(triageId)}`)
+      // 1. Triage code: 'T-XXXXXXXX' (current label payload) or the
+      //    legacy 'TRIAGE:<uuid>' QR. Resolve by triage_code or id.
+      const triageCodeRe = /^T-[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}$/i
+      if (triageCodeRe.test(raw) || raw.startsWith('TRIAGE:')) {
+        const param = raw.startsWith('TRIAGE:')
+          ? `id=${encodeURIComponent(raw.replace('TRIAGE:', ''))}`
+          : `code=${encodeURIComponent(raw.toUpperCase())}`
+        const res = await fetch(`/api/admin/intake/triage?${param}`)
         if (!res.ok) {
           setError('Triage package not found')
           setScanLoading(false)
@@ -1498,8 +1502,7 @@ function TriagePrintedStep({ triagePackage, trackingNumber, sellerName, onNextPa
   onNextPackage: () => void
 }) {
   const isUserIdType = triagePackage.triage_type === 'user_id'
-  const triageId = triagePackage.id
-  const shortId = triageId.slice(0, 8).toUpperCase()
+  const shortId = triagePackage.triage_code
 
   return (
     <div className="bg-white border-2 border-purple-200 rounded-xl overflow-hidden">
@@ -1541,7 +1544,7 @@ function TriagePrintedStep({ triagePackage, trackingNumber, sellerName, onNextPa
               <div className="mt-2 text-sm text-zinc-500 space-y-0.5">
                 <p>Tracking: <span className="font-mono">{trackingNumber}</span></p>
                 {isUserIdType && sellerName && <p>Seller: <span className="font-semibold text-zinc-700">{sellerName}</span></p>}
-                <p>QR Data: <span className="font-mono text-xs">TRIAGE:{triageId.slice(0, 12)}...</span></p>
+                <p>QR Data: <span className="font-mono text-xs">{triagePackage.triage_code}</span></p>
               </div>
             </div>
           </div>

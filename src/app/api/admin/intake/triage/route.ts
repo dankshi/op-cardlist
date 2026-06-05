@@ -70,15 +70,20 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const triageId = searchParams.get('id')
+  const triageCode = searchParams.get('code')
   const status = searchParams.get('status')
 
-  // Single lookup by ID (for QR code scans)
-  if (triageId) {
-    const { data: pkg } = await supabase
+  // Single lookup for QR scans / manual entry — by triage_code ('T-…',
+  // the current label payload) or by id (legacy). Crockford is
+  // case-insensitive, so normalize the code to the stored uppercase form.
+  if (triageCode || triageId) {
+    let lookup = supabase
       .from('triage_packages')
       .select('*, seller:profiles!triage_packages_seller_id_fkey(id, display_name, username)')
-      .eq('id', triageId)
-      .single()
+    lookup = triageCode
+      ? lookup.eq('triage_code', triageCode.toUpperCase())
+      : lookup.eq('id', triageId as string)
+    const { data: pkg } = await lookup.single()
 
     if (!pkg) {
       return NextResponse.json({ error: 'Triage package not found' }, { status: 404 })
