@@ -95,30 +95,37 @@ async function main() {
     console.warn('⚠ TCGPLAYER_AUTH_COOKIE not set — will fall back to 5-sale anon cap.');
   }
 
-  // 15 most valuable (matches home page "Most Valuable" carousel)
-  const { data: topByPrice } = await supabase
-    .from('tcgplayer_card_prices')
-    .select('card_id, tcgplayer_product_id, tcgplayer_product_name')
-    .not('market_price', 'is', null)
-    .order('market_price', { ascending: false })
-    .limit(15);
+  // Targets: 15 most valuable (matches the home "Most Valuable" carousel) +
+  // every Sugar. Prices/names are product-side now (tcgplayer_card_prices was
+  // dropped, migration 20260537): join card_tcgplayer_mapping → product_id /
+  // name with tcgplayer_current_prices → market_price.
+  const [{ data: maps }, { data: prices }] = await Promise.all([
+    supabase.from('card_tcgplayer_mapping').select('card_id, tcgplayer_product_id, tcgplayer_name'),
+    supabase.from('tcgplayer_current_prices').select('tcgplayer_product_id, market_price').not('market_price', 'is', null),
+  ]);
+  const marketByProduct = new Map<number, number>();
+  for (const p of prices ?? []) marketByProduct.set(p.tcgplayer_product_id as number, p.market_price as number);
+  const mapped = (maps ?? [])
+    .filter(m => m.tcgplayer_product_id != null)
+    .map(m => ({
+      cardId: m.card_id as string,
+      productId: m.tcgplayer_product_id as number,
+      name: (m.tcgplayer_name as string) ?? '',
+      market: marketByProduct.get(m.tcgplayer_product_id as number) ?? null,
+    }));
 
-  // Every Sugar
-  const { data: sugars } = await supabase
-    .from('tcgplayer_card_prices')
-    .select('card_id, tcgplayer_product_id, tcgplayer_product_name')
-    .ilike('tcgplayer_product_name', '%sugar%');
+  const topByPrice = mapped
+    .filter(m => m.market != null)
+    .sort((a, b) => (b.market as number) - (a.market as number))
+    .slice(0, 15);
+  const sugars = mapped.filter(m => m.name.toLowerCase().includes('sugar'));
 
   const seen = new Set<number>();
   const targets: { cardId: string; productId: number; name: string }[] = [];
-  for (const r of [...(topByPrice ?? []), ...(sugars ?? [])]) {
-    if (!r.tcgplayer_product_id || seen.has(r.tcgplayer_product_id)) continue;
-    seen.add(r.tcgplayer_product_id);
-    targets.push({
-      cardId: r.card_id,
-      productId: r.tcgplayer_product_id,
-      name: r.tcgplayer_product_name ?? '',
-    });
+  for (const r of [...topByPrice, ...sugars]) {
+    if (!r.productId || seen.has(r.productId)) continue;
+    seen.add(r.productId);
+    targets.push({ cardId: r.cardId, productId: r.productId, name: r.name });
   }
 
   console.log(`Backfilling ${targets.length} target cards...`);
@@ -152,18 +159,18 @@ async function main() {
 
         const latest = sales[0];
         await supabase
-          .from('tcgplayer_card_prices')
+          .from('tcgplayer_products')
           .update({
             last_sold_price: latest.purchasePrice,
             last_sold_date: latest.orderDate,
             sales_scraped_at: new Date().toISOString(),
           })
-          .eq('card_id', t.cardId);
+          .eq('product_id', t.productId);
       } else {
         await supabase
-          .from('tcgplayer_card_prices')
+          .from('tcgplayer_products')
           .update({ sales_scraped_at: new Date().toISOString() })
-          .eq('card_id', t.cardId);
+          .eq('product_id', t.productId);
       }
 
       totalSales += rows.length;

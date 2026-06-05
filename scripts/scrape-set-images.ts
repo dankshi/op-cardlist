@@ -40,6 +40,7 @@ const SET_SEARCH_CONFIG: Record<string, { query: string; matchKeyword?: string }
   'op-10': { query: 'Royal Blood Booster Box' },
   'op-11': { query: 'A Fist of Divine Speed Booster Box', matchKeyword: 'divine speed' },
   'op-12': { query: 'Legacy of the Master Booster Box', matchKeyword: 'legacy' },
+  'op-16': { query: 'The Time of Battle Booster Box', matchKeyword: 'time of battle' },
   'op-13': { query: 'Carrying on His Will Booster Box' },
   'eb-01': { query: 'Memorial Collection Booster Box' },
   'eb-02': { query: 'Anime 25th Collection Booster Box', matchKeyword: 'anime 25th' },

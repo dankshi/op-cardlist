@@ -15,6 +15,9 @@ export const SET_NAME_MAP: Record<string, string[]> = {
   'op-11': ['a-fist-of-divine-speed', 'a-fist-of-divine-speed-release-event-cards'],
   'op-12': ['legacy-of-the-master', 'legacy-of-the-master-release-event-cards'],
   'op-13': ['carrying-on-his-will', 'carrying-on-his-will-3rd-anniversary-tournament-cards'],
+  // OP-16 slug is a best guess — CONFIRM via `npx tsx scripts/discover-tcg-sets.ts --report-only`
+  // before running auto-map (TCGplayer had not indexed OP-16 at ingest time).
+  'op-16': ['the-time-of-battle'],
   'eb-01': ['extra-booster-memorial-collection'],
   'eb-02': ['extra-booster-anime-25th-collection'],
   'eb-03': ['extra-booster-one-piece-heroines-edition'],

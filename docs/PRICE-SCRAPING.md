@@ -1,14 +1,25 @@
 # Price Scraping Documentation
 
+> **Adding a whole new set?** Use the runbook — [docs/adding-a-set.md](adding-a-set.md) — which covers
+> the full pipeline and ordering. This document is the **deep-dive on variant ↔ art-style matching**,
+> which the runbook references.
+
 This document covers how price scraping works for the One Piece TCG card database, including the mapping between Bandai's card variants and TCGPlayer's product listings.
 
 ## Overview
 
 Card data comes from two sources:
 1. **Bandai Official Website** (`scripts/scrape-bandai-cards.ts`) - Card metadata, images, and variant IDs → UPSERT to `cards` + `card_sets` tables
-2. **TCGPlayer API** (`scripts/scrape-prices.ts`) - Market prices → UPSERT to `tcgplayer_card_prices` table
+2. **TCGPlayer API** - Card→product matching by `scripts/auto-map-tcgplayer.ts` → `card_tcgplayer_mapping`; market prices + sales by `scripts/scrape-prices.ts` → `tcgplayer_card_price_history` + `card_sales`
 
 The challenge is matching Bandai's variant naming (p1, p2, p3, p4) to TCGPlayer's art style naming (Parallel, Super Alternate Art, etc.).
+
+> **Schema note (kept current):** prices live in `tcgplayer_card_price_history` (daily snapshots) and
+> `card_sales`, not a per-card `tcgplayer_card_prices`/`card_prices` table (those were consolidated
+> away). The card→product link is its own table, `card_tcgplayer_mapping`. The old `card.isParallel`
+> boolean was dropped — a card is a parallel when `card.variant` is non-null (e.g. `'p1'`), and its
+> derived label is `card.art_style`. Some illustrative code snippets below predate that rename; read
+> `isParallel` as `variant != null`.
 
 ---
 
@@ -69,15 +80,9 @@ When a new set's English version releases:
 
 ### Adding New Sets
 
-When a new set (e.g., EB-05) is announced:
-
-1. Find the series ID on the Asia site (check network tab or page source)
-2. Add to `SETS` in `scripts/scrape-bandai-cards.ts`:
-   ```typescript
-   '556205': { id: 'eb-05', name: 'EB-05 Extra Booster - [Name]', site: 'asia', englishImages: false },
-   ```
-3. Run scraper: `npm run scrape`
-4. Run price scraper: `npm run scrape:prices -- --set=eb-05`
+The full, current procedure (config edits, script order, and the Bandai-now / TCGPlayer-later timing)
+lives in the runbook: **[docs/adding-a-set.md](adding-a-set.md)**. This section is intentionally
+short to avoid drift — don't duplicate the steps here.
 
 ---
 
@@ -283,19 +288,13 @@ Cards reprinted in later sets (e.g., `OP11-058_p1` appearing in OP-13) need spec
 
 ## Price Data Structure
 
-Stored in `data/cards.json`:
+Prices live in Supabase, **not** a JSON file (the old `data/cards.json` is gone):
 
-```typescript
-interface CardPrice {
-  marketPrice: number | null;
-  lowPrice: number | null;
-  midPrice: number | null;
-  highPrice: number | null;
-  lastUpdated: string;           // ISO date
-  tcgplayerUrl: string;          // Direct product link
-  tcgplayerProductId: number;    // For API lookups
-}
-```
+- **`tcgplayer_card_price_history`** — daily snapshots keyed by `(tcgplayer_product_id, recorded_date)`
+  with `market_price`, `lowest_price`, `median_price`, `total_listings`. Current price = latest row.
+- **`card_sales`** — recent individual TCGPlayer sales (price, condition, sold date).
+- **`card_tcgplayer_mapping`** — the `card_id → tcgplayer_product_id` link (with `tcgplayer_url`,
+  `tcgplayer_name`, and `source` = `auto`/`review`/`manual`). The app joins this to the price history.
 
 ---
 

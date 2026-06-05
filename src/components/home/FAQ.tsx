@@ -5,7 +5,7 @@ const items = [
   },
   {
     q: 'What are the fees for sellers?',
-    a: 'Slabs use a tier model that drops from 9% (Basic) down to 7% (Diamond) as your sales volume grows. Raw cards stay at a flat 9.5% across every tier — ungraded cards take more work to authenticate and carry more risk. On top of that, all sales include a flat 3% payment-processing fee, and Ship-to-Nomi listings have a $5 per-card platform fee (waived on Drop-off). No listing fees, no subscriptions. Use the home-page calculator to preview your exact payout before you list.',
+    a: 'Slabs use a tier model that drops from 9% (Basic) down to 7% (Diamond) as your sales volume grows. Raw cards stay at a flat 9.5% across every tier — ungraded cards take more work to authenticate and carry more risk. On top of that, all sales include a flat 3% payment-processing fee, and Ship-to-Nomi listings have a $5 per-card platform fee (waived on Drop-off). No listing fees, no subscriptions. Use the calculator on this page to preview your exact payout before you list.',
   },
   {
     q: 'How do seller tiers work?',
@@ -18,10 +18,6 @@ const items = [
   {
     q: 'What happens if a card arrives damaged?',
     a: 'Every order is photographed at our facility before shipping and insured in transit. If your card arrives in worse condition than listed, contact support within 7 days for a full refund or replacement.',
-  },
-  {
-    q: 'Which games do you support?',
-    a: 'One Piece Card Game is live today. Pokemon support is coming soon — sign up to be notified at launch.',
   },
 ];
 

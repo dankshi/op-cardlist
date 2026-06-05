@@ -33,8 +33,8 @@ npx tsx scripts/scrape-prices.ts --set=op14-eb04 --debug
 
 - Matches our cards to TCGPlayer products by card number + art style
 - Fetches: market price, lowest listing, median price, total listings, last sold price + date
-- **Writes directly to Supabase `tcgplayer_card_prices` table** (single source of truth)
-- **Respects manual mappings**: cards marked `manually_mapped = true` keep their product IDs — only prices are refreshed
+- **Writes price snapshots to Supabase `tcgplayer_card_price_history`** (the single source of truth; current price = latest row, exposed via the `tcgplayer_current_prices` view). The old `card_prices`/`tcgplayer_card_prices` tables were dropped in migration 20260537.
+- **Respects manual mappings**: product IDs in `card_tcgplayer_mapping` are preserved — the scraper only refreshes prices, never the mapping
 - **Must run after Step 1** so it has the latest card list
 
 ## Quick Reference
@@ -46,10 +46,10 @@ npx tsx scripts/scrape-bandai-cards.ts && npx tsx scripts/scrape-prices.ts
 
 ## How Manual Fixes Work
 
-1. On the `/test` page, a user fixes a wrong card→product mapping
-2. The fix is saved to both `card_mappings` (audit trail) and `tcgplayer_card_prices` (source of truth)
-3. The fix is immediately visible on the main site (reads from Supabase)
-4. When the scraper runs, it sees `manually_mapped = true` and preserves the product ID
+1. On the `/admin/mappings` page, an admin fixes a wrong card→product mapping
+2. The fix is saved to both `card_mappings_legacy` (audit trail) and `card_tcgplayer_mapping` with `source='manual'` (source of truth)
+3. The fix is immediately visible on the main site (prices follow the mapping by construction)
+4. When the scraper runs, it preserves the manually-mapped product ID
 5. The scraper still fetches fresh prices for that product from TCGPlayer
 
 ## Notes

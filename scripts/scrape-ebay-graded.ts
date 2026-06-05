@@ -268,38 +268,48 @@ async function selectTargets(opts: {
   threshold?: number
   all?: boolean
 }): Promise<CardTarget[]> {
+  // Prices/names live product-side now (card_prices was dropped, migration
+  // 20260537): card_tcgplayer_mapping gives card_id → product_id + name, and
+  // tcgplayer_current_prices gives the latest market_price per product.
   if (opts.cardId) {
     const { data } = await supabase
-      .from('tcgplayer_card_prices')
-      .select('card_id, tcgplayer_product_name')
+      .from('card_tcgplayer_mapping')
+      .select('card_id, tcgplayer_name')
       .eq('card_id', opts.cardId)
       .single()
     return [
       {
         cardId: opts.cardId,
-        query: buildQuery(opts.cardId, data?.tcgplayer_product_name ?? null),
+        query: buildQuery(opts.cardId, data?.tcgplayer_name ?? null),
       },
     ]
   }
 
-  let query = supabase
-    .from('tcgplayer_card_prices')
-    .select('card_id, market_price, tcgplayer_product_name')
-    .not('market_price', 'is', null)
-    .order('market_price', { ascending: false })
+  const [{ data: maps, error: mErr }, { data: prices, error: pErr }] = await Promise.all([
+    supabase
+      .from('card_tcgplayer_mapping')
+      .select('card_id, tcgplayer_product_id, tcgplayer_name'),
+    supabase
+      .from('tcgplayer_current_prices')
+      .select('tcgplayer_product_id, market_price')
+      .not('market_price', 'is', null),
+  ])
+  if (mErr) throw mErr
+  if (pErr) throw pErr
 
-  if (!opts.all && opts.threshold != null) {
-    query = query.gte('market_price', opts.threshold)
-  }
+  const marketByProduct = new Map<number, number>()
+  for (const p of prices ?? []) marketByProduct.set(p.tcgplayer_product_id as number, p.market_price as number)
 
-  const { data, error } = await query
-  if (error) throw error
-  return (data ?? [])
-    .filter(r => r.card_id)
-    .map(r => ({
-      cardId: r.card_id as string,
-      query: buildQuery(r.card_id as string, r.tcgplayer_product_name as string | null),
+  return (maps ?? [])
+    .filter(m => m.card_id && m.tcgplayer_product_id != null && marketByProduct.has(m.tcgplayer_product_id as number))
+    .map(m => ({
+      cardId: m.card_id as string,
+      name: m.tcgplayer_name as string | null,
+      market: marketByProduct.get(m.tcgplayer_product_id as number)!,
     }))
+    .filter(r => opts.all || opts.threshold == null || r.market >= opts.threshold)
+    .sort((a, b) => b.market - a.market)
+    .map(r => ({ cardId: r.cardId, query: buildQuery(r.cardId, r.name) }))
 }
 
 // ─────────────────────────────────────────────────────────────────────

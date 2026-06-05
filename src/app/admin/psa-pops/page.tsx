@@ -87,7 +87,7 @@ function tcgSearchUrl(row: PopsRow): string {
 
 function staleReason(row: PopsRow): string | null {
   if (!row.card_id) return null
-  if (!row.tcg_name) return 'Linked card_id no longer exists in card_prices.'
+  if (!row.tcg_name) return 'Linked card_id has no card_tcgplayer_mapping row.'
 
   const name = row.tcg_name.toLowerCase()
   const desc = row.description

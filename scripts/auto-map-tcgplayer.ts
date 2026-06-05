@@ -4,12 +4,12 @@
 //   cards                  — Bandai card catalog (with rarity + art_style)
 //   tcgplayer_products     — TCGplayer's product catalog (with rarity, card_number, name)
 //   SET_NAME_MAP           — bandai set_id ↔ TCGplayer set_name slugs (src/lib/set-names.ts)
-//   card_prices            — existing mappings (for conflict detection)
+//   card_tcgplayer_mapping — existing mappings (for conflict detection)
 //
 // Output: writes to card_tcgplayer_mapping with one of three sources:
 //   'auto'   — clean unambiguous match, safe to use
 //   'review' — auto-match found a different product than the existing
-//              card_prices mapping; needs human confirmation
+//              card_tcgplayer_mapping row; needs human confirmation
 //   (skipped) — ambiguous (multiple candidates) or no candidate; left in
 //              the unmapped bucket for /admin/mappings to surface
 //

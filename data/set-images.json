@@ -159,7 +159,15 @@
       "tcgplayerUrl": "https://www.tcgplayer.com/product/628452/Premium Booster Vol 2 Booster Box",
       "tcgplayerProductId": 628452,
       "lastUpdated": "2026-05-21T00:50:58.689Z"
+    },
+    "op-16": {
+      "setId": "op-16",
+      "setName": "The Time of Battle",
+      "boosterBoxImageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/689336_400w.jpg",
+      "tcgplayerUrl": "https://www.tcgplayer.com/product/689336/The Time of Battle Booster Box",
+      "tcgplayerProductId": 689336,
+      "lastUpdated": "2026-06-02T01:50:29.395Z"
     }
   },
-  "lastUpdated": "2026-05-21T00:50:58.998Z"
+  "lastUpdated": "2026-06-02T01:50:29.702Z"
 }

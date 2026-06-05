@@ -39,6 +39,7 @@ interface SetInfo {
 // Release dates are English release dates
 const SETS: Record<string, SetInfo> = {
   // Main Booster Packs (English site)
+  '569116': { id: 'op-16', name: 'OP-16 - The Time of Battle', releaseDate: '2026-06-12' },
   '569113': { id: 'op-13', name: 'OP-13 - Carrying On His Will', releaseDate: '2025-11-07' },
   '569112': { id: 'op-12', name: 'OP-12 - Legacy of the Master', releaseDate: '2025-08-22' },
   '569111': { id: 'op-11', name: 'OP-11 - A Fist of Divine Speed', releaseDate: '2025-06-06' },
@@ -462,10 +463,27 @@ async function seedArtStyles(ids: string[], inferred: Map<string, string>): Prom
     console.log('  (art_style already set on every scraped card — no seed needed)');
     return;
   }
-  const seedRows = nullIds
-    .map(id => ({ id, art_style: inferred.get(id) ?? 'standard' }));
-  await upsertInChunks('cards', seedRows, 'id');
-  console.log(`  seeded art_style on ${seedRows.length} brand-new card(s).`);
+  // Seed via UPDATE, not upsert: these ids exist by construction (they came
+  // from a SELECT on `cards`), and a partial-column upsert would attempt an
+  // INSERT of {id, art_style} whose base_id is NULL — Postgres checks the
+  // NOT NULL constraint on the proposed insert row before ON CONFLICT can
+  // turn it into an UPDATE, so it always fails on a brand-new set. Group by
+  // inferred style so it's one UPDATE per distinct art_style per chunk.
+  const byStyle = new Map<string, string[]>();
+  for (const id of nullIds) {
+    const style = inferred.get(id) ?? 'standard';
+    (byStyle.get(style) ?? byStyle.set(style, []).get(style)!).push(id);
+  }
+  for (const [style, styleIds] of byStyle) {
+    for (let i = 0; i < styleIds.length; i += CHUNK) {
+      const { error } = await supabase
+        .from('cards')
+        .update({ art_style: style })
+        .in('id', styleIds.slice(i, i + CHUNK));
+      if (error) throw new Error(`art_style seed failed: ${error.message}`);
+    }
+  }
+  console.log(`  seeded art_style on ${nullIds.length} brand-new card(s).`);
 }
 
 // --- main ---------------------------------------------------------------

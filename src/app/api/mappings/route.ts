@@ -95,7 +95,8 @@ export async function GET(request: Request) {
 }
 
 // POST /api/mappings - Submit new mapping(s)
-// Writes to both card_mappings (audit trail) and card_prices (source of truth)
+// Writes to both card_mappings_legacy (audit trail) and card_tcgplayer_mapping
+// (source of truth for the card_id ↔ tcgplayer_product_id link)
 export async function POST(request: Request) {
   try {
     if (!supabase) {

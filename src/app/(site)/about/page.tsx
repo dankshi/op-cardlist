@@ -1,13 +1,16 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { SITE_URL, SITE_NAME, BASE_KEYWORDS, getBreadcrumbSchema } from "@/lib/seo";
+import { PayoutCalculator } from "@/components/home/PayoutCalculator";
+import { FAQ } from "@/components/home/FAQ";
 
 export const metadata: Metadata = {
-  title: "How It Works",
+  title: "About",
   description:
     "Learn how nomi market authenticates every trading card before it ships. Every order verified in-hand at our facility.",
   keywords: [
     ...BASE_KEYWORDS,
+    "about",
     "how it works",
     "card authentication",
     "verified cards",
@@ -17,7 +20,7 @@ export const metadata: Metadata = {
     canonical: `${SITE_URL}/about`,
   },
   openGraph: {
-    title: "How It Works — nomi market",
+    title: "About — nomi market",
     description:
       "Every card authenticated. Every order verified before it ships.",
     url: `${SITE_URL}/about`,
@@ -63,7 +66,7 @@ export default function AboutPage() {
           __html: JSON.stringify(
             getBreadcrumbSchema([
               { name: "Home", url: SITE_URL },
-              { name: "How It Works", url: `${SITE_URL}/about` },
+              { name: "About", url: `${SITE_URL}/about` },
             ])
           ),
         }}
@@ -152,6 +155,17 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+
+      <div className="section-divider mb-20" />
+
+      {/* Transparent pricing — the interactive calculator covers tiers,
+          fulfillment, raw vs. slab, and the full fee breakdown in one place. */}
+      <PayoutCalculator />
+
+      <div className="section-divider mb-20" />
+
+      {/* FAQ */}
+      <FAQ />
 
       {/* CTA */}
       <section className="text-center pb-12">

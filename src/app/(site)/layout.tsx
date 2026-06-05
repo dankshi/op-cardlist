@@ -82,7 +82,7 @@ export default function SiteLayout({
               Marketplace
             </Link>
             <Link href="/about" className="hidden lg:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
-              How It Works
+              About
             </Link>
             <Link href="/sell" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
               Sell
@@ -104,7 +104,7 @@ export default function SiteLayout({
           </div>
 
           <div className="flex items-center justify-center gap-4 text-xs text-zinc-400">
-            <Link href="/about" className="hover:text-zinc-900 transition-colors">How It Works</Link>
+            <Link href="/about" className="hover:text-zinc-900 transition-colors">About</Link>
             <span className="text-zinc-300">|</span>
             <span>One Piece TCG</span>
             <span className="text-zinc-300">&middot;</span>
