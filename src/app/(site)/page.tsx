@@ -7,13 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, BASE_KEYWORDS } from "@/lib/seo";
 import { CardCarousel } from "@/components/home/CardCarousel";
 import { ListingCarousel } from "@/components/home/ListingCarousel";
-import { SellCTA } from "@/components/home/SellCTA";
 import { LaunchRaffleBanner } from "@/components/home/LaunchRaffleBanner";
-import { FAQ } from "@/components/home/FAQ";
 import { RecentlyViewed } from "@/components/home/RecentlyViewed";
-import { PricingTable } from "@/components/home/PricingTable";
-import { PayoutCalculator } from "@/components/home/PayoutCalculator";
-import { ConsignmentBanner } from "@/components/home/ConsignmentBanner";
 import { OfferCarousel } from "@/components/home/OfferCarousel";
 import type { Card } from "@/types/card";
 import type { EnrichedListing } from "@/components/home/ListingCarousel";
@@ -205,18 +200,28 @@ export default async function Home() {
     // Supabase unavailable — skip listings section
   }
 
-  // Newest set + its top cards
+  // Newest set + its top cards. A brand-new set (e.g. a pre-release that's
+  // been scraped from Bandai but not yet priced on TCGplayer) has no priced
+  // cards, which would make this carousel render empty and disappear. So walk
+  // newest→oldest and feature the first set that actually has priced cards;
+  // the new set takes over automatically once its prices land.
   const sortedSets = [...sets].sort(
     (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
   );
-  const newestSet = sortedSets[0];
-  const newReleaseCards: Card[] = newestSet
-    ? allCards
-        .filter((c) => c.setId === newestSet.id)
-        .filter((c) => c.price?.marketPrice != null && c.price.marketPrice > 0)
-        .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))
-        .slice(0, 15)
-    : [];
+  let newestSet: (typeof sortedSets)[number] | undefined;
+  let newReleaseCards: Card[] = [];
+  for (const set of sortedSets) {
+    const cards = allCards
+      .filter((c) => c.setId === set.id)
+      .filter((c) => c.price?.marketPrice != null && c.price.marketPrice > 0)
+      .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0))
+      .slice(0, 15);
+    if (cards.length > 0) {
+      newestSet = set;
+      newReleaseCards = cards;
+      break;
+    }
+  }
 
   // 6 newest sets for Browse Sets section
   const newestSets = sortedSets.slice(0, 6);
@@ -395,21 +400,6 @@ export default async function Home() {
           />
         </section>
       )}
-
-      {/* ===== PRICING CHART (tier ladder + fulfillment matrix) ===== */}
-      <PricingTable />
-
-      {/* ===== PAYOUT CALCULATOR (interactive, full model) ===== */}
-      <PayoutCalculator />
-
-      {/* ===== CONSIGNMENT (power-seller path) ===== */}
-      <ConsignmentBanner />
-
-      {/* ===== SELL CTA ===== */}
-      <SellCTA />
-
-      {/* ===== FAQ ===== */}
-      <FAQ />
 
       {/* Schema markup */}
       <script
