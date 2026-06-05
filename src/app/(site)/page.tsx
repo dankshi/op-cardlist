@@ -9,8 +9,6 @@ import { CardCarousel } from "@/components/home/CardCarousel";
 import { ListingCarousel } from "@/components/home/ListingCarousel";
 import { SellCTA } from "@/components/home/SellCTA";
 import { LaunchRaffleBanner } from "@/components/home/LaunchRaffleBanner";
-import { MarketplacePulse } from "@/components/home/MarketplacePulse";
-import { HowItWorks } from "@/components/home/HowItWorks";
 import { FAQ } from "@/components/home/FAQ";
 import { RecentlyViewed } from "@/components/home/RecentlyViewed";
 import { PricingTable } from "@/components/home/PricingTable";
@@ -86,47 +84,8 @@ export default async function Home() {
   // same card, so buyers can act on real new lows.
   let enrichedListings: EnrichedListing[] = [];
   let topOffers: EnrichedOffer[] = [];
-  let activeListingsCount = 0;
-  let listingsLast24h = 0;
-  let ordersShippedLast30d = 0;
-  let avgListingPrice: number | null = null;
   try {
     const supabase = await createClient();
-
-    // Pulse stats — run in parallel, all best-effort.
-    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const [activeCountRes, last24hRes, ordersRes, avgPriceRes] = await Promise.all([
-      supabase
-        .from('listings')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'active'),
-      supabase
-        .from('listings')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'active')
-        .gte('created_at', since24h),
-      supabase
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ['shipped', 'delivered'])
-        .gte('created_at', since30d),
-      supabase
-        .from('listings')
-        .select('price')
-        .eq('status', 'active')
-        .limit(500),
-    ]);
-    activeListingsCount = activeCountRes.count ?? 0;
-    listingsLast24h = last24hRes.count ?? 0;
-    ordersShippedLast30d = ordersRes.count ?? 0;
-    if (avgPriceRes.data && avgPriceRes.data.length > 0) {
-      const total = avgPriceRes.data.reduce(
-        (sum: number, row: { price: number | string }) => sum + Number(row.price),
-        0,
-      );
-      avgListingPrice = total / avgPriceRes.data.length;
-    }
 
     // Pull a wider batch than we'll display so filtering doesn't leave the
     // section empty on busy days.
@@ -437,14 +396,6 @@ export default async function Home() {
         </section>
       )}
 
-      {/* ===== MARKETPLACE PULSE (live trust signal) ===== */}
-      <MarketplacePulse
-        activeListings={activeListingsCount}
-        listingsLast24h={listingsLast24h}
-        ordersShippedLast30d={ordersShippedLast30d}
-        avgListingPrice={avgListingPrice}
-      />
-
       {/* ===== PRICING CHART (tier ladder + fulfillment matrix) ===== */}
       <PricingTable />
 
@@ -456,9 +407,6 @@ export default async function Home() {
 
       {/* ===== SELL CTA ===== */}
       <SellCTA />
-
-      {/* ===== HOW IT WORKS ===== */}
-      <HowItWorks />
 
       {/* ===== FAQ ===== */}
       <FAQ />
