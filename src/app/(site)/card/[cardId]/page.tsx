@@ -537,6 +537,8 @@ export default async function CardPage({ params }: PageProps) {
                 "@type": "Offer",
                 price: card.price.marketPrice,
                 priceCurrency: "USD",
+                // Server Component: per-request clock read, not a client re-render.
+                // eslint-disable-next-line react-hooks/purity
                 priceValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 availability: "https://schema.org/InStock",
                 url: card.price.tcgplayerUrl || `${SITE_URL}/card/${card.id.toLowerCase()}`,
