@@ -49,3 +49,9 @@ data/price-history/
 next-env.d.ts
 
 .vercel
+
+# supabase CLI local state (linked project ref, cached versions)
+supabase/.temp/
+
+# claude code runtime lock
+.claude/scheduled_tasks.lock
