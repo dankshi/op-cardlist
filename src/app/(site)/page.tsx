@@ -44,9 +44,9 @@ export default async function Home() {
   const historyFiles = getPriceHistoryFiles();
   const hasHistory = historyFiles.length > 1;
   let trendingCards: Card[] = [];
-  let priceChanges: Record<string, number> = {};
+  const priceChanges: Record<string, number> = {};
   let dealCards: Card[] = [];
-  let dealPriceChanges: Record<string, number> = {};
+  const dealPriceChanges: Record<string, number> = {};
 
   if (hasHistory) {
     const currentPrices: Record<string, number> = {};
@@ -147,6 +147,9 @@ export default async function Home() {
     // discovery surface: "here's what people are willing to pay big
     // money for right now — do you have one?" Mirrors "Just Listed" on
     // the seller side.
+    // Server Component: this clock read runs once per request, not on a
+    // client re-render, so the purity rule's re-render concern doesn't apply.
+    // eslint-disable-next-line react-hooks/purity
     const sinceOffers = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     // Pull a wider batch — we dedup by card_id below, so a chase card
     // with 7 grade-tier offers consumes 7 raw rows but only earns 1 tile.
