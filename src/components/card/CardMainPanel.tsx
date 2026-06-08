@@ -286,6 +286,9 @@ export function CardMainPanel({
         cardName={cardName}
         company={filter?.company ?? null}
         grade={filter?.grade ?? null}
+        variants={variants}
+        selectedKey={selectedKey}
+        onSelectVariant={setSelectedKey}
         topOfferPrice={topOffer?.price ?? null}
         marketPrice={marketPrice}
         existingOwnListings={existingOwnListings.map(l => ({ id: l.id, price: l.price }))}

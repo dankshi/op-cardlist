@@ -78,6 +78,12 @@ export default function SiteLayout({
             </Suspense>
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
+            <Link href="/search" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
+              Cards
+            </Link>
+            <Link href="/sets" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
+              Sets
+            </Link>
             <Link href="/marketplace" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
               Marketplace
             </Link>

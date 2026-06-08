@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { gradingStyle } from '@/lib/gradingStyle'
+import { GradeSelector } from './GradeSelector'
+import type { VariantData } from './variantChips'
 
 interface Props {
   open: boolean
@@ -11,9 +13,17 @@ interface Props {
   cardId: string
   cardName: string
   /** Variant from the chip selector — drives the listing's
-   *  grading_company + grade and the in-modal label display. */
+   *  grading_company + grade and the in-modal label display. Derived by the
+   *  parent from `selectedKey`, so changing the in-modal grade selector
+   *  (below) flows back up and re-derives these. */
   company: string | null
   grade: string | null
+  /** Full variant ladder + selection, so the seller can see and change the
+   *  grade they're listing as right inside the flow (prefilled to whatever
+   *  they had filtered to). Owned by the parent — one source of truth. */
+  variants: VariantData[]
+  selectedKey: string
+  onSelectVariant: (key: string) => void
   /** Reference points for the price-suggestion buttons. Top offer
    *  becomes the floor (you must list above it); market price is a
    *  fallback anchor for raw cards when there are no offers yet. */
@@ -56,6 +66,9 @@ export function ListModal({
   cardName,
   company,
   grade,
+  variants,
+  selectedKey,
+  onSelectVariant,
   topOfferPrice,
   marketPrice,
   existingOwnListings,
@@ -108,9 +121,6 @@ export function ListModal({
       document.body.style.overflow = prev
     }
   }, [open, onClose, submitting])
-
-  const variantLabel = company && grade ? `${company} ${grade}` : 'Ungraded NM'
-  const style = company && grade ? gradingStyle(company, grade) : null
 
   // Suggestion anchor: top offer if present, else market. Percentage
   // bumps scale to value tier without needing tiered logic per card.
@@ -196,18 +206,7 @@ export function ListModal({
         <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-3 border-b border-zinc-100">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-zinc-900">{placedListing ? 'Listed' : 'List your card'}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              {style ? (
-                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ring-1 ${style.pill}`}>
-                  {style.shortLabel}
-                </span>
-              ) : (
-                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300">
-                  Ungraded NM
-                </span>
-              )}
-              <span className="text-sm text-zinc-500 truncate">{cardName}</span>
-            </div>
+            <p className="text-sm text-zinc-500 truncate mt-1">{cardName}</p>
           </div>
           <button
             onClick={onClose}
@@ -234,6 +233,22 @@ export function ListModal({
         <>
 
         <div className="px-6 py-5 space-y-4">
+          {/* Grade selector — surfaced in the flow (not hidden as a tiny
+              chip) so the seller clearly sees / can change the grade they're
+              listing as. Prefilled to whatever variant they had selected;
+              changing it flows up to the parent and re-derives company/grade
+              + the reference prices below. */}
+          <div className="rounded-lg ring-1 ring-zinc-200 p-3">
+            <GradeSelector
+              variants={variants}
+              selectedKey={selectedKey}
+              onSelect={onSelectVariant}
+              heading="Listing as"
+              helperText={null}
+              embedded
+            />
+          </div>
+
           {/* Existing-listings warning. We don't block adding another
               (different physical card could be the same variant) but we
               surface what's already there with manage-it shortcuts so

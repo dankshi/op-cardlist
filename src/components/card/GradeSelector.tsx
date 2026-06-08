@@ -18,10 +18,22 @@ export function GradeSelector({
   variants,
   selectedKey,
   onSelect,
+  /** Section title. Card page uses "Grades"; embedded contexts (e.g. the
+   *  List modal) can relabel it ("Listing as") or hide it with null. */
+  heading = 'Grades',
+  /** Caption under the ladder. Pass null to hide (e.g. in the modal where
+   *  the "buy box above" copy doesn't apply). */
+  helperText = 'Tap a grade to load its lowest listing into the buy box above.',
+  /** Embedded mode drops the full-width section chrome (top border + margin)
+   *  so the ladder sits cleanly inside another container like a modal. */
+  embedded = false,
 }: {
   variants: VariantData[]
   selectedKey: string
   onSelect: (key: string) => void
+  heading?: string | null
+  helperText?: string | null
+  embedded?: boolean
 }) {
   const chips = useMemo(() => buildChips(variants), [variants])
   const [showAll, setShowAll] = useState(false)
@@ -42,24 +54,31 @@ export function GradeSelector({
     })).filter(g => g.chips.length > 0)
   }, [chips, showAll])
 
-  return (
-    <section className="mt-8 border-t border-zinc-200 pt-6">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-lg font-bold text-zinc-900">Grades</h2>
-        {hiddenCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowAll(s => !s)}
-            className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
-          >
-            {showAll ? 'Show less' : `Show all (${hiddenCount} more)`}
-          </button>
-        )}
-      </div>
+  const Wrapper = embedded ? 'div' : 'section'
 
-      {/* Ungraded leads, then one labelled group per grading company. The
-          divider between groups echoes the population tables below. */}
-      {/* Each company is its own bordered segmented group with connected
+  return (
+    <Wrapper className={embedded ? '' : 'mt-8 border-t border-zinc-200 pt-6'}>
+      {(heading || hiddenCount > 0) && (
+        <div className={`flex items-center justify-between ${embedded ? 'mb-3' : 'mb-5'}`}>
+          {heading ? (
+            <h2 className={embedded ? 'text-[11px] font-bold uppercase tracking-wider text-zinc-500' : 'text-lg font-bold text-zinc-900'}>
+              {heading}
+            </h2>
+          ) : <span />}
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAll(s => !s)}
+              className="text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
+            >
+              {showAll ? 'Show less' : `Show all (${hiddenCount} more)`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Ungraded leads, then one labelled group per grading company.
+          Each company is its own bordered segmented group with connected
           cells (ALT-style) — the grouping is implied by the container so we
           don't need dividers between companies. */}
       <div className="flex flex-wrap items-start gap-x-4 gap-y-4">
@@ -85,10 +104,10 @@ export function GradeSelector({
         ))}
       </div>
 
-      <p className="text-xs text-zinc-400 mt-4">
-        Tap a grade to load its lowest listing into the buy box above.
-      </p>
-    </section>
+      {helperText && (
+        <p className="text-xs text-zinc-400 mt-4">{helperText}</p>
+      )}
+    </Wrapper>
   )
 }
 

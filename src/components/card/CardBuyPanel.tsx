@@ -155,12 +155,27 @@ export function CardBuyPanel({
               </div>
             </div>
           ) : (
+            /* No offers — keep the SAME layout as the offered/buy states
+               (label row + big line + button on the right) so toggling
+               buy↔sell doesn't shift the panel. */
             <div className="mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Sell now for</p>
-              <p className="text-2xl font-semibold text-zinc-500 mb-3">No offers yet</p>
-              <ListButton onClick={onListClick} cardId={cardId} selected={selected} variant="primary">
-                List your card
-              </ListButton>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                  Sell now for
+                </span>
+              </div>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-4xl font-light tracking-tight text-zinc-400 leading-none">
+                    No offers yet
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <ListButton onClick={onListClick} cardId={cardId} selected={selected} variant="primary">
+                    List your card
+                  </ListButton>
+                </div>
+              </div>
             </div>
           )}
         </>
