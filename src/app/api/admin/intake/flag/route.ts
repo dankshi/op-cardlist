@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const VALID_ISSUE_TYPES = [
-  'wrong_card', 'wrong_condition', 'missing_item', 'counterfeit',
-  'damaged_in_transit', 'wrong_quantity', 'other',
+  'courier_damage', 'seller_packaging', 'internal_handling', 'missing_item',
 ] as const
 
 export async function POST(request: Request) {

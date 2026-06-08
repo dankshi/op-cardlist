@@ -59,13 +59,10 @@ function cardImageUrl(item: OrderItem): string | null {
 }
 
 const ISSUE_TYPE_LABELS: Record<IntakeIssueType, string> = {
-  wrong_card: 'Wrong Card',
-  wrong_condition: 'Wrong Condition',
+  courier_damage: 'Courier Damage',
+  seller_packaging: 'Seller Packaging',
+  internal_handling: 'Internal Handling',
   missing_item: 'Missing Item',
-  counterfeit: 'Counterfeit',
-  damaged_in_transit: 'Damaged in Transit',
-  wrong_quantity: 'Wrong Quantity',
-  other: 'Other',
 }
 
 // ============================================
@@ -1223,8 +1220,6 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, showSuccess 
   showSuccess: (msg: string) => void
 }) {
   const [flagModal, setFlagModal] = useState<{ item: OrderItem; orderId: string } | null>(null)
-  const [addItemModal, setAddItemModal] = useState(false)
-  const [damageModal, setDamageModal] = useState<{ item: OrderItem } | null>(null)
 
   // No explicit "Verify" — items are verified on receipt (see
   // handleReceiveAndPrint). Operators only flag exceptions here.
@@ -1305,7 +1300,7 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, showSuccess 
                 className={`flex items-center gap-3 px-4 py-3 ${isFlagged ? 'bg-red-50/40' : isDone ? 'bg-emerald-50/30' : ''}`}
               >
                 <span className="text-xs text-zinc-300 w-4 text-right flex-shrink-0 tabular-nums">{index + 1}</span>
-                <div className="relative w-10 h-[3.5rem] bg-zinc-100 rounded overflow-hidden flex-shrink-0">
+                <div className="relative w-16 h-[5.5rem] bg-zinc-100 rounded overflow-hidden flex-shrink-0">
                   {imgUrl ? (
                     <Image src={imgUrl} alt={item.card_name} fill className="object-cover" unoptimized />
                   ) : (
@@ -1329,10 +1324,10 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, showSuccess 
                       </>
                     )}
                   </div>
-                  {/* Reference IDs (QR encodes the Item ID) */}
+                  {/* Lead identifier: the human-readable product_id short
+                      code (the QR label still encodes the Item UUID). */}
                   <div className="flex items-center gap-x-4 gap-y-0.5 mt-1 flex-wrap text-xs">
-                    <RefId label="Item" value={item.id} />
-                    <RefId label="Listing" value={item.listing_id} />
+                    <RefId label="ID" value={item.product_id} />
                   </div>
                   {item.intake_notes && <p className="text-xs text-zinc-400 mt-1 italic">{item.intake_notes}</p>}
                   {item.is_damaged && (
@@ -1364,44 +1359,16 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, showSuccess 
                     </button>
                   )}
                   <button
-                    onClick={() => setDamageModal({ item })}
-                    className={`py-1.5 px-2.5 text-xs font-semibold rounded-lg cursor-pointer ${
-                      item.is_damaged ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
-                    }`}
-                    title={item.is_damaged ? 'Edit damage' : 'Mark damaged'}
-                  >
-                    {item.is_damaged ? '⚠' : 'Damage'}
-                  </button>
-                  <button
                     onClick={() => handlePrintItemLabel(item)}
-                    className="py-1.5 px-2.5 bg-zinc-100 text-zinc-500 text-xs rounded-lg hover:bg-zinc-200 cursor-pointer"
+                    className="py-1.5 px-3 bg-zinc-100 text-zinc-600 text-xs font-semibold rounded-lg hover:bg-zinc-200 cursor-pointer"
                     title="Reprint label"
                   >
-                    🏷️
+                    Print Label
                   </button>
                 </div>
               </div>
             )
           })}
-        </div>
-
-        {/* Actions Footer */}
-        <div className="p-4 border-t border-zinc-100 bg-zinc-50 flex items-center gap-3">
-          <button
-            onClick={() => setFlagModal({
-              item: { id: '', product_id: '', order_id: order.id, card_name: '', listing_id: '', card_id: '', quantity: 0, unit_price: 0, condition: 'near_mint', snapshot_photo_url: null, intake_status: 'pending', intake_verified_at: null, intake_verified_by: null, intake_notes: null, is_damaged: false, damage_notes: null, auth_decision: 'pending', auth_condition: null, exception_types: [], exception_details: {}, auth_decided_at: null, auth_decided_by: null, created_at: '' },
-              orderId: order.id,
-            })}
-            className="px-4 py-2 bg-red-100 text-red-700 text-sm font-semibold rounded-lg hover:bg-red-200 cursor-pointer"
-          >
-            Report Missing Item
-          </button>
-          <button
-            onClick={() => setAddItemModal(true)}
-            className="px-4 py-2 bg-blue-100 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-200 cursor-pointer"
-          >
-            Add Item
-          </button>
         </div>
 
         {/* Issues */}
@@ -1462,31 +1429,6 @@ function OrderDetailsStep({ order, source, printerReady, onRefresh, showSuccess 
         />
       )}
 
-      {/* Add Item Modal */}
-      {addItemModal && (
-        <AddItemModal
-          orderId={order.id}
-          onClose={() => setAddItemModal(false)}
-          onSuccess={() => {
-            setAddItemModal(false)
-            showSuccess('Item added')
-            onRefresh(order.id)
-          }}
-        />
-      )}
-
-      {/* Damage Modal */}
-      {damageModal && (
-        <DamageModal
-          item={damageModal.item}
-          onClose={() => setDamageModal(null)}
-          onSuccess={() => {
-            setDamageModal(null)
-            showSuccess('Damage status updated')
-            onRefresh(order.id)
-          }}
-        />
-      )}
     </>
   )
 }
@@ -1877,38 +1819,30 @@ function TriageSearchStep({ triagePackage, cardType, certNumber, nomiInput, prin
 // Modal: Flag Issue
 // ============================================
 
-function FlagModal({ item, orderId, onClose, onSuccess }: {
+function FlagModal({ item, onClose, onSuccess }: {
   item: OrderItem
   orderId: string
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [issueType, setIssueType] = useState<IntakeIssueType>('wrong_card')
-  const [description, setDescription] = useState('')
-  const [expectedCard, setExpectedCard] = useState(item.card_name || '')
-  const [receivedCard, setReceivedCard] = useState('')
+  const [issueType, setIssueType] = useState<IntakeIssueType>('courier_damage')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const isMissing = !item.id
-
   const handleSubmit = async () => {
-    if (!description) { setError('Description is required'); return }
     setSubmitting(true)
-
-    const body: Record<string, unknown> = {
-      issueType: isMissing ? 'missing_item' : issueType,
-      description,
-      expectedCardName: expectedCard || undefined,
-      receivedCardName: receivedCard || undefined,
-    }
-    if (isMissing) body.orderId = orderId
-    else body.orderItemId = item.id
+    setError('')
 
     const res = await fetch('/api/admin/intake/flag', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        orderItemId: item.id,
+        issueType,
+        // No free-form description in the UI anymore; store the bucket label
+        // so the DB's NOT NULL description + the issues list stay populated.
+        description: ISSUE_TYPE_LABELS[issueType],
+      }),
     })
 
     if (res.ok) onSuccess()
@@ -1921,45 +1855,31 @@ function FlagModal({ item, orderId, onClose, onSuccess }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-zinc-900 mb-4">
-          {isMissing ? 'Report Missing Item' : `Flag Issue — ${item.card_name}`}
+          Flag Issue — {item.card_name}
         </h2>
 
-        {!isMissing && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Issue Type</label>
-            <select
-              value={issueType}
-              onChange={e => setIssueType(e.target.value as IntakeIssueType)}
-              className="w-full px-3 py-2 rounded-lg border border-zinc-300 text-zinc-900 text-sm"
-            >
-              {Object.entries(ISSUE_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
         <div className="mb-4">
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Description</label>
-          <textarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Describe the issue..."
-            rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 text-zinc-900 text-sm placeholder-zinc-400"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Expected Card</label>
-            <input type="text" value={expectedCard} onChange={e => setExpectedCard(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-zinc-300 text-zinc-900 text-sm" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Received Card</label>
-            <input type="text" value={receivedCard} onChange={e => setReceivedCard(e.target.value)} placeholder="What was actually received" className="w-full px-3 py-2 rounded-lg border border-zinc-300 text-zinc-900 text-sm placeholder-zinc-400" />
+          <label className="block text-sm font-medium text-zinc-700 mb-2">Issue Type</label>
+          <div className="grid grid-cols-1 gap-2">
+            {(Object.entries(ISSUE_TYPE_LABELS) as [IntakeIssueType, string][]).map(([value, label]) => {
+              const checked = issueType === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setIssueType(value)}
+                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold text-left transition-colors ${
+                    checked
+                      ? 'bg-zinc-900 text-white'
+                      : 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:ring-zinc-400'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -1970,279 +1890,6 @@ function FlagModal({ item, orderId, onClose, onSuccess }: {
           <button onClick={handleSubmit} disabled={submitting} className="px-5 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg hover:bg-red-600 disabled:opacity-50 cursor-pointer">
             {submitting ? 'Submitting...' : 'Flag Issue'}
           </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================
-// Modal: Add Item
-// ============================================
-
-type AddItemCard = {
-  id: string
-  name: string
-  imageUrl: string
-  rarity: string
-}
-
-function AddItemModal({ orderId, onClose, onSuccess }: {
-  orderId: string
-  onClose: () => void
-  onSuccess: () => void
-}) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<AddItemCard[]>([])
-  const [searching, setSearching] = useState(false)
-  const [hasSearched, setHasSearched] = useState(false)
-  const [selectedCard, setSelectedCard] = useState<AddItemCard | null>(null)
-  const [quantity, setQuantity] = useState(1)
-  const [notes, setNotes] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-
-  // Debounced card search — same source as the /sell card picker so admins
-  // always pick a real catalog card instead of typing free-text.
-  useEffect(() => {
-    if (query.length < 2) {
-      setResults([])
-      setHasSearched(false)
-      return
-    }
-    const timer = setTimeout(async () => {
-      setSearching(true)
-      try {
-        const res = await fetch(`/api/cards?search=${encodeURIComponent(query)}&mode=name`)
-        const data = await res.json()
-        const all: AddItemCard[] = data.cards || []
-        setResults(all.slice(0, 24))
-      } catch {
-        setResults([])
-      }
-      setSearching(false)
-      setHasSearched(true)
-    }, 250)
-    return () => clearTimeout(timer)
-  }, [query])
-
-  const handleSubmit = async () => {
-    if (!selectedCard) { setError('Pick a card from the catalog first'); return }
-    setSubmitting(true)
-    setError('')
-
-    const res = await fetch('/api/admin/intake/add-item', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId,
-        cardId: selectedCard.id,
-        cardName: selectedCard.name,
-        quantity,
-        notes,
-      }),
-    })
-
-    if (res.ok) onSuccess()
-    else {
-      const data = await res.json()
-      setError(data.error || 'Failed to add item')
-    }
-    setSubmitting(false)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="p-6 pb-3 border-b border-zinc-100">
-          <h2 className="text-lg font-bold text-zinc-900 mb-3">Add Item to Order</h2>
-
-          {selectedCard ? (
-            <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-lg p-2">
-              <Image src={selectedCard.imageUrl} alt="" width={40} height={56} className="w-10 h-14 object-cover rounded flex-shrink-0" unoptimized />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-zinc-900 truncate">{selectedCard.name}</p>
-                <p className="text-xs text-zinc-500">{selectedCard.id} &middot; {selectedCard.rarity}</p>
-              </div>
-              <button
-                onClick={() => setSelectedCard(null)}
-                className="text-xs text-zinc-500 hover:text-zinc-900 underline cursor-pointer flex-shrink-0"
-              >
-                Change
-              </button>
-            </div>
-          ) : (
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search card name or ID (e.g. Luffy, OP01-001)…"
-                autoFocus
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-300 text-zinc-900 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              />
-              {searching && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 pt-4">
-          {!selectedCard && results.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
-              {results.map(card => (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() => setSelectedCard(card)}
-                  className="group text-left rounded-lg overflow-hidden border border-zinc-200 hover:ring-2 hover:ring-orange-400 transition-all cursor-pointer"
-                >
-                  <div className="aspect-[2.5/3.5] relative bg-zinc-100">
-                    <Image src={card.imageUrl} alt={card.name} fill sizes="(max-width: 640px) 33vw, 25vw" className="object-cover" unoptimized />
-                  </div>
-                  <div className="p-1.5 bg-white border-t border-zinc-100">
-                    <p className="text-[11px] font-medium text-zinc-900 truncate leading-tight">{card.name}</p>
-                    <p className="text-[10px] text-zinc-500 leading-tight">{card.id}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {!selectedCard && hasSearched && !searching && results.length === 0 && (
-            <p className="text-sm text-zinc-500 text-center py-8">No cards found for &ldquo;{query}&rdquo;</p>
-          )}
-
-          {!selectedCard && !hasSearched && (
-            <p className="text-sm text-zinc-400 text-center py-8">Start typing to search the card catalog</p>
-          )}
-
-          {selectedCard && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Quantity</label>
-                <input
-                  type="number"
-                  value={quantity}
-                  onChange={e => setQuantity(Number(e.target.value))}
-                  min={1}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-300 text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1">Notes</label>
-                <textarea
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  placeholder="Why is this item being added?"
-                  rows={2}
-                  className="w-full px-3 py-2 rounded-lg border border-zinc-300 text-zinc-900 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                />
-              </div>
-            </div>
-          )}
-
-          {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-        </div>
-
-        <div className="flex justify-end gap-3 p-6 pt-3 border-t border-zinc-100">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 cursor-pointer">Cancel</button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || !selectedCard}
-            className="px-5 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          >
-            {submitting ? 'Adding...' : 'Add Item'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================
-// Modal: Mark Damaged
-// ============================================
-
-function DamageModal({ item, onClose, onSuccess }: {
-  item: OrderItem
-  onClose: () => void
-  onSuccess: () => void
-}) {
-  const [notes, setNotes] = useState(item.damage_notes || '')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-
-  const save = async (isDamaged: boolean) => {
-    setSubmitting(true)
-    setError('')
-    const res = await fetch('/api/admin/intake/damage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderItemId: item.id,
-        isDamaged,
-        damageNotes: isDamaged ? notes.trim() : null,
-      }),
-    })
-    if (res.ok) onSuccess()
-    else {
-      const data = await res.json()
-      setError(data.error || 'Failed to update damage')
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-zinc-900 mb-1">Mark Damaged</h2>
-        <p className="text-sm text-zinc-500 mb-4 truncate">{item.card_name}</p>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-zinc-700 mb-1">
-            What's wrong? <span className="text-zinc-400 font-normal">(notes for the authenticator)</span>
-          </label>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="e.g. corner ding from shipping, no toploader, bent during opening…"
-            rows={3}
-            autoFocus
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 text-zinc-900 text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-          />
-        </div>
-
-        {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-
-        <div className="flex justify-between gap-3">
-          {item.is_damaged ? (
-            <button
-              onClick={() => save(false)}
-              disabled={submitting}
-              className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 disabled:opacity-50 cursor-pointer"
-            >
-              Clear damage
-            </button>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 cursor-pointer">
-              Cancel
-            </button>
-            <button
-              onClick={() => save(true)}
-              disabled={submitting || !notes.trim()}
-              className="px-5 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {submitting ? 'Saving…' : 'Mark Damaged'}
-            </button>
-          </div>
         </div>
       </div>
     </div>

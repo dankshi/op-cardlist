@@ -165,14 +165,15 @@ export interface ShippingAddress {
 
 export type IntakeStatus = 'pending' | 'verified' | 'flagged' | 'resolved' | 'rejected'
 
+// Fault-source buckets for an intake exception. Who/what is responsible:
+// the courier, the seller's packaging, our own handling, or the item never
+// arrived. (Replaced the older granular taxonomy — wrong_card/condition/
+// counterfeit/etc. — which is now captured in the free-form context.)
 export type IntakeIssueType =
-  | 'wrong_card'
-  | 'wrong_condition'
+  | 'courier_damage'
+  | 'seller_packaging'
+  | 'internal_handling'
   | 'missing_item'
-  | 'counterfeit'
-  | 'damaged_in_transit'
-  | 'wrong_quantity'
-  | 'other'
 
 export type IntakeResolutionStatus = 'open' | 'in_progress' | 'resolved' | 'escalated'
 

@@ -7,13 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import type { IntakeIssue, IntakeIssueType, IntakeResolutionStatus, IntakeResolutionType } from '@/types/database'
 
 const ISSUE_TYPE_LABELS: Record<IntakeIssueType, string> = {
-  wrong_card: 'Wrong Card',
-  wrong_condition: 'Wrong Condition',
+  courier_damage: 'Courier Damage',
+  seller_packaging: 'Seller Packaging',
+  internal_handling: 'Internal Handling',
   missing_item: 'Missing Item',
-  counterfeit: 'Counterfeit',
-  damaged_in_transit: 'Damaged in Transit',
-  wrong_quantity: 'Wrong Quantity',
-  other: 'Other',
 }
 
 const RESOLUTION_TYPE_LABELS: Record<IntakeResolutionType, string> = {
