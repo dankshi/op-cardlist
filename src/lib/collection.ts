@@ -7,6 +7,10 @@ export interface Holding {
   condition: CardCondition | null
   quantity: number
   acquiredPrice: number | null
+  /** Set for graded slabs — lets the portfolio time-series value them off the
+   *  slab comp history instead of the raw TCGplayer price. Null/undefined = raw. */
+  gradingCompany?: string | null
+  grade?: string | null
 }
 
 /** Resolve the per-line market price for one holding, in priority order:

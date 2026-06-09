@@ -46,6 +46,7 @@ interface ParsedSale {
   title: string
   ebayItemId: string | null
   listingUrl: string | null
+  parseConfidence: 'high' | 'low'
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -90,6 +91,23 @@ export function parseGradeFromTitle(title: string): { company: GradingCompany; g
     if (x.company !== first.company || x.grade !== first.grade) return null
   }
   return first
+}
+
+/**
+ * Heuristic confidence that a single-slab grade parse is trustworthy. Returns
+ * 'low' for titles that smell like multi-item / non-standard listings (lots,
+ * bundles, proxies, custom/repack), which the /admin/slab-sales queue surfaces
+ * with a "parse?" badge so an admin can eyeball + exclude them. Conservative —
+ * the comp trim already drops most price outliers; this just routes the
+ * suspicious rows to human review.
+ */
+export function parseConfidence(title: string): 'high' | 'low' {
+  const t = title.toLowerCase()
+  if (/\b(lot|lots|bundle|bulk|repack|reprint|proxy|custom|sticker|digital|playset|joblot)\b/.test(t)) return 'low'
+  if (/\b(lot|set)\s+of\b/.test(t)) return 'low'         // "lot of", "set of"
+  if (/\bx\s?[2-9]\d*\b/.test(t)) return 'low'            // "x2", "x 10"
+  if (/\(\s*[2-9]\d*\s*(pcs|cards|count|ct)?\s*\)/.test(t)) return 'low' // "(2)", "(3 cards)"
+  return 'high'
 }
 
 /**
@@ -225,6 +243,7 @@ function rowsFromRawResults(
       title: r.title,
       ebayItemId,
       listingUrl: r.url || null,
+      parseConfidence: parseConfidence(r.title),
     })
     void cardId
   }
@@ -395,6 +414,7 @@ async function main() {
           title: p.title,
           ebay_item_id: p.ebayItemId,
           listing_url: p.listingUrl,
+          parse_confidence: p.parseConfidence,
         }))
         // Dedup on ebay_item_id (its partial unique index survived the rename to
         // slab_sales). ignoreDuplicates means an admin-set status='excluded' on a

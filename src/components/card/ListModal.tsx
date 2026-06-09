@@ -90,6 +90,9 @@ export function ListModal({
   // Cleared on each open so a stale success doesn't bleed into a new
   // listing session.
   const [placedListing, setPlacedListing] = useState<ListedListing | null>(null)
+  // These open-driven resets sync form state to the modal opening — the
+  // intended use of an effect. (Codebase convention for this rule.)
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { if (open) setPlacedListing(null) }, [open])
   // Graded slabs are by definition unique physical cards — qty is always
   // 1, no input shown. Ungraded raw can have multiple at the same price
@@ -113,6 +116,7 @@ export function ListModal({
       setPrice('')
     }
   }, [open, topOfferPrice, marketPrice])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!open) return

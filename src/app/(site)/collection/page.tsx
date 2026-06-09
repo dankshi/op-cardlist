@@ -6,7 +6,7 @@ import { summarize, holdingMarketPrice, type Holding } from '@/lib/collection'
 import { getPortfolioValueSeries, type Range } from '@/lib/collection-history'
 import { CollectionClient } from '@/components/collection/CollectionClient'
 import type { HoldingRow } from '@/components/collection/HoldingsGrid'
-import type { CollectionItem } from '@/types/database'
+import type { CollectionItem, CollectionActivityRow } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,10 +37,22 @@ export default async function CollectionPage() {
     condition: i.condition,
     quantity: i.quantity,
     acquiredPrice: i.acquired_price != null ? Number(i.acquired_price) : null,
+    gradingCompany: i.grading_company,
+    grade: i.grade,
   }))
 
+  // Recent activity for the inline transactions panel (full ledger lives at
+  // /collection/activity). Sold-off cards may not be in `items`, so fold their
+  // ids into the card-metadata batch below.
+  const { data: actRaw } = await supabase
+    .from('collection_activity')
+    .select('*')
+    .order('happened_at', { ascending: false })
+    .limit(8)
+  const activity = (actRaw ?? []) as CollectionActivityRow[]
+
   // Batch card metadata + current (raw) market price in one call.
-  const uniqueIds = [...new Set(items.map(i => i.card_id))]
+  const uniqueIds = [...new Set([...items.map(i => i.card_id), ...activity.map(a => a.card_id)])]
   const cards = uniqueIds.length ? await getCardsByIds(uniqueIds) : []
   const metaByCard = new Map(cards.map(c => [c.id, c]))
 
@@ -134,6 +146,17 @@ export default async function CollectionPage() {
     .eq('user_id', user.id)
   const realizedGain = (saleRows ?? []).reduce((s, r) => s + (r.realized_gain != null ? Number(r.realized_gain) : 0), 0)
 
+  const txns = activity.map(a => ({
+    id: `${a.kind}-${a.source_id}`,
+    cardId: a.card_id,
+    cardName: metaByCard.get(a.card_id)?.name ?? a.card_id,
+    kind: a.kind,
+    happenedAt: a.happened_at,
+    quantity: a.quantity,
+    amount: a.amount != null ? Number(a.amount) : null,
+    realized: a.realized != null ? Number(a.realized) : null,
+  }))
+
   return (
     <CollectionClient
       summary={{
@@ -145,6 +168,7 @@ export default async function CollectionPage() {
         realizedGain,
       }}
       rows={rows}
+      txns={txns}
       initialSeries={series}
       initialRange={DEFAULT_RANGE}
     />

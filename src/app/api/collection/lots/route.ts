@@ -49,6 +49,8 @@ export async function POST(request: Request) {
 
   const price = toPrice(body.price_paid)
   if (price === undefined) return NextResponse.json({ error: 'Invalid price' }, { status: 400 })
+  const gradingCost = toPrice(body.grading_cost)
+  if (gradingCost === undefined) return NextResponse.json({ error: 'Invalid grading cost' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('collection_lots')
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
       quantity: toQty(body.quantity),
       price_paid: price,
       acquired_date: toDate(body.acquired_date),
+      grading_cost: gradingCost ?? 0,
     })
     .select()
     .single()
@@ -80,6 +83,11 @@ export async function PATCH(request: Request) {
     const price = toPrice(body.price_paid)
     if (price === undefined) return NextResponse.json({ error: 'Invalid price' }, { status: 400 })
     patch.price_paid = price
+  }
+  if ('grading_cost' in body) {
+    const gc = toPrice(body.grading_cost)
+    if (gc === undefined) return NextResponse.json({ error: 'Invalid grading cost' }, { status: 400 })
+    patch.grading_cost = gc ?? 0
   }
   if ('acquired_date' in body) patch.acquired_date = toDate(body.acquired_date)
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })

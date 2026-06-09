@@ -452,6 +452,42 @@ export interface CollectionSale {
   realized_gain: number | null
 }
 
+/** A logged collection adjustment (migration 20260626): a grade change, basis
+ *  tweak, or note. */
+export interface CollectionAdjustment {
+  id: string
+  user_id: string
+  card_id: string
+  collection_id: string | null
+  type: 'grade' | 'basis' | 'note'
+  from_grade: string | null
+  to_grade: string | null
+  amount: number | null
+  happened_at: string
+  note: string | null
+  created_at: string
+}
+
+/** A normalized row from the `collection_activity` view (migration 20260626) —
+ *  the unified buy/sell/grade feed for the per-card history + global ledger. */
+export interface CollectionActivityRow {
+  user_id: string
+  card_id: string
+  collection_id: string | null
+  kind: 'buy' | 'sell' | 'grade' | 'basis' | 'note'
+  happened_at: string
+  quantity: number | null
+  amount: number | null
+  basis: number | null
+  realized: number | null
+  ref_order_id: string | null
+  ref_listing_id: string | null
+  from_grade: string | null
+  to_grade: string | null
+  note: string | null
+  source_id: string
+}
+
 export interface WantListItem {
   id: string
   user_id: string

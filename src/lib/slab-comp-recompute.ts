@@ -72,5 +72,29 @@ export async function recomputeSlabCards(
     if (upErr) throw upErr
     written += chunk.length
   }
+
+  // Append today's snapshot to the history table that powers the portfolio
+  // time-series. Best-effort: this is non-critical telemetry, so a missing
+  // table (migration not yet pushed) or transient error must not break the
+  // recompute/curation flow above.
+  try {
+    const recordedDate = now.toISOString().slice(0, 10)
+    const histRows = upserts.map(u => ({
+      card_id: u.card_id,
+      grading_company: u.grading_company,
+      grade: u.grade,
+      recorded_date: recordedDate,
+      market_value: u.market_value,
+    }))
+    for (let i = 0; i < histRows.length; i += CHUNK) {
+      const { error: histErr } = await admin
+        .from('slab_market_value_history')
+        .upsert(histRows.slice(i, i + CHUNK), { onConflict: 'card_id,grading_company,grade,recorded_date' })
+      if (histErr) { console.warn('slab value-history snapshot skipped:', histErr.message); break }
+    }
+  } catch (e) {
+    console.warn('slab value-history snapshot skipped:', e instanceof Error ? e.message : String(e))
+  }
+
   return written
 }
