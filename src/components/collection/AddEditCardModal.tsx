@@ -59,6 +59,11 @@ export function AddEditCardModal({
   const [lots, setLots] = useState<LotDraft[]>([])
   const [loadedLots, setLoadedLots] = useState<LotDraft[]>([])
   const [loadingLots, setLoadingLots] = useState(false)
+  // The persisted collection line id. Set from the start in edit mode; in add
+  // mode it's null until the first greedy save creates the line. Once set, the
+  // card + grade are locked (the line's variant is fixed).
+  const [lineId, setLineId] = useState<string | null>(editItem?.id ?? null)
+  const committed = lineId != null
   const [customValue, setCustomValue] = useState('')
   const [serial, setSerial] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -98,6 +103,7 @@ export function AddEditCardModal({
       setSerial(editItem.serialNumber ?? '')
       setLots([])
       setLoadedLots([])
+      setLineId(editItem.id)
     } else {
       setCard(presetCard ? { id: presetCard.id, name: presetCard.name, rarity: '', imageUrl: presetCard.image } : null)
       setCompany('')
@@ -106,6 +112,7 @@ export function AddEditCardModal({
       setSerial('')
       setLots([{ quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }])
       setLoadedLots([])
+      setLineId(null)
     }
     // Depend on the preset's fields + the edited line id, not object identity,
     // so a fresh literal from the parent each render doesn't re-fire this.
@@ -151,7 +158,20 @@ export function AddEditCardModal({
     setLots(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l))
     setError(null)
   }
-  function addLot() {
+  async function addLot() {
+    if (submitting) return
+    setError(null)
+    setFlash(null)
+    // Greedy: persist whatever's entered so far before adding a blank row, so
+    // closing the modal mid-entry never loses an acquisition.
+    if (canSubmit) {
+      setSubmitting(true)
+      const id = await persistAll()
+      setSubmitting(false)
+      if (id == null) return // error shown; the user's rows are kept intact
+      onSaved()
+      setFlash('Saved ✓')
+    }
     setLots(prev => [...prev, { quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }])
   }
   function removeLot(i: number) {
@@ -201,34 +221,16 @@ export function AddEditCardModal({
     return true
   }
 
-  async function handleSubmit(keepOpen = false) {
-    if (!canSubmit || submitting) return
-    setSubmitting(true)
-    setError(null)
-    setFlash(null)
-
-    try {
-      if (isEdit) {
-        // Variant-level fields, then lot diffs.
-        const res = await fetch('/api/collection', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editItem!.id, custom_value: customValue || null, serial_number: serial || null }),
-        })
-        if (!res.ok) {
-          const b = await res.json().catch(() => ({}))
-          setError(b.error || 'Something went wrong.')
-          return
-        }
-        const ok = await persistEditLots(editItem!.id)
-        if (!ok) { setError('Failed to save acquisitions.'); return }
-        onSaved()
-        onClose()
-        return
-      }
-
-      // Add: create the line + first lot via the increment RPC, then append
-      // any extra lots to the returned line.
+  // Persist the whole editor: create the line (add mode, first time) or update
+  // variant fields + diff lots (line already exists), then resync drafts with
+  // the server so saved lots carry real ids. Returns the line id, or null on
+  // failure (error already surfaced). Used by both Save and the greedy
+  // "add another acquisition".
+  async function persistAll(): Promise<string | null> {
+    let id = lineId
+    if (id == null) {
+      // Add mode, first save — create the line + first lot via the increment
+      // RPC, then append any further lots.
       const [first, ...rest] = lots
       const createRes = await fetch('/api/collection', {
         method: 'POST',
@@ -247,26 +249,68 @@ export function AddEditCardModal({
       if (!createRes.ok) {
         const b = await createRes.json().catch(() => ({}))
         setError(b.error || 'Something went wrong.')
-        return
+        return null
       }
       const { item } = await createRes.json()
+      id = item.id as string
+      setLineId(id)
       for (const lot of rest) {
-        await fetch('/api/collection/lots', {
+        const r = await fetch('/api/collection/lots', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ collection_id: item.id, quantity: lot.quantity, price_paid: lot.price, acquired_date: lot.date || null }),
+          body: JSON.stringify({ collection_id: id, quantity: lot.quantity, price_paid: lot.price, acquired_date: lot.date || null }),
         })
+        if (!r.ok) { setError('Failed to save an acquisition.'); return null }
       }
+    } else {
+      const res = await fetch('/api/collection', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, custom_value: customValue || null, serial_number: serial || null }),
+      })
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}))
+        setError(b.error || 'Something went wrong.')
+        return null
+      }
+      const ok = await persistEditLots(id)
+      if (!ok) { setError('Failed to save acquisitions.'); return null }
+    }
+
+    // Resync drafts with the server so saved lots carry real ids — further
+    // edits diff correctly and nothing is re-created.
+    try {
+      const d = await (await fetch(`/api/collection/lots?collection_id=${id}`)).json()
+      const drafts: LotDraft[] = (d.lots ?? []).map((l: { id: string; quantity: number; price_paid: number | null; acquired_date: string | null }) => ({
+        id: l.id, quantity: l.quantity, price: l.price_paid != null ? String(l.price_paid) : '', date: l.acquired_date ?? '',
+      }))
+      if (drafts.length) { setLots(drafts); setLoadedLots(drafts) }
+    } catch { /* keep local drafts */ }
+
+    return id
+  }
+
+  async function handleSubmit(keepOpen = false) {
+    if (!canSubmit || submitting) return
+    setSubmitting(true)
+    setError(null)
+    setFlash(null)
+    try {
+      const name = card?.name ?? 'card'
+      const id = await persistAll()
+      if (id == null) return
       onSaved()
 
-      if (keepOpen) {
-        const name = card?.name ?? 'card'
+      if (keepOpen && !isEdit) {
+        // Reset for the next card (add-another-CARD). New card → new line.
         setCard(presetCard ? { id: presetCard.id, name: presetCard.name, rarity: '', imageUrl: presetCard.image } : null)
         setCompany('')
         setGrade('')
         setCustomValue('')
         setSerial('')
         setLots([{ quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }])
+        setLoadedLots([])
+        setLineId(null)
         setFlash(`Added ${name} ✓`)
         return
       }
@@ -314,13 +358,13 @@ export function AddEditCardModal({
         <div className="px-7 py-6 space-y-5">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Card</label>
-            {isEdit || presetCard ? (
+            {isEdit || presetCard || committed ? (
               <div className="flex items-center gap-3 rounded-lg ring-1 ring-zinc-200 p-2.5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={isEdit ? editItem!.card_image : presetCard!.image} alt="" className="w-10 h-14 rounded object-cover bg-zinc-100" />
+                <img src={card?.imageUrl || ''} alt="" className="w-10 h-14 rounded object-cover bg-zinc-100" />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-zinc-900 truncate">{isEdit ? editItem!.card_name : presetCard!.name}</p>
-                  <p className="text-[11px] text-zinc-400 font-mono">{isEdit ? editItem!.card_id : presetCard!.id}</p>
+                  <p className="text-sm font-semibold text-zinc-900 truncate">{card?.name}</p>
+                  <p className="text-[11px] text-zinc-400 font-mono">{card?.id}</p>
                 </div>
               </div>
             ) : (
@@ -331,7 +375,7 @@ export function AddEditCardModal({
           {/* Grade — Raw or a slab. Chosen on add; fixed once the line exists. */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Grade</label>
-            {isEdit ? (
+            {isEdit || committed ? (
               <div className="inline-flex items-center rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-700">
                 {gradeText(company || null, grade || null)}
               </div>
