@@ -169,21 +169,13 @@ export function AddEditCardModal({
     setLots(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l))
     setError(null)
   }
-  async function addLot() {
+  function addLot() {
     if (submitting) return
     setError(null)
     setFlash(null)
-    // Greedy: persist whatever's entered so far before adding a blank row, so
-    // closing the modal mid-entry never loses an acquisition.
-    if (canSubmit) {
-      setSubmitting(true)
-      const id = await persistAll()
-      setSubmitting(false)
-      if (id == null) return // error shown; the user's rows are kept intact
-      onSaved()
-      router.refresh()
-      setFlash('Saved ✓')
-    }
+    // Purely local — just append a blank row. Nothing is persisted until the
+    // user explicitly clicks Save (persistAll writes every draft lot then), so
+    // adding a row no longer refreshes the page or steals focus mid-entry.
     setLots(prev => [...prev, { quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }])
   }
   function removeLot(i: number) {
