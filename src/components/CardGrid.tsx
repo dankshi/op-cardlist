@@ -6,6 +6,7 @@ import type { Card, Rarity } from "@/types/card";
 import type { ListingsSummary } from "@/lib/cards";
 import { CardThumbnail } from "./card/CardThumbnail";
 import { PriceRow, ViewPill } from "./card/PriceRow";
+import { AddToCollectionButton } from "./collection/AddToCollectionButton";
 
 function formatUSD(n: number): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -232,25 +233,32 @@ export default function CardGrid({ cards, initialSearch, priceChanges, listingsS
             {filteredCards.map((card) => {
               const summary = listingsSummary?.[card.id];
               return (
-                <Link
-                  key={card.id}
-                  href={`/card/${card.id.toLowerCase()}`}
-                  className="block group"
-                >
-                  <CardThumbnail card={card} />
-                  {card.price?.marketPrice != null && (
-                    <PriceRow
-                      price={card.price.marketPrice}
-                      changePercent={priceChanges?.[card.id] ?? null}
-                      trailing={<ViewPill />}
-                    />
-                  )}
-                  {summary && (
-                    <div className={card.price?.marketPrice != null ? 'mt-1' : 'mt-2'}>
-                      <ListingsLine summary={summary} />
-                    </div>
-                  )}
-                </Link>
+                <div key={card.id} className="relative group">
+                  <Link
+                    href={`/card/${card.id.toLowerCase()}`}
+                    className="block"
+                  >
+                    <CardThumbnail card={card} />
+                    {card.price?.marketPrice != null && (
+                      <PriceRow
+                        price={card.price.marketPrice}
+                        changePercent={priceChanges?.[card.id] ?? null}
+                        trailing={<ViewPill />}
+                      />
+                    )}
+                    {summary && (
+                      <div className={card.price?.marketPrice != null ? 'mt-1' : 'mt-2'}>
+                        <ListingsLine summary={summary} />
+                      </div>
+                    )}
+                  </Link>
+                  {/* Quick-add to collection — overlay, visible on hover
+                      (always shown on touch). Sibling of the Link so we don't
+                      nest a button inside an anchor. */}
+                  <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <AddToCollectionButton cardId={card.id} cardName={card.name} variant="icon" />
+                  </div>
+                </div>
               );
             })}
           </div>

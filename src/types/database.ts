@@ -397,8 +397,59 @@ export interface CollectionItem {
   notes: string | null
   acquired_price: number | null
   acquired_date: string | null
+  /** Grade, when the owned copy is slabbed. Both null = raw (condition). */
+  grading_company: string | null
+  grade: string | null
+  /** Owner-set per-card current value, overriding market price in totals. */
+  custom_value: number | null
+  /** Serial / print number for numbered cards (e.g. "012/100"). */
+  serial_number: string | null
+  /** How this line entered the collection: a manual add or an auto-add from
+   *  a delivered Nomi purchase. */
+  acquired_via: 'manual' | 'purchase'
+  /** Order that first created this line (provenance for purchase auto-adds). */
+  order_id: string | null
   created_at: string
   updated_at: string
+}
+
+/** A single acquisition within a collection line (migration 20260620). A line's
+ *  quantity + cost basis roll up from its lots; the parent collections row
+ *  carries the synced aggregate. price_paid null = an unpriced ("loose") lot. */
+export interface CollectionLot {
+  id: string
+  collection_id: string
+  quantity: number
+  price_paid: number | null
+  acquired_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** A disposition — closing collection lots via a sale (migration 20260621,
+ *  docs/collection-pnl.md). `channel` 'nomi' rows are auto-recorded when an
+ *  order authenticates; 'manual' rows are off-platform sales (Phase 2).
+ *  `realized_gain` is a stored generated column (`net_proceeds − cost_basis`),
+ *  null when the closed lots had no recorded cost basis. */
+export interface CollectionSale {
+  id: string
+  user_id: string
+  card_id: string
+  collection_id: string | null
+  order_id: string | null
+  listing_id: string | null
+  channel: 'nomi' | 'manual'
+  quantity: number
+  gross_proceeds: number | null
+  fees: number
+  net_proceeds: number | null
+  cost_basis: number | null
+  grading_company: string | null
+  grade: string | null
+  sold_at: string
+  note: string | null
+  created_at: string
+  realized_gain: number | null
 }
 
 export interface WantListItem {

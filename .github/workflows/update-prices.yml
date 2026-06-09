@@ -28,8 +28,14 @@ jobs:
         run: npm run scrape:prices
         env:
           NODE_ENV: production
+          # Daily run does PRICES only — fast and rate-limit-free. Sales are
+          # handled continuously by the Update Sales workflow (small windows).
+          SCRAPE_PHASE: prices
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # Service role lets the scraper record runs to scraper_runs and read
+          # the DB-managed auth cookie (both are locked down from anon).
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # Authenticated TCGPlayer session — unlocks the deep latestsales feed.
           # If unset, the scraper silently falls back to anon mode (5 sales/product cap).
           # Rotate when expired: log out + back in on tcgplayer.com, grab new

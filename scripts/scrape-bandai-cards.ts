@@ -492,9 +492,33 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
   const seriesIds = args.filter(a => !a.startsWith('--'));
+
+  // Onboarding/staging mode: scrape ONE set defined by a set_onboarding row
+  // into staged_cards (never the live catalog) for admin verification.
+  const onboardingArg = args.find(a => a.startsWith('--onboarding='))?.split('=')[1];
+  const onboardingId = onboardingArg ? Number(onboardingArg) : null;
+  if (onboardingId != null) {
+    const { data: ob, error } = await supabase.from('set_onboarding').select('*').eq('id', onboardingId).single();
+    if (error || !ob) {
+      console.error(`Onboarding row ${onboardingId} not found: ${error?.message ?? 'missing'}`);
+      process.exit(1);
+    }
+    // Inject the requested set into SETS so the existing scrape path works.
+    SETS[ob.bandai_series_id] = {
+      id: ob.set_id,
+      name: ob.name,
+      releaseDate: ob.release_date ?? '',
+      site: ob.bandai_site === 'asia-en' ? 'asia' : undefined,
+      englishImages: ob.bandai_site === 'asia-en' ? false : undefined,
+    };
+    seriesIds.length = 0;
+    seriesIds.push(ob.bandai_series_id);
+    await supabase.from('set_onboarding').update({ status: 'staging', error: null, updated_at: new Date().toISOString() }).eq('id', onboardingId);
+  }
+
   const targets = seriesIds.length > 0 ? seriesIds : Object.keys(SETS);
 
-  console.log(`Scraping ${targets.length} set(s)...`);
+  console.log(`Scraping ${targets.length} set(s)${onboardingId != null ? ` (staging for onboarding ${onboardingId})` : ''}...`);
 
   const sets: { set: CardSet; seriesId: string }[] = [];
 
@@ -509,6 +533,9 @@ async function main() {
 
   if (sets.length === 0) {
     console.log('Nothing to upsert (no sets scraped successfully).');
+    if (onboardingId != null) {
+      await supabase.from('set_onboarding').update({ status: 'failed', error: 'Scrape returned no cards — check the Bandai series id / site.', updated_at: new Date().toISOString() }).eq('id', onboardingId);
+    }
     return;
   }
 
@@ -538,6 +565,26 @@ async function main() {
   const cardRows: CardRow[] = Array.from(cardMap.values());
   if (dupes.length > 0) {
     console.log(`  (deduped ${dupes.length} cross-set duplicate id(s): ${dupes.slice(0, 5).join(', ')}${dupes.length > 5 ? '...' : ''})`);
+  }
+
+  // Staging mode: write the scraped cards to staged_cards (tagged by
+  // onboarding_id) for admin review, then stop — never touch the live catalog.
+  if (onboardingId != null) {
+    const stagedRows = cardRows.map(r => ({
+      ...r,
+      art_style: inferredArtStyle.get(r.id) ?? null,
+      onboarding_id: onboardingId,
+    }));
+    await supabase.from('staged_cards').delete().eq('onboarding_id', onboardingId);
+    await upsertInChunks('staged_cards', stagedRows, 'onboarding_id,id');
+    await supabase.from('set_onboarding').update({
+      status: 'staged',
+      staged_card_count: stagedRows.length,
+      error: null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', onboardingId);
+    console.log(`Staged ${stagedRows.length} cards for onboarding ${onboardingId} (no live writes).`);
+    return;
   }
 
   // Reprint protection. Bandai's "collection" pages (PRB, EB, etc.) list

@@ -420,7 +420,7 @@ function StepDetails({
 // ============================================
 
 /** Reference price for the price step. Returns the median of recent
- *  same-company / same-grade slab sales from card_graded_sales for
+ *  same-company / same-grade slab sales from slab_sales for
  *  graded listings. Raw cards use the parent's TCGplayer marketPrice
  *  directly. Falls back to null when no relevant data exists — the UI
  *  then hides the comparison entirely instead of pretending a raw price
@@ -434,9 +434,10 @@ async function fetchGradedMedian(
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - 90)
   const { data, error } = await supabase
-    .from('card_graded_sales')
+    .from('slab_sales')
     .select('price, grading_company, grade')
     .eq('card_id', cardId)
+    .eq('status', 'visible')
     .eq('grading_company', gradingCompany)
     .eq('grade', grade)
     .gte('sold_at', startDate.toISOString())
@@ -1150,7 +1151,7 @@ function SellPageContent() {
       <div className="max-w-5xl mx-auto">
         <SuccessScreen
           cardName={selectedCard.name}
-          onViewDashboard={() => router.push('/mystuff')}
+          onViewDashboard={() => router.push('/sellerhub')}
           onListAnother={handleListAnother}
         />
       </div>

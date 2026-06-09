@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { card_id, title, description, price, quantity, language, is_first_edition, photo_urls, grading_company, grade } = body
+  const { card_id, title, description, price, quantity, language, is_first_edition, photo_urls, grading_company, grade, collection_id } = body
 
   if (!card_id || !title || !price || price <= 0) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -92,6 +92,9 @@ export async function POST(request: Request) {
       photo_urls: photo_urls || [],
       grading_company: grading_company || null,
       grade: grade || null,
+      // Ties the listing to the collection line it was listed from, so the
+      // sale can close that line's lots for realized P&L (docs/collection-pnl.md).
+      collection_id: typeof collection_id === 'string' ? collection_id : null,
     })
     .select()
     .single()

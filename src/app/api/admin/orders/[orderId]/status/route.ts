@@ -10,6 +10,7 @@ import {
   sendBuyerAuthenticatedEmail,
 } from '@/lib/email'
 import { recordOrderRaffleEntries } from '@/lib/raffle'
+import { recordSaleDispositions } from '@/lib/collectionSales'
 
 const VALID_TRANSITIONS: Record<string, string> = {
   seller_shipped: 'received',
@@ -145,6 +146,15 @@ export async function POST(
           ? 'Sale credited on authentication (net of shipping + platform fee)'
           : 'Sale credited on authentication (net of platform fee + processing)',
       })
+    }
+
+    // Collection P&L (docs/collection-pnl.md): record the seller-side
+    // disposition + realized gain for any sold line they listed from their
+    // collection. Best-effort — never block the credit/status update.
+    try {
+      await recordSaleDispositions(adminSupabase, order)
+    } catch (err) {
+      console.error('recordSaleDispositions failed', err)
     }
   } else if (status === 'shipped_to_buyer') {
     // Only auto-generate the outbound label if the admin hasn't already

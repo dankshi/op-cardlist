@@ -22,6 +22,20 @@ export interface GradingStyle {
   shortLabel: string
 }
 
+/** Clean, human grade label for display text (no company prefix on the named
+ *  top tiers). Raw → "Near Mint" (raw isn't a grade; condition is). BGS Black
+ *  Label 10 → "Black Label"; CGC/TAG Pristine 10 → "Pristine"; otherwise
+ *  "<company> <grade>" e.g. "PSA 10", "BGS 9.5". */
+export function gradeLabel(
+  company: string | null | undefined,
+  grade: string | null | undefined,
+): string {
+  if (!company || !grade) return 'Near Mint'
+  if (/black\s*label/i.test(grade)) return 'Black Label'
+  if (/pristine/i.test(grade)) return 'Pristine'
+  return `${company} ${grade}`
+}
+
 export function gradingStyle(
   company: string | null | undefined,
   grade: string | null | undefined,

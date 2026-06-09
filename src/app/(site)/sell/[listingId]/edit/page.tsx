@@ -86,7 +86,7 @@ export default function EditListingPage() {
         .single()
 
       if (!data || data.seller_id !== user.id) {
-        router.push('/mystuff')
+        router.push('/sellerhub')
         return
       }
 

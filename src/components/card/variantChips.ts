@@ -14,6 +14,12 @@ export interface VariantData {
   grade: string | null
   /** Population count for this graded variant (0 for raw / no data). */
   population: number
+  /** Computed market value for this graded variant (slab_market_values, with
+   *  any admin override applied). Null when we have no comp for it. The grade
+   *  ladder shows this as the "worth" estimate when there's no live listing. */
+  marketValue: number | null
+  /** Confidence of `marketValue` — drives how prominently the estimate renders. */
+  marketConfidence: 'high' | 'medium' | 'low' | 'none' | null
   lowestListingId: string | null
   lowestListingPrice: number | null
   /** How many units of the lowest listing the seller still has. Drives
@@ -69,6 +75,9 @@ export interface ChipData {
   grade: string | null
   display: string | null           // short grade text on the tile face
   population: number
+  /** Computed market value (slab_market_values + override) for this variant. */
+  marketValue: number | null
+  marketConfidence: 'high' | 'medium' | 'low' | 'none' | null
   lowestListingId: string | null
   lowestListingPrice: number | null
   /** Cap for the multi-quantity Buy Now selector. 0 when no listing. */
@@ -94,6 +103,9 @@ export function buildChips(variants: VariantData[]): ChipData[] {
     grade: null,
     display: null,
     population: 0,
+    // Raw cards value off the TCGplayer market price elsewhere, not the slab comp.
+    marketValue: null,
+    marketConfidence: null,
     lowestListingId: raw?.lowestListingId ?? null,
     lowestListingPrice: raw?.lowestListingPrice ?? null,
     lowestListingQuantityAvailable: raw?.lowestListingQuantityAvailable ?? 0,
@@ -111,6 +123,8 @@ export function buildChips(variants: VariantData[]): ChipData[] {
       grade: def.grade,
       display: def.display,
       population: v?.population ?? 0,
+      marketValue: v?.marketValue ?? null,
+      marketConfidence: v?.marketConfidence ?? null,
       lowestListingId: v?.lowestListingId ?? null,
       lowestListingPrice: v?.lowestListingPrice ?? null,
       lowestListingQuantityAvailable: v?.lowestListingQuantityAvailable ?? 0,

@@ -21,7 +21,9 @@
     "discover:sets": "tsx scripts/discover-tcg-sets.ts",
     "scrape:all-sets": "tsx scripts/scrape-all-sets.ts",
     "backfill:prices": "tsx scripts/backfill-price-history.ts",
-    "scrape:manga": "tsx scripts/scrape-alt-manga.ts"
+    "scrape:manga": "tsx scripts/scrape-alt-manga.ts",
+    "scrape:ebay-graded": "tsx scripts/scrape-ebay-graded.ts",
+    "compute:slab-values": "tsx scripts/compute-slab-values.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",

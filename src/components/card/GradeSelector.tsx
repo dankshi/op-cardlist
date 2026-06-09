@@ -142,6 +142,15 @@ function GradeTile({
   onClick: () => void
 }) {
   const hasListing = chip.lowestListingPrice != null
+  // Fall back to the computed comp value when nobody's actively listing this
+  // grade — shown as a "~" estimate so it reads as "what it's worth", distinct
+  // from a firm ask. Dimmer for low-confidence comps.
+  const estimate = !hasListing && chip.marketValue != null ? chip.marketValue : null
+  const estimateColor = isActive
+    ? 'text-orange-600'
+    : chip.marketConfidence === 'low'
+      ? 'text-zinc-400'
+      : 'text-zinc-500'
   const isGraded = chip.companyKey !== null
   const gradeText = isGraded ? chip.display : 'NM'
 
@@ -160,11 +169,19 @@ function GradeTile({
         {gradeText}
       </div>
 
-      {/* Lowest listing price (or em-dash when none). */}
+      {/* Price line: firm lowest listing if one exists, else the comp-value
+          estimate (~$), else em-dash. */}
       <div className="mt-1">
         {hasListing ? (
           <span className={`text-[13px] font-light tabular-nums tracking-tight ${isActive ? 'text-orange-600' : 'text-zinc-900'}`}>
             ${chip.lowestListingPrice!.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          </span>
+        ) : estimate != null ? (
+          <span
+            className={`text-[13px] font-light tabular-nums tracking-tight ${estimateColor}`}
+            title="Estimated market value from recent sales"
+          >
+            ~${estimate.toLocaleString('en-US', { maximumFractionDigits: 0 })}
           </span>
         ) : (
           <span className="text-[13px] font-light text-zinc-300">—</span>

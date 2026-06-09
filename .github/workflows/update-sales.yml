@@ -1,0 +1,52 @@
+name: Update Sales
+
+on:
+  schedule:
+    # Every 5 minutes. Each run pulls the sales feed for a SMALL window of the
+    # stalest products (SALES_ROTATION_LIMIT), so the whole catalog cycles
+    # every few hours instead of a single big daily burst that TCGPlayer
+    # rate-limits. The rotation cursor is the products' sales_scraped_at.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub UI
+
+# Never let runs pile up: if a window is still going when the next tick fires,
+# queue at most one and drop the rest.
+concurrency:
+  group: update-sales
+  cancel-in-progress: false
+
+jobs:
+  update-sales:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run sales scraper (small rotating window)
+        run: npm run scrape:prices
+        env:
+          NODE_ENV: production
+          # Sales-only — skips the price scrape, rotates the stalest products.
+          SCRAPE_PHASE: sales
+          SALES_ROTATION_LIMIT: '30'
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # Service role lets the scraper record runs to scraper_runs and read
+          # the DB-managed auth cookie (both are locked down from anon).
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Authenticated TCGPlayer session — unlocks the deep latestsales feed.
+          # If unset, the scraper silently falls back to anon mode (5 sales/product cap).
+          # Rotate when expired: log out + back in on tcgplayer.com, grab new
+          # TCGAuthTicket_Production cookie, `gh secret set TCGPLAYER_AUTH_COOKIE -b "..."`.
+          TCGPLAYER_AUTH_COOKIE: ${{ secrets.TCGPLAYER_AUTH_COOKIE }}

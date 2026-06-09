@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Card, CardSet, CardDatabase, CardType, CardColor, Rarity, Attribute, ArtStyle } from '../src/types/card';
 import { SET_NAME_MAP } from '../src/lib/set-names';
+import { parseSale } from '../src/lib/scraper/tcgplayer-sales';
 
 dotenv.config({ path: '.env.local' });
 
@@ -287,7 +288,11 @@ type FetchPage =
   | { kind: 'rate_limited' }
   | { kind: 'error'; message: string };
 
-const TCG_AUTH_COOKIE = process.env.TCGPLAYER_AUTH_COOKIE;
+// The TCGplayer auth cookie. Defaults to the env/GitHub-secret value, but
+// main() overrides it from the scraper_settings table when a service-role
+// client is available — so admins can refresh it from the Scraper HQ without
+// touching CI secrets.
+let authCookie: string | undefined = process.env.TCGPLAYER_AUTH_COOKIE;
 const PAGE_SIZE = 25;
 // Cap at 6 pages (150 sales) per product. Covers 90 days for nearly every card
 // and limits how far we paginate on the rare high-volume chase card.
@@ -313,8 +318,8 @@ async function fetchSalesPage(
         'Referer': 'https://www.tcgplayer.com/',
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
-        ...(TCG_AUTH_COOKIE
-          ? { Cookie: `TCGAuthTicket_Production=${TCG_AUTH_COOKIE}` }
+        ...(authCookie
+          ? { Cookie: `TCGAuthTicket_Production=${authCookie}` }
           : {}),
       },
       body: JSON.stringify({
@@ -340,18 +345,7 @@ async function fetchSalesPage(
 
     return {
       kind: 'ok',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      sales: sales.map((s: any) => ({
-        price: s.purchasePrice,
-        date: s.orderDate,
-        condition: s.condition ?? null,
-        variant: s.variant ?? null,
-        language: s.language ?? null,
-        listingType: s.listingType ?? null,
-        shippingPrice: s.shippingPrice ?? null,
-        customListingId: s.customListingId ?? null,
-        quantity: s.quantity ?? 1,
-      })),
+      sales: sales.map(parseSale),
       hasMore: data.nextPage === 'Yes',
       totalResults: Number(data.totalResults ?? sales.length),
     };
@@ -410,7 +404,7 @@ async function fetchSales(productId: number): Promise<SaleRecord[]> {
 
     fetchStats.ok++;
     if (result.sales.length === PAGE_SIZE) fetchStats.pagesWith25++;
-    if (TCG_AUTH_COOKIE && result.totalResults > 5) fetchStats.authedPages++;
+    if (authCookie && result.totalResults > 5) fetchStats.authedPages++;
 
     all.push(...result.sales);
 
@@ -489,6 +483,45 @@ async function loadCardDatabaseFromSupabase(supabase: SupabaseClient): Promise<C
   return { sets, lastUpdated: new Date().toISOString() };
 }
 
+// Service-role client + current run id for the scraper_runs audit trail.
+// Run-logging and DB-backed auth cookie need the service role (the locked-down
+// tables aren't anon-accessible); without it the scraper still works, it just
+// doesn't record runs or self-serve the cookie.
+let adminClient: SupabaseClient | null = null;
+let currentRunId: number | null = null;
+
+async function startRun(jobType: string, scope: Record<string, unknown>): Promise<void> {
+  if (!adminClient) return;
+  const trigger = process.env.GITHUB_EVENT_NAME
+    ? (process.env.GITHUB_EVENT_NAME === 'schedule' ? 'cron' : 'manual')
+    : 'local';
+  const logUrl =
+    process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
+      ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+      : null;
+  const { data, error } = await adminClient
+    .from('scraper_runs')
+    .insert({ job_type: jobType, trigger, scope, status: 'running', log_url: logUrl })
+    .select('id')
+    .single();
+  if (error) {
+    console.warn(`  (run-logging disabled: ${error.message})`);
+    return;
+  }
+  currentRunId = data.id as number;
+}
+
+async function finishRun(
+  status: 'success' | 'partial' | 'failed',
+  patch: { error?: string | null; error_code?: string | null; stats?: Record<string, unknown> } = {},
+): Promise<void> {
+  if (!adminClient || currentRunId == null) return;
+  await adminClient
+    .from('scraper_runs')
+    .update({ status, finished_at: new Date().toISOString(), ...patch })
+    .eq('id', currentRunId);
+}
+
 async function main() {
   // Connect to Supabase (required)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -501,6 +534,21 @@ async function main() {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
   console.log('Connected to Supabase');
+
+  // Service-role client for the locked-down HQ tables (run log + auth cookie).
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    adminClient = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    // Prefer the DB-managed cookie (admin-refreshable) over the env secret.
+    const { data: cookieRow } = await adminClient
+      .from('scraper_settings')
+      .select('value')
+      .eq('key', 'tcgplayer_auth_cookie')
+      .maybeSingle();
+    if (cookieRow?.value) {
+      authCookie = cookieRow.value as string;
+      console.log('Auth cookie: loaded from scraper_settings (DB).');
+    }
+  }
 
   console.log('Loading card catalog from cards + card_sets tables...');
   const database = await loadCardDatabaseFromSupabase(supabase);
@@ -543,21 +591,43 @@ async function main() {
   const cardFilter = args.find(a => a.startsWith('--card='))?.split('=')[1];
   const debug = args.includes('--debug');
   const listSets = args.includes('--list-sets');
+  // Phase control for split scheduling: 'prices' runs the daily price scrape
+  // only (fast, no rate-limit); 'sales' runs ONLY the sales rotation against
+  // existing mappings (small frequent windows dodge TCGPlayer's burst limit);
+  // 'both' (default) is the original all-in-one behaviour.
+  const phase = (process.env.SCRAPE_PHASE ?? 'both') as 'prices' | 'sales' | 'both';
+
+  // DB-registered TCGplayer slugs supplement the in-code SET_NAME_MAP so a
+  // freshly onboarded/promoted set is priced without a code change.
+  const dbSlugs = new Map<string, string[]>();
+  {
+    const { data } = await supabase.from('set_tcgplayer_slugs').select('set_id, slugs');
+    for (const r of data ?? []) if (Array.isArray(r.slugs) && r.slugs.length) dbSlugs.set(r.set_id as string, r.slugs as string[]);
+  }
+  const slugsFor = (setId: string): string[] | undefined => SET_NAME_MAP[setId] ?? dbSlugs.get(setId);
 
   if (listSets) {
     console.log('Available sets and their TCGPlayer mappings:');
     for (const set of database.sets) {
-      const tcgNames = SET_NAME_MAP[set.id] || ['UNMAPPED'];
+      const tcgNames = slugsFor(set.id) || ['UNMAPPED'];
       console.log(`  ${set.id.padEnd(10)} -> ${tcgNames.join(', ')}`);
     }
     return;
   }
 
+  // Open the run record (no-op without a service-role client).
+  await startRun(phase, {
+    phase,
+    set: setFilter ?? null,
+    card: cardFilter ?? null,
+    rotation_limit: process.env.SALES_ROTATION_LIMIT ?? null,
+  });
+
   // Count total cards to process
   let totalCards = 0;
   for (const set of database.sets) {
     if (setFilter && set.id !== setFilter) continue;
-    if (!SET_NAME_MAP[set.id]) continue;
+    if (!slugsFor(set.id)) continue;
     for (const card of set.cards) {
       if (cardFilter && !card.id.toLowerCase().includes(cardFilter.toLowerCase())) continue;
       totalCards++;
@@ -575,6 +645,12 @@ async function main() {
   let totalFound = 0;
   let totalNotFound = 0;
   let totalManualPreserved = 0;
+  // Hoisted to function scope so the final run-record stats can read them
+  // (the sales block reassigns these).
+  let lastSoldFound = 0;
+  let totalSalesStored = 0;
+  // Exact cards touched this run (for the HQ run drill-down).
+  const scrapedCards: { cardId: string; productId: number; sales: number }[] = [];
   const matchedProductIds: { cardId: string; productId: number }[] = [];
   const startTime = Date.now();
 
@@ -614,10 +690,11 @@ async function main() {
     source: 'auto';
   }
 
-  for (const set of database.sets) {
+  // Skip the whole price scrape in sales-only mode.
+  if (phase !== 'sales') for (const set of database.sets) {
     if (setFilter && set.id !== setFilter) continue;
 
-    const tcgSetNames = SET_NAME_MAP[set.id];
+    const tcgSetNames = slugsFor(set.id);
     if (!tcgSetNames) {
       console.log(`\nSkipping ${set.name} - no TCGPlayer mapping`);
       continue;
@@ -747,15 +824,40 @@ async function main() {
     }
   }
 
+  // Sales-only mode skipped the price scrape, so the product list wasn't
+  // built from this run's matches — load it from the existing mappings.
+  if (phase === 'sales') {
+    // Paginate — PostgREST caps a single select at 1000 rows, and we have
+    // thousands of mappings; without this the rotation would starve every
+    // product past the first page.
+    const MAP_PAGE = 1000;
+    for (let from = 0; ; from += MAP_PAGE) {
+      const { data: maps } = await supabase
+        .from('card_tcgplayer_mapping')
+        .select('card_id, tcgplayer_product_id')
+        .range(from, from + MAP_PAGE - 1);
+      if (!maps || maps.length === 0) break;
+      for (const m of maps) {
+        matchedProductIds.push({ cardId: m.card_id as string, productId: m.tcgplayer_product_id as number });
+      }
+      if (maps.length < MAP_PAGE) break;
+    }
+    console.log(`Sales-only mode: loaded ${matchedProductIds.length} mapped products.`);
+  }
+
   // Fetch sales history for matched products on a staleness rotation —
   // touch only the N most-stale products per run so traffic looks natural
   // and we stay under TCGPlayer's anti-bot threshold. Full coverage in
-  // ~ceil(matchedProductIds.length / ROTATION_LIMIT) days.
-  const ROTATION_LIMIT = process.env.SCRAPE_ALL_PRODUCTS
-    ? matchedProductIds.length
-    : 300;
+  // ~ceil(matchedProductIds.length / ROTATION_LIMIT) days. Run smaller
+  // windows more often (SALES_ROTATION_LIMIT) to spread load and keep sales
+  // fresh without tripping rate limits.
+  const ROTATION_LIMIT = process.env.SALES_ROTATION_LIMIT
+    ? Number(process.env.SALES_ROTATION_LIMIT)
+    : process.env.SCRAPE_ALL_PRODUCTS
+      ? matchedProductIds.length
+      : 300;
 
-  if (matchedProductIds.length > 0) {
+  if (phase !== 'prices' && matchedProductIds.length > 0) {
     // Order by sales_scraped_at NULLS FIRST so unseen + stalest products
     // come first. After the 20260537 consolidation, sales_scraped_at lives
     // on tcgplayer_products (keyed by product_id) — the rotation is now
@@ -783,8 +885,8 @@ async function main() {
       `\nFetching sales for ${targets.length} stalest products${skipped > 0 ? ` (skipping ${skipped} fresh ones)` : ''}...`,
     );
 
-    let lastSoldFound = 0;
-    let totalSalesStored = 0;
+    lastSoldFound = 0;
+    totalSalesStored = 0;
     // last_sold_* and sales_scraped_at live on tcgplayer_products now
     // (keyed by product_id). Multiple cards mapped to the same product
     // share one product-level entry — dedupe on the way in.
@@ -884,6 +986,9 @@ async function main() {
           product_id: productId,
           sales_scraped_at: now,
         });
+        if (scrapedCards.length < 500) {
+          scrapedCards.push({ cardId: batch[j].cardId, productId, sales: sales.length });
+        }
         if (sales.length > 0) {
           pendingLastSold.push({
             product_id: productId,
@@ -931,9 +1036,9 @@ async function main() {
       `  fetchSales: ok-pages=${fetchStats.ok}  rate-limited-retries=${fetchStats.rateLimited}  gave-up=${fetchStats.giveUp}  hard-errors=${fetchStats.error}`,
     );
     console.log(
-      `  cookie: pages-with-25=${fetchStats.pagesWith25}  authed-pages=${fetchStats.authedPages}  ${TCG_AUTH_COOKIE ? '(cookie present)' : '(NO COOKIE — anon mode, capped at 5 sales/product)'}`,
+      `  cookie: pages-with-25=${fetchStats.pagesWith25}  authed-pages=${fetchStats.authedPages}  ${authCookie ? '(cookie present)' : '(NO COOKIE — anon mode, capped at 5 sales/product)'}`,
     );
-    if (TCG_AUTH_COOKIE && fetchStats.authedPages === 0 && fetchStats.ok > 0) {
+    if (authCookie && fetchStats.authedPages === 0 && fetchStats.ok > 0) {
       console.warn(
         `  ⚠ Cookie is set but every authed response looked anonymous (totalResults <= 5). Cookie has likely expired — refresh TCGPLAYER_AUTH_COOKIE.`,
       );
@@ -954,6 +1059,23 @@ async function main() {
   console.log(`  Not found: ${totalNotFound}`);
   console.log(`  Saved to: Supabase tcgplayer_card_price_history`);
 
+  // Health signals for the run record + HQ.
+  const authExpired = !!authCookie && fetchStats.authedPages === 0 && fetchStats.ok > 0;
+  const rateLimitedHard = fetchStats.giveUp > 0;
+  const runStats = {
+    durationMs: Date.now() - startTime,
+    totalCards,
+    totalProcessed,
+    totalFound,
+    totalNotFound,
+    totalManualPreserved,
+    salesStored: totalSalesStored,
+    productsWithSales: lastSoldFound,
+    fetch: { ...fetchStats },
+    dbWriteErrors,
+    cards: scrapedCards,
+  };
+
   // Fail the run if any DB write errored. The scraper deliberately logs-and-
   // continues per batch (so one bad row doesn't lose the whole scrape), but a
   // run that couldn't persist its prices must NOT report success — otherwise a
@@ -961,11 +1083,22 @@ async function main() {
   // job that silently writes nothing.
   if (dbWriteErrors > 0) {
     console.error(`\n✗ ${dbWriteErrors} database write error(s) during this run — exiting non-zero so the schedule surfaces it.`);
+    await finishRun('failed', {
+      error: `${dbWriteErrors} database write error(s)`,
+      error_code: authExpired ? 'auth_expired' : null,
+      stats: runStats,
+    });
     process.exit(1);
   }
+
+  await finishRun(authExpired || rateLimitedHard ? 'partial' : 'success', {
+    error_code: authExpired ? 'auth_expired' : null,
+    stats: runStats,
+  });
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error(err);
+  await finishRun('failed', { error: String(err?.message ?? err) });
   process.exit(1);
 });

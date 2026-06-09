@@ -155,7 +155,7 @@ export default function OrderDetailPage() {
         const sellerProfile = sellerProfileRes.data
 
         if (!orderData || (orderData.buyer_id !== user.id && orderData.seller_id !== user.id)) {
-          router.push('/mystuff?tab=purchases')
+          router.push('/orders')
           return
         }
 
@@ -272,8 +272,8 @@ export default function OrderDetailPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <Link href={isSeller ? '/mystuff' : '/orders'} className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
-        &larr; {isSeller ? 'Back to My Stuff' : 'Back to Orders'}
+      <Link href={isSeller ? '/sellerhub' : '/orders'} className="text-sm text-zinc-500 hover:text-zinc-700 mb-4 inline-block">
+        &larr; {isSeller ? 'Back to Seller Hub' : 'Back to Orders'}
       </Link>
 
       <div className="flex items-center justify-between mb-8">
@@ -676,11 +676,16 @@ export default function OrderDetailPage() {
           <p className="text-zinc-600 mb-3">Have you received this order?</p>
           <button
             onClick={async () => {
-              await supabase
-                .from('orders')
-                .update({ status: 'delivered', delivered_at: new Date().toISOString() })
-                .eq('id', order.id)
-              setOrder({ ...order, status: 'delivered' as Order['status'], delivered_at: new Date().toISOString() })
+              // Server route flips status AND auto-adds the items to the
+              // buyer's collection (cost basis = price paid). See
+              // /api/orders/[orderId]/confirm-delivery.
+              const res = await fetch(`/api/orders/${order.id}/confirm-delivery`, { method: 'POST' })
+              if (res.ok) {
+                setOrder({ ...order, status: 'delivered' as Order['status'], delivered_at: new Date().toISOString() })
+              } else {
+                const body = await res.json().catch(() => ({}))
+                alert(body.error || 'Failed to confirm delivery.')
+              }
             }}
             className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold text-sm transition-colors cursor-pointer"
           >

@@ -166,11 +166,25 @@ export default function AuthButton() {
             My Profile
           </Link>
           <Link
-            href="/mystuff?tab=purchases"
+            href="/collection"
+            onClick={() => setMenuOpen(false)}
+            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+          >
+            Collection
+          </Link>
+          <Link
+            href="/orders"
             onClick={() => setMenuOpen(false)}
             className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
           >
             Purchases
+          </Link>
+          <Link
+            href="/offers"
+            onClick={() => setMenuOpen(false)}
+            className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+          >
+            Offers
           </Link>
           <Link
             href="/wallet"

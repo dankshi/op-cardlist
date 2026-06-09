@@ -1,0 +1,28 @@
+name: Onboard Set (staging)
+
+# Manually triggered from Scraper HQ. Scrapes one new set (defined by a
+# set_onboarding row) into staged_cards for admin review — never the live
+# catalog. Promote happens separately, in-app, after verification.
+on:
+  workflow_dispatch:
+    inputs:
+      onboarding_id:
+        description: 'set_onboarding row id'
+        required: true
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Stage new-set cards
+        run: npx tsx scripts/scrape-bandai-cards.ts --onboarding=${{ inputs.onboarding_id }}
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

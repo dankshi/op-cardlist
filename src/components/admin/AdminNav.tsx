@@ -24,6 +24,7 @@ const ORDER_STATUS_LINKS = [
 
 const FULFILLMENT_LINKS = [
   { href: '/admin/intake', label: 'Intake' },
+  { href: '/admin/authenticate', label: 'Need Authentication' },
   { href: '/admin/pack', label: 'Pack' },
   { href: '/admin/intake/issues', label: 'Issues' },
   { href: '/admin/risk', label: 'Risk Review' },
@@ -31,8 +32,11 @@ const FULFILLMENT_LINKS = [
 ]
 
 const DATA_LINKS = [
+  { href: '/admin/scraper-hq', label: 'Scraper HQ' },
   { href: '/admin/cards', label: 'Edit Cards' },
   { href: '/admin/mappings', label: 'TCGplayer Mappings' },
+  { href: '/admin/slab-sales', label: 'Slab Sales' },
+  { href: '/admin/price-sources', label: 'Price Sources' },
   { href: '/admin/psa-pops', label: 'PSA Pop Mappings' },
   { href: '/admin/promos', label: 'Promo Cards' },
 ]

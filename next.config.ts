@@ -9,8 +9,9 @@ const nextConfig: NextConfig = {
         destination: "https://www.nomimarket.com/:path*",
         permanent: true,
       },
-      // /dashboard was renamed to /mystuff. Preserve existing links + bookmarks.
-      { source: "/dashboard", destination: "/mystuff", permanent: true },
+      // Legacy buyer-hub routes now live under /collection. Preserve old
+      // links + bookmarks (/mystuff also redirects to /collection in-app).
+      { source: "/dashboard", destination: "/collection", permanent: true },
     ];
   },
   images: {

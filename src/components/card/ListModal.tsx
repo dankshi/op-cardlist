@@ -38,6 +38,11 @@ interface Props {
    *  row. Lets the parent push it into local state so the Listings tab
    *  + chip row reflect it without a page reload. */
   onListed?: (listing: ListedListing) => void
+  /** Collection line this listing is being created from ("List for sale" on a
+   *  holding). Ties the listing → line so the eventual sale closes that line's
+   *  lots for realized P&L (docs/collection-pnl.md). Null when listing from the
+   *  generic buy panel. */
+  collectionId?: string | null
 }
 
 /** Subset of the listing row returned by POST /api/listings that the
@@ -73,6 +78,7 @@ export function ListModal({
   marketPrice,
   existingOwnListings,
   onListed,
+  collectionId,
 }: Props) {
   const router = useRouter()
   const [price, setPrice] = useState('')
@@ -164,6 +170,7 @@ export function ListModal({
         photo_urls: [],
         grading_company: company,
         grade,
+        collection_id: collectionId ?? null,
       }),
     })
     setSubmitting(false)

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCardById, getParallelCards, isHiddenCard } from "@/lib/cards";
-import { getCardSales, getCardGradedSales, getCardPopulations, getCardPsaInfo } from "@/lib/price-history";
+import { getCardSales, getCardGradedSales, getCardPopulations, getCardPsaInfo, getCardSlabValues, type SlabValue } from "@/lib/price-history";
 import { createClient } from "@/lib/supabase/server";
 import { SITE_URL, SITE_NAME, getCardKeywords, getBreadcrumbSchema } from "@/lib/seo";
 import { Card3DPreview } from "@/components/card/Card3DPreview";
@@ -13,6 +13,9 @@ import { CardThumbnail } from "@/components/card/CardThumbnail";
 import { RecentSales } from "@/components/card/RecentSales";
 import { type VariantData } from "@/components/card/CardBuyPanel";
 import { CardMainPanel } from "@/components/card/CardMainPanel";
+import { GradeSelectionProvider } from "@/components/card/GradeSelectionContext";
+import type { PositionRow as CollectionPositionRow } from "@/components/collection/CollectionPositionPanel";
+import { holdingMarketPrice } from "@/lib/collection";
 import type { PopulationBucket, GradeCompany } from "@/lib/price-history";
 
 // Ordering for the variant chip row: Raw first, then by grading company,
@@ -38,6 +41,7 @@ function gradeRank(grade: string): number {
 function buildVariants(
   listings: Array<{ id: string; price: number; grading_company: string | null; grade: string | null; quantity_available: number }>,
   populations: Partial<Record<GradeCompany, PopulationBucket[]>>,
+  slabValues: Map<string, SlabValue>,
 ): VariantData[] {
   // Group listings by variant key. Listings already arrive price-ascending
   // so listings[0] for any key is its cheapest. We also carry forward
@@ -78,12 +82,16 @@ function buildVariants(
       if (!isHighGrade(grade)) continue;
     }
     const variantListings = listingsByKey.get(key) ?? [];
+    // getCardSlabValues is keyed by "<company> <grade>" (space), matching the label.
+    const slab = company && grade ? slabValues.get(`${company} ${grade}`) : undefined;
     variants.push({
       key,
       label: company && grade ? `${company} ${grade}` : 'Raw',
       company,
       grade,
       population: popsByKey.get(key) ?? 0,
+      marketValue: slab?.marketValue ?? null,
+      marketConfidence: slab?.confidence ?? null,
       lowestListingId: variantListings[0]?.id ?? null,
       lowestListingPrice: variantListings[0]?.price ?? null,
       lowestListingQuantityAvailable: variantListings[0]?.quantity_available ?? 0,
@@ -185,11 +193,12 @@ export default async function CardPage({ params }: PageProps) {
   }
 
   const supabase = await createClient();
-  const [sales, gradedSales, populations, psaInfo, listingAgg, bidsAgg, userRes] = await Promise.all([
+  const [sales, gradedSales, populations, psaInfo, slabValues, listingAgg, bidsAgg, userRes] = await Promise.all([
     getCardSales(card.id, 90),
     getCardGradedSales(card.id, 90),
     getCardPopulations(card.id),
     getCardPsaInfo(card.id),
+    getCardSlabValues(card.id),
     // All active listings — used both for the variant chips (raw + each
     // graded company×grade) and for the inline market-data drawer's Asks
     // tab (with seller info). One fetch serves both. Asc by price so the
@@ -298,7 +307,68 @@ export default async function CardPage({ params }: PageProps) {
   // listing one) or from population data (someone could theoretically grade
   // theirs and sell it). Either source qualifies — that's why the chip row
   // shows both "buyable now" and "open to offers" variants together.
-  const variants = buildVariants(allListings, populations);
+  const variants = buildVariants(allListings, populations, slabValues);
+
+  // Serializable slab comp values for the client position panel's re-valuation
+  // after a mutation, keyed "<company> <grade>" (override already folded in).
+  const slabValuesForPanel: Record<string, number> = {};
+  for (const [k, v] of slabValues) {
+    if (v.marketValue != null) slabValuesForPanel[k] = v.marketValue;
+  }
+
+  // The viewer's own holdings of THIS card — powers the "In your collection"
+  // position panel on the card page (unified card + portfolio view). Valued
+  // like the /collection page: custom override, else lowest active listing for
+  // that grade, else raw market.
+  let collectionPosition: CollectionPositionRow[] = [];
+  if (userRes.data.user) {
+    const { data: colRows } = await supabase
+      .from('collections')
+      .select('*')
+      .eq('user_id', userRes.data.user.id)
+      .eq('card_id', card.id)
+      .gt('quantity', 0);
+    const gradedMin = new Map<string, number>();
+    for (const l of allListings) {
+      if (l.grading_company && l.grade) {
+        const key = `${l.grading_company}|${l.grade}`;
+        const cur = gradedMin.get(key);
+        if (cur == null || Number(l.price) < cur) gradedMin.set(key, Number(l.price));
+      }
+    }
+    collectionPosition = (colRows ?? []).map((c) => {
+      const isGraded = !!(c.grading_company && c.grade);
+      const market = holdingMarketPrice({
+        customValue: c.custom_value != null ? Number(c.custom_value) : null,
+        isGraded,
+        slabValue: isGraded ? slabValues.get(`${c.grading_company} ${c.grade}`)?.marketValue ?? null : null,
+        gradedListing: isGraded ? gradedMin.get(`${c.grading_company}|${c.grade}`) ?? null : null,
+        rawMarket: marketPrice,
+      });
+      const qty = c.quantity as number;
+      const acq = c.acquired_price != null ? Number(c.acquired_price) : null;
+      const currentValue = market != null ? market * qty : null;
+      const costBasis = acq != null ? acq * qty : null;
+      const gain = currentValue != null && costBasis != null ? currentValue - costBasis : null;
+      const gainPct = gain != null && costBasis != null && costBasis > 0 ? gain / costBasis : null;
+      return {
+        id: c.id as string,
+        condition: c.condition ?? null,
+        gradingCompany: c.grading_company ?? null,
+        grade: c.grade ?? null,
+        quantity: qty,
+        acquiredPrice: acq,
+        acquiredDate: c.acquired_date ?? null,
+        customValue: c.custom_value != null ? Number(c.custom_value) : null,
+        serialNumber: c.serial_number ?? null,
+        currentValue,
+        costBasis,
+        gain,
+        gainPct,
+      };
+    });
+  }
+
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
   // Drop self + any hidden variants (base C/UC/R/P/SR standards we don't
   // sell). The current card stays visible even if hidden, since the user
@@ -332,6 +402,7 @@ export default async function CardPage({ params }: PageProps) {
           layout + the shared grade selection so the chip, buy box, ladder,
           and market drawer all stay in sync. Image / debug / share are
           server-rendered here and passed in as slots. */}
+      <GradeSelectionProvider>
       <CardMainPanel
         cardId={card.id}
         cardName={card.name}
@@ -342,6 +413,9 @@ export default async function CardPage({ params }: PageProps) {
         sales={combinedSales}
         currentUserId={userRes.data.user?.id ?? null}
         isAdmin={isAdmin}
+        collection={collectionPosition}
+        slabValues={slabValuesForPanel}
+        cardImageUrl={card.imageUrl}
         image={
           <Card3DPreview
             card={card}
@@ -410,9 +484,27 @@ export default async function CardPage({ params }: PageProps) {
         )}
       />
 
-      {/* Other Versions — promoted above sales. Full width so on wide
-          displays we get more cards per row instead of leaving large
-          gutters. Generous gaps keep the tiles from feeling cramped. */}
+      {/* Recent Sales — driven by the grade selected in the ladder above.
+          Snapshot for at-a-glance signal; the full table lives on /market. */}
+      {(sales.length > 0 || gradedSales.length > 0) && (
+        <section className="mt-16 mb-16">
+          <div className="flex items-baseline justify-between border-t border-zinc-200 pt-6 mb-6">
+            <h2 className="text-lg font-bold text-zinc-900">Recent Sales</h2>
+            <Link
+              href={`/card/${card.id.toLowerCase()}/market`}
+              className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+            >
+              View all →
+            </Link>
+          </div>
+          <div className="bg-white border border-zinc-100 rounded-xl p-4">
+            <RecentSales sales={sales} gradedSales={gradedSales} />
+          </div>
+        </section>
+      )}
+
+      {/* Other Versions — full width so on wide displays we get more cards
+          per row instead of leaving large gutters. */}
       {relatedCards.length > 0 && (
         <section className="mt-16 mb-16">
           <div className="flex items-baseline justify-between border-t border-zinc-200 pt-6 mb-6">
@@ -447,25 +539,7 @@ export default async function CardPage({ params }: PageProps) {
           </div>
         </section>
       )}
-
-      {/* Recent Sales — stats + filters + chart + list. The full sales
-          table lives on /market; this is a snapshot for at-a-glance signal. */}
-      {(sales.length > 0 || gradedSales.length > 0) && (
-        <section className="mt-16 mb-16">
-          <div className="flex items-baseline justify-between border-t border-zinc-200 pt-6 mb-6">
-            <h2 className="text-lg font-bold text-zinc-900">Recent Sales</h2>
-            <Link
-              href={`/card/${card.id.toLowerCase()}/market`}
-              className="text-xs font-semibold text-orange-600 hover:text-orange-700"
-            >
-              View all →
-            </Link>
-          </div>
-          <div className="bg-white border border-zinc-100 rounded-xl p-4">
-            <RecentSales sales={sales} gradedSales={gradedSales} />
-          </div>
-        </section>
-      )}
+      </GradeSelectionProvider>
 
       {/* Populations were here as a standalone table; the data has moved
           into the variant chip row in the Buy panel above, where it's

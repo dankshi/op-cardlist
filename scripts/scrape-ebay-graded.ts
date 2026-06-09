@@ -385,16 +385,22 @@ async function main() {
       if (!opts.dryRun && parsed.length > 0) {
         const rows = parsed.map(p => ({
           card_id: t.cardId,
+          source: 'ebay',
+          source_item_id: p.ebayItemId,
           grading_company: p.gradingCompany,
           grade: p.grade,
+          sale_kind: 'sold',
           sold_at: p.soldAt.toISOString(),
           price: p.price,
           title: p.title,
           ebay_item_id: p.ebayItemId,
           listing_url: p.listingUrl,
         }))
+        // Dedup on ebay_item_id (its partial unique index survived the rename to
+        // slab_sales). ignoreDuplicates means an admin-set status='excluded' on a
+        // previously-seen sale is never resurrected by a re-scrape.
         const { error } = await supabase
-          .from('card_graded_sales')
+          .from('slab_sales')
           .upsert(rows, { onConflict: 'ebay_item_id', ignoreDuplicates: true })
         if (error) console.error(`  upsert error for ${t.cardId}:`, error.message)
         else totalInserted += rows.length

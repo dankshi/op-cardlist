@@ -369,9 +369,10 @@ export async function getCardGradedSales(
   startDate.setDate(startDate.getDate() - days);
 
   const { data: rows } = await supabase
-    .from('card_graded_sales')
+    .from('slab_sales')
     .select('sold_at, price, grading_company, grade, title, listing_url')
     .eq('card_id', cardId)
+    .eq('status', 'visible')
     .gte('sold_at', startDate.toISOString())
     .order('sold_at', { ascending: true });
 
@@ -385,4 +386,73 @@ export async function getCardGradedSales(
     title: r.title,
     listing_url: r.listing_url,
   }));
+}
+
+/**
+ * The comp-engine output for one card: the authoritative market value per
+ * graded variant, keyed by `${gradingCompany} ${grade}` (e.g. "PSA 10").
+ * Reads slab_market_values, then lets a slab_value_overrides row win — the
+ * same "a human can overrule the machine" pattern as manual TCGplayer mappings.
+ * Returns an empty map when the card has no computed graded values.
+ */
+export interface SlabValue {
+  gradingCompany: GradingCompany;
+  grade: string;
+  marketValue: number | null;
+  lastSoldPrice: number | null;
+  lastSoldAt: string | null;
+  sampleSize: number;
+  confidence: 'high' | 'medium' | 'low' | 'none';
+  trend30dPct: number | null;
+  isOverride: boolean;
+}
+
+export async function getCardSlabValues(cardId: string): Promise<Map<string, SlabValue>> {
+  const out = new Map<string, SlabValue>();
+  if (!supabase) return out;
+
+  const [valuesRes, overridesRes] = await Promise.all([
+    supabase
+      .from('slab_market_values')
+      .select('grading_company, grade, market_value, last_sold_price, last_sold_at, sample_size, confidence, trend_30d_pct')
+      .eq('card_id', cardId),
+    supabase
+      .from('slab_value_overrides')
+      .select('grading_company, grade, value')
+      .eq('card_id', cardId),
+  ]);
+
+  for (const r of valuesRes.data ?? []) {
+    const key = `${r.grading_company} ${r.grade}`;
+    out.set(key, {
+      gradingCompany: r.grading_company as GradingCompany,
+      grade: r.grade,
+      marketValue: r.market_value == null ? null : Number(r.market_value),
+      lastSoldPrice: r.last_sold_price == null ? null : Number(r.last_sold_price),
+      lastSoldAt: r.last_sold_at,
+      sampleSize: Number(r.sample_size ?? 0),
+      confidence: (r.confidence ?? 'none') as SlabValue['confidence'],
+      trend30dPct: r.trend_30d_pct == null ? null : Number(r.trend_30d_pct),
+      isOverride: false,
+    });
+  }
+
+  // Overrides win; they may also exist for variants with no computed value.
+  for (const r of overridesRes.data ?? []) {
+    const key = `${r.grading_company} ${r.grade}`;
+    const existing = out.get(key);
+    out.set(key, {
+      gradingCompany: r.grading_company as GradingCompany,
+      grade: r.grade,
+      marketValue: Number(r.value),
+      lastSoldPrice: existing?.lastSoldPrice ?? null,
+      lastSoldAt: existing?.lastSoldAt ?? null,
+      sampleSize: existing?.sampleSize ?? 0,
+      confidence: existing?.confidence ?? 'none',
+      trend30dPct: existing?.trend30dPct ?? null,
+      isOverride: true,
+    });
+  }
+
+  return out;
 }

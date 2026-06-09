@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { PriceHistoryChart } from './PriceHistoryChart';
+import { useGradeSelection } from './GradeSelectionContext';
 import type { GradingCompany } from '@/lib/price-history';
 
 interface RawSale {
@@ -24,24 +25,15 @@ interface GradedSale {
   listing_url: string | null;
 }
 
-type ConditionFilter = 'NM' | 'LP' | 'All';
-type Tab = 'raw' | 'graded';
-
 const PERIODS = [
   { label: '7d', days: 7 },
   { label: '30d', days: 30 },
   { label: '90d', days: 90 },
 ];
 
-const CONDITIONS: ConditionFilter[] = ['NM', 'LP', 'All'];
-const COMPANIES: GradingCompany[] = ['PSA', 'CGC', 'BGS', 'TAG'];
-
-function matchesCondition(c: string | null, filter: ConditionFilter) {
-  if (filter === 'All') return true;
+function isNearMint(c: string | null) {
   const lower = (c || '').toLowerCase();
-  if (filter === 'NM') return lower.includes('near mint') || lower === 'nm';
-  if (filter === 'LP') return lower.includes('lightly played') || lower === 'lp';
-  return true;
+  return lower.includes('near mint') || lower === 'nm';
 }
 
 function median(values: number[]): number | null {
@@ -76,29 +68,18 @@ interface RecentSalesProps {
 }
 
 export function RecentSales({ sales, gradedSales = [] }: RecentSalesProps) {
-  const hasGraded = gradedSales.length > 0;
-  const [tab, setTab] = useState<Tab>('raw');
+  // Driven by the grade ladder: 'raw'/null → raw Near Mint sales;
+  // '<company>-<grade>' → graded sales for that exact slab.
+  const { key } = useGradeSelection();
+  const graded = !!key && key !== 'raw';
 
-  return (
-    <div>
-      {hasGraded && (
-        <div className="flex gap-1 mb-4 border-b border-zinc-200">
-          <TabButton active={tab === 'raw'} onClick={() => setTab('raw')}>
-            Raw
-          </TabButton>
-          <TabButton active={tab === 'graded'} onClick={() => setTab('graded')}>
-            Graded
-          </TabButton>
-        </div>
-      )}
-
-      {tab === 'raw' || !hasGraded ? (
-        <RawSalesView sales={sales} />
-      ) : (
-        <GradedSalesView sales={gradedSales} />
-      )}
-    </div>
-  );
+  if (graded) {
+    const idx = key!.indexOf('-');
+    const company = key!.slice(0, idx) as GradingCompany;
+    const grade = key!.slice(idx + 1);
+    return <GradedSalesView sales={gradedSales} company={company} grade={grade} />;
+  }
+  return <RawSalesView sales={sales} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -107,7 +88,6 @@ export function RecentSales({ sales, gradedSales = [] }: RecentSalesProps) {
 
 function RawSalesView({ sales }: { sales: RawSale[] }) {
   const [period, setPeriod] = useState(30);
-  const [condition, setCondition] = useState<ConditionFilter>('NM');
 
   // Variant + language filters — auto-build from sales data.
   // Default to "All" so we don't accidentally hide data when only one variant exists.
@@ -125,33 +105,27 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
   const [variant, setVariant] = useState<string>('All');
   const [language, setLanguage] = useState<string>('All');
 
-  // Default to most common variant/language once data loads.
-  // (English Foil is by far the most common for One Piece TCG.)
-  useMemo(() => {
-    if (variant === 'All' && availableVariants.length === 1) {
-      setVariant(availableVariants[0]);
-    }
-  }, [availableVariants, variant]);
-  useMemo(() => {
-    if (language === 'All' && availableLanguages.length === 1) {
-      setLanguage(availableLanguages[0]);
-    }
-  }, [availableLanguages, language]);
+  // When only one variant/language exists, default the filter to it (derived,
+  // not stored — avoids setState-in-render). The chips for these only render
+  // when there's more than one option, so this is purely the default.
+  const effVariant = variant === 'All' && availableVariants.length === 1 ? availableVariants[0] : variant;
+  const effLanguage = language === 'All' && availableLanguages.length === 1 ? availableLanguages[0] : language;
 
   const filtered = useMemo(() => {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - period);
     return sales.filter(s => {
       if (new Date(s.date) < cutoff) return false;
-      if (!matchesCondition(s.condition, condition)) return false;
-      if (variant !== 'All' && s.variant !== variant) return false;
-      if (language !== 'All' && s.language !== language) return false;
+      // Raw view = the Near Mint market (the standard raw comp).
+      if (!isNearMint(s.condition)) return false;
+      if (effVariant !== 'All' && s.variant !== effVariant) return false;
+      if (effLanguage !== 'All' && s.language !== effLanguage) return false;
       // Filter out seller-customized listings — those are someone listing a
       // different product under our SKU and inflate noise.
       if (s.custom_listing_id && s.custom_listing_id !== '0') return false;
       return true;
     });
-  }, [sales, period, condition, variant, language]);
+  }, [sales, period, effVariant, effLanguage]);
 
   const newestFirst = useMemo(
     () => [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -188,11 +162,10 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
       />
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4 flex-wrap">
-        <ChipGroup options={CONDITIONS} value={condition} onChange={setCondition} ariaLabel="Condition" />
         {availableVariants.length > 1 && (
           <ChipGroup
             options={['All', ...availableVariants]}
-            value={variant}
+            value={effVariant}
             onChange={setVariant}
             ariaLabel="Variant"
           />
@@ -200,7 +173,7 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
         {availableLanguages.length > 1 && (
           <ChipGroup
             options={['All', ...availableLanguages]}
-            value={language}
+            value={effLanguage}
             onChange={setLanguage}
             ariaLabel="Language"
           />
@@ -234,7 +207,7 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
           source: 'TCG' as const,
           quantity: s.quantity,
         }))}
-        emptyText={`No ${condition === 'All' ? '' : condition + ' '}sales in the last ${period} days.`}
+        emptyText={`No Near Mint sales in the last ${period} days.`}
       />
     </div>
   );
@@ -244,34 +217,8 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
 // Graded sales
 // ─────────────────────────────────────────────────────────────────────
 
-function GradedSalesView({ sales }: { sales: GradedSale[] }) {
+function GradedSalesView({ sales, company, grade }: { sales: GradedSale[]; company: GradingCompany; grade: string }) {
   const [period, setPeriod] = useState(90);
-
-  // Companies present in the data, plus the canonical list as fallback
-  const availableCompanies = useMemo(() => {
-    const set = new Set(sales.map(s => s.grading_company));
-    return COMPANIES.filter(c => set.has(c)).length > 0
-      ? COMPANIES.filter(c => set.has(c))
-      : COMPANIES;
-  }, [sales]);
-
-  const [company, setCompany] = useState<GradingCompany>(availableCompanies[0] ?? 'PSA');
-
-  // Grades observed for the selected company, sorted high→low
-  const availableGrades = useMemo(() => {
-    const grades = Array.from(new Set(sales.filter(s => s.grading_company === company).map(s => s.grade)));
-    grades.sort((a, b) => parseFloat(b) - parseFloat(a));
-    return grades;
-  }, [sales, company]);
-
-  const [grade, setGrade] = useState<string>(availableGrades[0] ?? '10');
-
-  // Keep grade in sync when company changes
-  useMemo(() => {
-    if (availableGrades.length > 0 && !availableGrades.includes(grade)) {
-      setGrade(availableGrades[0]);
-    }
-  }, [availableGrades, grade]);
 
   const filtered = useMemo(() => {
     const cutoff = new Date();
@@ -312,15 +259,7 @@ function GradedSalesView({ sales }: { sales: GradedSale[] }) {
       />
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4 flex-wrap">
-        <ChipGroup options={availableCompanies} value={company} onChange={setCompany} ariaLabel="Grading company" />
-        {availableGrades.length > 0 && (
-          <ChipGroup
-            options={availableGrades}
-            value={grade}
-            onChange={setGrade}
-            ariaLabel="Grade"
-          />
-        )}
+        <span className="text-sm font-semibold text-zinc-700">{company} {grade}</span>
         <ChipGroup
           options={PERIODS.map(p => p.label)}
           value={`${period}d`}
@@ -442,29 +381,6 @@ function ChipGroup<T extends string>({
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-        active
-          ? 'text-zinc-900 border-b-2 border-zinc-900 -mb-px'
-          : 'text-zinc-500 hover:text-zinc-700'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 interface SaleRow {
   date: string;

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { Profile, Listing, Order } from '@/types/database'
+import type { Profile, Listing, Order, CollectionItem } from '@/types/database'
 import { Overview } from './Overview'
 import { InventoryTable } from './InventoryTable'
+import { CollectionListPanel } from './CollectionListPanel'
 import { BulkCreate } from './BulkCreate'
 import { OffersPanel } from './OffersPanel'
 import { OrdersTable } from './OrdersTable'
@@ -36,6 +37,7 @@ export function SellerHubClient({ userId, profile }: Props) {
 
   const [listings, setListings] = useState<Listing[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [collection, setCollection] = useState<CollectionItem[]>([])
   const [cardImages, setCardImages] = useState<Record<string, string>>({})
   const [cardNames, setCardNames] = useState<Record<string, string>>({})
   const [marketPrices, setMarketPrices] = useState<Record<string, number>>({})
@@ -62,7 +64,7 @@ export function SellerHubClient({ userId, profile }: Props) {
     didLoad.current = true
     async function load() {
       try {
-        const [{ data: l }, { data: o }] = await Promise.all([
+        const [{ data: l }, { data: o }, { data: col }] = await Promise.all([
           supabase
             .from('listings')
             .select('*')
@@ -74,22 +76,30 @@ export function SellerHubClient({ userId, profile }: Props) {
             .eq('seller_id', userId)
             .not('status', 'in', '("pending_payment","cancelled")')
             .order('created_at', { ascending: false }),
+          supabase
+            .from('collections')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false }),
         ])
 
         const fetchedListings = (l as Listing[]) || []
         const fetchedOrders = (o as Order[]) || []
+        const fetchedCollection = (col as CollectionItem[]) || []
         setListings(fetchedListings)
         setOrders(fetchedOrders)
+        setCollection(fetchedCollection)
         // The Offers tab loads its own actionable bids (scoped to the
         // seller's inventory) when opened.
 
         // Batch card metadata for every card_id we reference (listings +
-        // order items). Full endpoint (no basic=1) so we also get market
-        // price for the Inventory table's market + payout columns.
+        // order items + collection). Full endpoint (no basic=1) so we also
+        // get market price for the Inventory table + collection quick-list.
         const orderCardIds = fetchedOrders.flatMap(ord => ord.items?.map(i => i.card_id) || [])
         const uniqueCardIds = [...new Set([
           ...fetchedListings.map(li => li.card_id),
           ...orderCardIds,
+          ...fetchedCollection.map(c => c.card_id),
         ])]
         if (uniqueCardIds.length > 0) {
           try {
@@ -131,10 +141,10 @@ export function SellerHubClient({ userId, profile }: Props) {
           </p>
         </div>
         <Link
-          href="/mystuff"
+          href="/collection"
           className="text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
         >
-          ← Back to My Stuff
+          ← Back to Collection
         </Link>
       </div>
 
@@ -180,13 +190,23 @@ export function SellerHubClient({ userId, profile }: Props) {
             />
           )}
           {tab === 'inventory' && (
-            <InventoryTable
-              listings={listings}
-              onListingsChange={setListings}
-              cardImages={cardImages}
-              marketPrices={marketPrices}
-              tier={profile.seller_tier}
-            />
+            <div className="space-y-10">
+              <InventoryTable
+                listings={listings}
+                onListingsChange={setListings}
+                cardImages={cardImages}
+                marketPrices={marketPrices}
+                tier={profile.seller_tier}
+              />
+              <CollectionListPanel
+                items={collection}
+                cardImages={cardImages}
+                cardNames={cardNames}
+                marketPrices={marketPrices}
+                existingListings={listings}
+                onListed={listing => setListings(prev => [listing, ...prev])}
+              />
+            </div>
           )}
           {tab === 'add' && (
             <BulkCreate

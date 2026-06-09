@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import AuthButton from "@/components/auth/AuthButton";
 import MyShopLink from "@/components/nav/MyShopLink";
 import { SearchHero } from "@/components/home/SearchHero";
+import { ToastProvider } from "@/components/ui/Toaster";
 import { SITE_URL, SITE_DESCRIPTION, TWITTER_HANDLE, DEFAULT_OG_IMAGE, BASE_KEYWORDS, getOrganizationSchema, getWebSiteSchema } from "@/lib/seo";
 
 // Storefront-flavored metadata. Lives here (not the bare root layout) so
@@ -52,7 +53,7 @@ export default function SiteLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
+    <ToastProvider>
       {/* Organization Schema */}
       <script
         type="application/ld+json"
@@ -79,13 +80,7 @@ export default function SiteLayout({
           </div>
           <div className="flex items-center gap-4 flex-shrink-0">
             <Link href="/search" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
-              Cards
-            </Link>
-            <Link href="/sets" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
-              Sets
-            </Link>
-            <Link href="/marketplace" className="hidden md:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
-              Marketplace
+              Browse
             </Link>
             <Link href="/about" className="hidden lg:inline text-white/80 hover:text-white transition-colors text-sm font-medium">
               About
@@ -118,6 +113,6 @@ export default function SiteLayout({
           </div>
         </div>
       </footer>
-    </>
+    </ToastProvider>
   );
 }
