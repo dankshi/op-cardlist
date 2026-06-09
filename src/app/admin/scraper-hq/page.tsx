@@ -281,39 +281,6 @@ export default function ScraperHqPage() {
         />
       </div>
 
-      {/* Sets coverage */}
-      <div className="rounded-xl border border-zinc-200 bg-white">
-        <div className="px-5 py-3 border-b border-zinc-100"><h2 className="text-xs font-bold uppercase tracking-wide text-zinc-500">Sets — initial scrape &amp; mapping coverage</h2></div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="text-left text-xs text-zinc-400 uppercase tracking-wide">
-              <th className="px-5 py-2 font-semibold">Set</th>
-              <th className="px-3 py-2 font-semibold">Last scraped</th>
-              <th className="px-3 py-2 font-semibold">Cards</th>
-              <th className="px-5 py-2 font-semibold">Mapping</th>
-            </tr></thead>
-            <tbody className="divide-y divide-zinc-100">
-              {data.sets.map(s => {
-                const pct = s.total_cards > 0 ? Math.round((s.mapped_cards / s.total_cards) * 100) : 0
-                const full = s.total_cards > 0 && s.mapped_cards >= s.total_cards
-                return (
-                  <tr key={s.set_id}>
-                    <td className="px-5 py-2 text-zinc-900">{s.name}</td>
-                    <td className="px-3 py-2 text-zinc-500">{timeAgo(s.last_scraped_at)}</td>
-                    <td className="px-3 py-2 tabular-nums text-zinc-700">{s.total_cards}</td>
-                    <td className="px-5 py-2 tabular-nums font-semibold">
-                      {full
-                        ? <span className="text-emerald-600">✓</span>
-                        : <span className={pct >= 60 ? 'text-amber-600' : 'text-red-600'}>{s.mapped_cards}/{s.total_cards} · {pct}%</span>}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       {/* Recent runs */}
       <div className="rounded-xl border border-zinc-200 bg-white">
         <div className="px-5 py-3 border-b border-zinc-100"><h2 className="text-xs font-bold uppercase tracking-wide text-zinc-500">Recent runs</h2></div>
@@ -375,13 +342,47 @@ export default function ScraperHqPage() {
         </div>
       </div>
 
-      {/* New-set onboarding */}
+      {/* New-set onboarding + set coverage — both are manual/rarely-updated set
+          concerns, grouped at the bottom away from the live scraper status. */}
       <OnboardingSection />
+
+      {/* Sets coverage */}
+      <div className="rounded-xl border border-zinc-200 bg-white">
+        <div className="px-5 py-3 border-b border-zinc-100"><h2 className="text-xs font-bold uppercase tracking-wide text-zinc-500">Sets — initial scrape &amp; mapping coverage</h2></div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-xs text-zinc-400 uppercase tracking-wide">
+              <th className="px-5 py-2 font-semibold">Set</th>
+              <th className="px-3 py-2 font-semibold">Last scraped</th>
+              <th className="px-3 py-2 font-semibold">Cards</th>
+              <th className="px-5 py-2 font-semibold">Mapping</th>
+            </tr></thead>
+            <tbody className="divide-y divide-zinc-100">
+              {data.sets.map(s => {
+                const pct = s.total_cards > 0 ? Math.round((s.mapped_cards / s.total_cards) * 100) : 0
+                const full = s.total_cards > 0 && s.mapped_cards >= s.total_cards
+                return (
+                  <tr key={s.set_id}>
+                    <td className="px-5 py-2 text-zinc-900">{s.name}</td>
+                    <td className="px-3 py-2 text-zinc-500">{timeAgo(s.last_scraped_at)}</td>
+                    <td className="px-3 py-2 tabular-nums text-zinc-700">{s.total_cards}</td>
+                    <td className="px-5 py-2 tabular-nums font-semibold">
+                      {full
+                        ? <span className="text-emerald-600">✓</span>
+                        : <span className={pct >= 60 ? 'text-amber-600' : 'text-red-600'}>{s.mapped_cards}/{s.total_cards} · {pct}%</span>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* How it works */}
       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-600 space-y-2">
         <h2 className="text-xs font-bold uppercase tracking-wide text-zinc-500">How the scraper works</h2>
-        <p><strong className="text-zinc-800">Sets &amp; cards</strong> are ingested from Bandai&rsquo;s cardlist (manual run per new set), then each card is mapped to a TCGplayer product. The &ldquo;Sets&rdquo; table above shows when each set was last ingested and how much of it is mapped.</p>
+        <p><strong className="text-zinc-800">Sets &amp; cards</strong> are ingested from Bandai&rsquo;s cardlist (manual run per new set), then each card is mapped to a TCGplayer product. The &ldquo;Sets&rdquo; table below shows when each set was last ingested and how much of it is mapped.</p>
         <p><strong className="text-zinc-800">Prices</strong> run once daily (06:00 UTC) and write a market-price snapshot for every mapped product into the price-history table. &ldquo;Latest price date&rdquo; should be today.</p>
         <p><strong className="text-zinc-800">Sales</strong> run every 5 minutes against a small rotating window of the stalest cards (cursor = each product&rsquo;s last sales-scrape time), pulling up to ~90 days of recorded sales per card. The whole catalog cycles roughly every ~11 hours, so any one card refreshes a couple of times a day.</p>
         <p><strong className="text-zinc-800">Token</strong>: the deep sales feed needs a logged-in TCGplayer cookie. If it expires, sales fall back to ~5 per card and the banner above turns red with refresh steps.</p>
