@@ -140,6 +140,8 @@ export function CollectionPositionPanel({
         {rows.map(row => {
           const up = (row.gain ?? 0) >= 0
           const busy = pendingId === row.id
+          // Per-item price (the "quote") — total value spread over the qty held.
+          const perItem = row.currentValue != null ? row.currentValue / row.quantity : null
           return (
             <div key={row.id} className="px-4 py-3">
               <div className="flex items-start justify-between gap-3">
@@ -153,15 +155,20 @@ export function CollectionPositionPanel({
                     )}
                   </div>
                   <p className="text-[11px] text-zinc-400 tabular-nums mt-0.5">
-                    {row.acquiredPrice != null ? `Paid ${fmtUSD(row.acquiredPrice)}${row.quantity > 1 ? ' ea' : ''}` : 'No cost basis'}
+                    {row.acquiredPrice != null ? `Avg ${fmtUSD(row.acquiredPrice)} ea` : 'No cost basis'}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-bold tabular-nums text-zinc-900">
-                    {row.currentValue != null ? fmtUSD(row.currentValue) : '—'}
+                  {/* Per-item price is the headline; qty × price = total value. */}
+                  <p className="text-base font-bold tabular-nums text-zinc-900 leading-tight">
+                    {perItem != null ? fmtUSD(perItem) : '—'}
+                    {perItem != null && <span className="text-[10px] font-medium text-zinc-400"> /ea</span>}
+                  </p>
+                  <p className="text-[11px] text-zinc-500 tabular-nums leading-tight mt-0.5">
+                    ×{row.quantity}{row.currentValue != null ? ` = ${fmtUSD(row.currentValue)}` : ''}
                   </p>
                   {row.gain != null && (
-                    <p className={`text-[11px] font-semibold tabular-nums mt-0.5 ${up ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <p className={`text-[11px] font-semibold tabular-nums leading-tight mt-0.5 ${up ? 'text-emerald-600' : 'text-red-600'}`}>
                       {up ? '+' : '−'}{fmtUSD(Math.abs(row.gain))}{row.gainPct != null ? ` (${up ? '+' : '−'}${(Math.abs(row.gainPct) * 100).toFixed(1)}%)` : ''}
                     </p>
                   )}

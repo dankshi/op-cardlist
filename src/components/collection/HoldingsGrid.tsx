@@ -4,12 +4,15 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { gradeLabel } from '@/lib/gradingStyle'
+import { Slab } from './Slab'
 
 export interface HoldingRow {
   id: string
   cardId: string
   cardName: string
   imageUrl: string
+  setId: string | null
+  rarity: string | null
   quantity: number
   acquiredPrice: number | null
   acquiredDate: string | null
@@ -148,43 +151,72 @@ export function HoldingsGrid({
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-6">
         {visible.map(row => {
-          const up = (row.gain ?? 0) >= 0
-          const gainColor = row.gain == null ? 'text-zinc-400' : up ? 'text-emerald-600' : 'text-red-600'
-          // Grade as plain text — "Near Mint" for raw, "Black Label"/"Pristine"
-          // for the named top tiers, "PSA 10" etc. otherwise. No pills/borders.
+          const isGraded = !!(row.gradingCompany && row.grade)
           const gradeText = gradeLabel(row.gradingCompany, row.grade)
+          // Per-card return vs avg cost — sized to match the hero price (the
+          // per-unit "quote"), like a brokerage position cell.
+          const perCardChange = row.marketPrice != null && row.acquiredPrice != null
+            ? row.marketPrice - row.acquiredPrice
+            : null
+          const hasReturn = perCardChange != null && Math.abs(perCardChange) >= 0.005
+          const up = perCardChange != null ? perCardChange >= 0 : (row.gain ?? 0) >= 0
+          const retColor = perCardChange == null ? 'text-zinc-400' : up ? 'text-emerald-600' : 'text-red-600'
+          const context = [row.rarity, row.cardId, gradeText].filter(Boolean).join(' · ')
           return (
             <Link
               key={row.id}
               href={`/card/${row.cardId.toLowerCase()}`}
               className="group block text-left"
             >
-              {/* Clean card art — no overlays. Whole tile opens the editor. */}
-              <div className="relative rounded-lg overflow-hidden bg-zinc-100 aspect-[5/7] ring-1 ring-transparent group-hover:ring-zinc-300 transition-all">
-                {row.imageUrl && (
-                  <Image src={row.imageUrl} alt={row.cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />
-                )}
-              </div>
-
-              <div className="mt-2">
-                {/* Price + grade on one clean row. */}
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-lg font-bold tabular-nums tracking-tight text-zinc-900">
-                    {row.currentValue != null ? fmtUSD(row.currentValue) : '—'}
-                  </span>
-                  <span className="text-xs text-zinc-400 truncate">{gradeText}</span>
-                </div>
-                {/* Always rendered (with reserved height) so a card with a
-                    serial / qty / gain isn't taller than one without — adding
-                    a serial never shifts the grid. */}
-                <div className="mt-0.5 min-h-[16px] flex items-center gap-2 text-[11px] tabular-nums text-zinc-400">
-                  {row.gain != null && (
-                    <span className={`font-semibold ${gainColor}`}>
-                      {up ? '+' : '−'}{row.gainPct != null ? `${(Math.abs(row.gainPct) * 100).toFixed(1)}%` : fmtUSD(Math.abs(row.gain))}
-                    </span>
+              {isGraded ? (
+                <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} cardId={row.cardId} serialNumber={row.serialNumber} />
+              ) : (
+                <div className="relative rounded-lg overflow-hidden bg-zinc-100 aspect-[5/7] ring-1 ring-transparent group-hover:ring-zinc-300 transition-all">
+                  {row.imageUrl && (
+                    <Image src={row.imageUrl} alt={row.cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />
                   )}
-                  {row.quantity > 1 && <span>×{row.quantity}</span>}
-                  {row.serialNumber && <span>#{row.serialNumber}</span>}
+                </div>
+              )}
+
+              <div className="mt-2.5">
+                {/* Identity */}
+                <p className="text-sm font-bold text-zinc-900 leading-tight line-clamp-2 group-hover:text-orange-600 transition-colors">
+                  {row.cardName}
+                </p>
+                <p className="text-[11px] text-zinc-400 truncate mt-0.5">{context}</p>
+
+                {/* Hero — individual (per-card) market price, the quote. */}
+                <div className="mt-1.5 flex items-baseline gap-1.5">
+                  <span className="text-xl font-bold tabular-nums tracking-tight text-zinc-900 leading-none">
+                    {row.marketPrice != null ? fmtUSD(row.marketPrice) : '—'}
+                  </span>
+                  {perCardChange != null && (
+                    <span className={`text-xs leading-none ${retColor}`}>{up ? '▲' : '▼'}</span>
+                  )}
+                </div>
+                {/* Return vs avg cost ($ + %), reserved height so tiles align. */}
+                <div className="min-h-[16px] mt-1 text-[11px] font-semibold tabular-nums">
+                  {hasReturn ? (
+                    <span className={retColor}>
+                      {up ? '+' : '−'}{fmtUSD(Math.abs(perCardChange!))}
+                      {row.gainPct != null ? ` (${up ? '+' : '−'}${(Math.abs(row.gainPct) * 100).toFixed(2)}%)` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-300">—</span>
+                  )}
+                </div>
+
+                {/* Position summary — quantity · total value, then avg cost. */}
+                <div className="mt-1.5 pt-1.5 border-t border-zinc-100 flex items-center justify-between text-[11px] tabular-nums">
+                  <span className="text-zinc-500">
+                    Qty {row.quantity}
+                    {row.serialNumber && <span className="text-zinc-400"> · #{row.serialNumber}</span>}
+                  </span>
+                  <span className="font-semibold text-zinc-900">{row.currentValue != null ? fmtUSD(row.currentValue) : '—'}</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] tabular-nums text-zinc-400 mt-0.5">
+                  <span>Avg cost</span>
+                  <span>{row.acquiredPrice != null ? fmtUSD(row.acquiredPrice) : '—'}</span>
                 </div>
               </div>
             </Link>

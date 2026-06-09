@@ -53,6 +53,7 @@ function buildCardPrice(
   cur: { market_price?: number | null; lowest_price?: number | null; median_price?: number | null; total_listings?: number | null; recorded_date?: string | null } | null,
   prod: { last_sold_price?: number | null; last_sold_date?: string | null } | null,
   mapping: { product_id: number; url: string | null; name: string | null } | null,
+  raw?: { market_value?: number | null; confidence?: string | null; sample_size?: number | null; window_days?: number | null; trend_30d_pct?: number | null; computed_at?: string | null } | null,
 ): CardPrice {
   return {
     marketPrice: cur?.market_price ?? null,
@@ -65,6 +66,12 @@ function buildCardPrice(
     tcgplayerProductId: mapping?.product_id ?? null,
     tcgplayerUrl: mapping?.url ?? null,
     tcgplayerProductName: mapping?.name ?? null,
+    ourMarketValue: raw?.market_value ?? null,
+    ourConfidence: (raw?.confidence as CardPrice['ourConfidence']) ?? null,
+    ourSampleSize: raw?.sample_size ?? null,
+    ourWindowDays: raw?.window_days ?? null,
+    ourTrend30dPct: raw?.trend_30d_pct ?? null,
+    ourComputedAt: raw?.computed_at ?? null,
   };
 }
 
@@ -155,7 +162,7 @@ const fetchSetRows = cache(async (): Promise<SetMeta[]> => {
 // cause of stale-price bugs and is gone after migration 20260537.
 const fetchPrices = cache(async (): Promise<Record<string, CardPrice>> => {
   if (!supabase) return {};
-  const [mappingRows, curRows, prodRows] = await Promise.all([
+  const [mappingRows, curRows, prodRows, rawRows] = await Promise.all([
     paginated<Record<string, unknown>>((from, to) =>
       supabase!.from('card_tcgplayer_mapping')
         .select('card_id, tcgplayer_product_id, tcgplayer_url, tcgplayer_name')
@@ -171,13 +178,22 @@ const fetchPrices = cache(async (): Promise<Record<string, CardPrice>> => {
         .select('product_id, last_sold_price, last_sold_date')
         .range(from, to),
     ),
+    // Our computed NM values (shown next to TCG's). Near-Mint only for now.
+    paginated<Record<string, unknown>>((from, to) =>
+      supabase!.from('raw_market_values')
+        .select('tcgplayer_product_id, market_value, confidence, sample_size, window_days, trend_30d_pct, computed_at')
+        .eq('condition', 'Near Mint')
+        .range(from, to),
+    ),
   ]);
 
-  // Index current prices and products by product_id for O(1) joins.
+  // Index current prices, products, and our values by product_id for O(1) joins.
   const curByProduct = new Map<number, Record<string, unknown>>();
   for (const c of curRows) curByProduct.set(c.tcgplayer_product_id as number, c);
   const prodByProduct = new Map<number, Record<string, unknown>>();
   for (const p of prodRows) prodByProduct.set(p.product_id as number, p);
+  const rawByProduct = new Map<number, Record<string, unknown>>();
+  for (const r of rawRows) rawByProduct.set(r.tcgplayer_product_id as number, r);
 
   const prices: Record<string, CardPrice> = {};
   for (const m of mappingRows) {
@@ -186,11 +202,12 @@ const fetchPrices = cache(async (): Promise<Record<string, CardPrice>> => {
     if (productId == null) continue;
     const cur = curByProduct.get(productId) as { market_price: number | null; lowest_price: number | null; median_price: number | null; total_listings: number | null; recorded_date: string | null } | undefined;
     const prod = prodByProduct.get(productId) as { last_sold_price: number | null; last_sold_date: string | null } | undefined;
+    const raw = rawByProduct.get(productId) as { market_value: number | null; confidence: string | null; sample_size: number | null; window_days: number | null; trend_30d_pct: number | null; computed_at: string | null } | undefined;
     prices[cardId] = buildCardPrice(cur ?? null, prod ?? null, {
       product_id: productId,
       url: (m.tcgplayer_url as string) ?? null,
       name: (m.tcgplayer_name as string) ?? null,
-    });
+    }, raw ?? null);
   }
 
   return prices;
@@ -385,8 +402,8 @@ export async function getCardsByIds(cardIds: string[]): Promise<Card[]> {
     .map(m => m.tcgplayer_product_id as number | null)
     .filter((p): p is number => p != null);
 
-  // Round 2: prices + products, keyed by product_id from the mappings.
-  const [curRes, prodRes] = productIds.length > 0
+  // Round 2: prices + products + our values, keyed by product_id from the mappings.
+  const [curRes, prodRes, rawRes] = productIds.length > 0
     ? await Promise.all([
         supabase.from('tcgplayer_current_prices')
           .select('tcgplayer_product_id, recorded_date, market_price, lowest_price, median_price, total_listings')
@@ -394,13 +411,19 @@ export async function getCardsByIds(cardIds: string[]): Promise<Card[]> {
         supabase.from('tcgplayer_products')
           .select('product_id, last_sold_price, last_sold_date')
           .in('product_id', productIds),
+        supabase.from('raw_market_values')
+          .select('tcgplayer_product_id, market_value, confidence, sample_size, window_days, trend_30d_pct, computed_at')
+          .eq('condition', 'Near Mint')
+          .in('tcgplayer_product_id', productIds),
       ])
-    : [{ data: [] as Record<string, unknown>[] }, { data: [] as Record<string, unknown>[] }];
+    : [{ data: [] as Record<string, unknown>[] }, { data: [] as Record<string, unknown>[] }, { data: [] as Record<string, unknown>[] }];
 
   const curByProduct = new Map<number, Record<string, unknown>>();
   for (const c of curRes.data ?? []) curByProduct.set(c.tcgplayer_product_id as number, c);
   const prodByProduct = new Map<number, Record<string, unknown>>();
   for (const p of prodRes.data ?? []) prodByProduct.set(p.product_id as number, p);
+  const rawByProduct = new Map<number, Record<string, unknown>>();
+  for (const r of rawRes.data ?? []) rawByProduct.set(r.tcgplayer_product_id as number, r);
 
   const prices: Record<string, CardPrice> = {};
   for (const m of mappings ?? []) {
@@ -409,11 +432,12 @@ export async function getCardsByIds(cardIds: string[]): Promise<Card[]> {
     if (productId == null) continue;
     const cur = curByProduct.get(productId) as { market_price: number | null; lowest_price: number | null; median_price: number | null; total_listings: number | null; recorded_date: string | null } | undefined;
     const prod = prodByProduct.get(productId) as { last_sold_price: number | null; last_sold_date: string | null } | undefined;
+    const raw = rawByProduct.get(productId) as { market_value: number | null; confidence: string | null; sample_size: number | null; window_days: number | null; trend_30d_pct: number | null; computed_at: string | null } | undefined;
     prices[cardId] = buildCardPrice(cur ?? null, prod ?? null, {
       product_id: productId,
       url: (m.tcgplayer_url as string) ?? null,
       name: (m.tcgplayer_name as string) ?? null,
-    });
+    }, raw ?? null);
   }
 
   return cardRows.map(row => mergePrice(rowToCard(row as Record<string, unknown>), prices));

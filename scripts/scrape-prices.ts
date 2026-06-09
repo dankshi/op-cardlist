@@ -4,6 +4,7 @@ import type { Card, CardSet, CardDatabase, CardType, CardColor, Rarity, Attribut
 import { SET_NAME_MAP } from '../src/lib/set-names';
 import { parseSale } from '../src/lib/scraper/tcgplayer-sales';
 import { isHiddenByFields } from '../src/lib/card-visibility';
+import { recomputeRawValues } from '../src/lib/raw-comp-recompute';
 
 dotenv.config({ path: '.env.local' });
 
@@ -1176,6 +1177,19 @@ async function main() {
       console.warn(
         `  ⚠ ${fetchStats.giveUp} products gave up after retries — TCGPlayer is rate-limiting hard. Consider lowering ROTATION_LIMIT or running from a residential IP.`,
       );
+    }
+
+    // Recompute our own raw NM market value for just the products we touched,
+    // so raw_market_values stays fresh alongside the new sales. Best-effort —
+    // a failure here must not fail the scrape.
+    if (adminClient) {
+      try {
+        const productIds = [...new Set(targets.map(t => t.productId))];
+        const n = await recomputeRawValues(adminClient, { productIds });
+        console.log(`  Recomputed ${n} raw NM market value(s).`);
+      } catch (err) {
+        console.warn(`  (raw value recompute skipped: ${(err as Error).message})`);
+      }
     }
   }
 

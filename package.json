@@ -24,6 +24,7 @@
     "scrape:manga": "tsx scripts/scrape-alt-manga.ts",
     "scrape:ebay-graded": "tsx scripts/scrape-ebay-graded.ts",
     "compute:slab-values": "tsx scripts/compute-slab-values.ts",
+    "compute:raw-values": "tsx scripts/compute-raw-values.ts",
     "dedup:slab-sales": "tsx scripts/dedup-slab-sales.ts"
   },
   "dependencies": {

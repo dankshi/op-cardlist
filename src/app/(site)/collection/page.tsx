@@ -118,6 +118,8 @@ export default async function CollectionPage() {
       cardId: i.card_id,
       cardName: meta?.name ?? i.card_id,
       imageUrl: meta?.imageUrl ?? '',
+      setId: meta?.setId ?? null,
+      rarity: meta?.rarity ?? null,
       quantity: qty,
       acquiredPrice,
       acquiredDate: i.acquired_date,

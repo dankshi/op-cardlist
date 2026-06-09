@@ -15,6 +15,16 @@ export interface CardPrice {
   tcgplayerUrl: string | null;
   tcgplayerProductId: number | null;
   tcgplayerProductName: string | null;
+  // Our own Near-Mint market value, computed from actual TCGplayer sales
+  // (card_sales) via the slab recency-weighted trimmed-median model. Shown
+  // alongside marketPrice (TCGplayer's number) for comparison — not yet the
+  // headline. Null when we have no comps for the product.
+  ourMarketValue: number | null;
+  ourConfidence: 'high' | 'medium' | 'low' | 'none' | null;
+  ourSampleSize: number | null;
+  ourWindowDays: number | null;
+  ourTrend30dPct: number | null;
+  ourComputedAt: string | null;
 }
 
 export interface Card {

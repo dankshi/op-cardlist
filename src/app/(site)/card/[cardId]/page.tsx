@@ -463,6 +463,19 @@ export default async function CardPage({ params }: PageProps) {
               <ManualUrlAssign cardId={card.id} refreshOnDone />
             </span>{'\n'}
             {'\n'}
+            <span className="text-sky-400">pricing — NM (ours vs TCGplayer)</span>{'\n'}
+            <span className="text-zinc-500">{'  tcg_market  '}</span><span className="text-orange-300">{card.price?.marketPrice != null ? `$${card.price.marketPrice.toFixed(2)}` : <span className="italic text-zinc-600">—</span>}</span>{'\n'}
+            <span className="text-zinc-500">{'  our_value   '}</span><span className="text-orange-300">{card.price?.ourMarketValue != null ? `$${card.price.ourMarketValue.toFixed(2)}` : <span className="italic text-zinc-600">—</span>}</span>
+            <span className="text-zinc-600">{card.price?.ourConfidence && card.price.ourConfidence !== 'none' ? `  (${card.price.ourConfidence}, n=${card.price.ourSampleSize}/${card.price.ourWindowDays}d${card.price.ourTrend30dPct != null ? `, trend ${(card.price.ourTrend30dPct * 100).toFixed(0)}%` : ''})` : '  (no comps)'}</span>{'\n'}
+            <span className="text-zinc-500">{'  delta       '}</span>
+            {(() => {
+              const t = card.price?.marketPrice, o = card.price?.ourMarketValue
+              if (t == null || o == null || t === 0) return <span className="italic text-zinc-600">—</span>
+              const pct = (o / t - 1) * 100
+              const cls = Math.abs(pct) < 5 ? 'text-emerald-400' : Math.abs(pct) < 15 ? 'text-amber-400' : 'text-red-400'
+              return <span className={cls}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}% vs TCG</span>
+            })()}{'\n'}
+            {'\n'}
             <span className="text-sky-400">pops_psa</span>{'\n'}
             {psaInfo ? (
               <>
