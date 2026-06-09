@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import type { Card, CardSet, CardPrice, SetImagesDatabase, SetImageData, Rarity, CardType, CardColor, Attribute, ArtStyle } from '@/types/card';
 import { supabase } from '@/lib/supabase';
+import { HIDDEN_RARITIES, isHiddenByFields } from './card-visibility';
 
 // set-images.json stays as a static file — it's a small separate concern
 // (booster box images for set-tile rendering) and isn't part of the
@@ -270,38 +271,11 @@ export async function getSetBySlug(slug: string): Promise<CardSet | undefined> {
   return setWithMergedPrices(set, prices);
 }
 
-/** Base rarities we don't sell standard prints of. Their alt arts, manga
- *  variants, and wanted-poster variants are still sellable — see
- *  `isHiddenCard()`. Higher rarities (SP, TR, SEC) are always shown.
- *  L (Leader) standard prints are hidden too — only their alt art /
- *  parallel versions have collector value. */
-export const HIDDEN_RARITIES: Set<string> = new Set(['C', 'UC', 'R', 'P', 'SR', 'L']);
-
-/** Centralized visibility rule. Every surface (set pages, search,
- *  admin/cards, admin/mappings, admin/psa-pops, card "Other Versions")
- *  routes through this so a rule change here propagates everywhere on the
- *  next render.
- *
- *  String-based variant for admin pages that work with raw Supabase rows
- *  (where the columns are `set_id`, `art_style`, etc., not the Card
- *  type's setId / artStyle).
- *
- *  Current rules:
- *  1. Low-rarity standard prints — base C/UC/R/P/SR/L cards with no
- *     variant treatment. Their alt arts / manga / wanted / textured
- *     variants stay visible.
- *  2. PRB-01 Event/Stage cards (every variant) — the foil/Reprint
- *     non-character reprints are noise, not worth listing. */
-export function isHiddenByFields(
-  setId: string | null,
-  type: string | null,
-  rarity: string | null,
-  artStyle: string | null,
-): boolean {
-  if (rarity && HIDDEN_RARITIES.has(rarity) && (artStyle ?? 'standard') === 'standard') return true;
-  if (setId === 'prb-01' && (type === 'EVENT' || type === 'STAGE')) return true;
-  return false;
-}
+// The visibility rule now lives in the dependency-free ./card-visibility module
+// so the tsx scraper can share the exact same predicate. Re-exported here so
+// every existing `@/lib/cards` import (admin/cards, set pages, search, …) keeps
+// working unchanged.
+export { HIDDEN_RARITIES, isHiddenByFields };
 
 /** Card-type variant — used everywhere the Card model is in hand. */
 export function isHiddenCard(card: Card): boolean {

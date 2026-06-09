@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Card, CardSet, CardDatabase, CardType, CardColor, Rarity, Attribute, ArtStyle } from '../src/types/card';
 import { SET_NAME_MAP } from '../src/lib/set-names';
 import { parseSale } from '../src/lib/scraper/tcgplayer-sales';
+import { isHiddenByFields } from '../src/lib/card-visibility';
 
 dotenv.config({ path: '.env.local' });
 
@@ -421,6 +422,28 @@ async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Set of card ids the site hides (and so we must not scrape). Used by the
+// sales-only path, which loads mappings directly and never builds the card DB.
+async function loadHiddenCardIds(supabase: SupabaseClient): Promise<Set<string>> {
+  const hidden = new Set<string>();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('cards')
+      .select('id, set_id, type, rarity, art_style')
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`hidden-card load: ${error.message}`);
+    if (!data || data.length === 0) break;
+    for (const r of data) {
+      if (isHiddenByFields(r.set_id as string, r.type as string, r.rarity as string, r.art_style as string)) {
+        hidden.add(r.id as string);
+      }
+    }
+    if (data.length < PAGE) break;
+  }
+  return hidden;
+}
+
 async function loadCardDatabaseFromSupabase(supabase: SupabaseClient): Promise<CardDatabase> {
   // Pull all sets + all cards from the DB and reassemble the CardDatabase
   // shape the rest of this script expects. Paginate cards to defeat the
@@ -442,7 +465,14 @@ async function loadCardDatabaseFromSupabase(supabase: SupabaseClient): Promise<C
   }
 
   const cardsBySet = new Map<string, Card[]>();
+  let hiddenSkipped = 0;
   for (const row of cardRows) {
+    // Don't scrape cards the site never shows (low-rarity standard prints, etc).
+    // Same predicate the storefront uses — see src/lib/card-visibility.
+    if (isHiddenByFields(row.set_id as string, row.type as string, row.rarity as string, row.art_style as string)) {
+      hiddenSkipped++;
+      continue;
+    }
     const card: Card = {
       id: row.id as string,
       baseId: row.base_id as string,
@@ -470,6 +500,8 @@ async function loadCardDatabaseFromSupabase(supabase: SupabaseClient): Promise<C
     if (list) list.push(card);
     else cardsBySet.set(card.setId, [card]);
   }
+
+  if (hiddenSkipped > 0) console.log(`  Skipped ${hiddenSkipped} hidden cards (not shown on site, not scraped)`);
 
   const sets: CardSet[] = (setRows ?? []).map((s: Record<string, unknown>) => ({
     id: s.id as string,
@@ -884,10 +916,18 @@ async function main() {
   // Sales-only mode skipped the price scrape, so the product list wasn't
   // built from this run's matches — load it from the existing mappings.
   if (phase === 'sales') {
+    // Sales-only mode skips the card-DB load above, so build the hidden-card set
+    // straight from the cards table and drop their mappings — otherwise the
+    // rotation keeps spending API calls on cards the site never shows. A product
+    // mapped from BOTH a hidden and a visible card stays in (the visible card's
+    // row keeps it); a product reachable only from hidden cards is dropped.
+    const hiddenCardIds = await loadHiddenCardIds(supabase);
+
     // Paginate — PostgREST caps a single select at 1000 rows, and we have
     // thousands of mappings; without this the rotation would starve every
     // product past the first page.
     const MAP_PAGE = 1000;
+    let hiddenMapSkipped = 0;
     for (let from = 0; ; from += MAP_PAGE) {
       const { data: maps } = await supabase
         .from('card_tcgplayer_mapping')
@@ -895,11 +935,17 @@ async function main() {
         .range(from, from + MAP_PAGE - 1);
       if (!maps || maps.length === 0) break;
       for (const m of maps) {
+        if (hiddenCardIds.has(m.card_id as string)) {
+          hiddenMapSkipped++;
+          continue;
+        }
         matchedProductIds.push({ cardId: m.card_id as string, productId: m.tcgplayer_product_id as number });
       }
       if (maps.length < MAP_PAGE) break;
     }
-    console.log(`Sales-only mode: loaded ${matchedProductIds.length} mapped products.`);
+    console.log(
+      `Sales-only mode: loaded ${matchedProductIds.length} mapped products (skipped ${hiddenMapSkipped} hidden-card mappings).`,
+    );
   }
 
   // Fetch sales history for matched products on a staleness rotation —

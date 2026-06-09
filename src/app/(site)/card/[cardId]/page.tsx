@@ -188,7 +188,10 @@ export default async function CardPage({ params }: PageProps) {
   const { cardId } = await params;
   const card = await getCardById(cardId.toUpperCase());
 
-  if (!card) {
+  // Hidden cards (low-rarity standard prints, etc.) aren't sold or scraped, so
+  // they shouldn't be reachable by direct URL either. Same predicate as the
+  // storefront — see src/lib/card-visibility.
+  if (!card || isHiddenCard(card)) {
     notFound();
   }
 
