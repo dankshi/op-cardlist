@@ -1,10 +1,11 @@
 import { MetadataRoute } from 'next';
-import { getAllSets, getAllCards } from '@/lib/cards';
+import { getAllSets, getBrowsableCards } from '@/lib/cards';
 import { getAllCharacterSlugs } from '@/lib/characters';
 import { SITE_URL } from '@/lib/seo';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [sets, cards] = await Promise.all([getAllSets(), getAllCards()]);
+  // Visible cards only — hidden cards 404, so listing them would emit dead URLs.
+  const [sets, cards] = await Promise.all([getAllSets(), getBrowsableCards()]);
 
   // Homepage and key pages
   const staticPages: MetadataRoute.Sitemap = [

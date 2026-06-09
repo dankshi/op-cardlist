@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllCards, getCardById, getCardsByIds, getCardsByIdsBasic, searchCards } from '@/lib/cards';
+import { getBrowsableCards, getCardById, getCardsByIds, getCardsByIdsBasic, searchCards } from '@/lib/cards';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -34,6 +34,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ cards });
   }
 
-  const cards = await getAllCards();
+  // Bare "all cards" — serve only what the site shows (by-id lookups above stay
+  // unfiltered, since collection/order callers may reference any owned card).
+  const cards = await getBrowsableCards();
   return NextResponse.json({ cards });
 }

@@ -97,6 +97,29 @@ const fetchCardRows = cache(async (): Promise<Card[]> => {
   return rows.map(rowToCard);
 });
 
+// Visible-only card rows — a DB-side payload reducer for the browse/search hot
+// paths. ~69% of the `cards` table is hidden low-rarity standard prints, so this
+// halves round-trips and transfer (measured: 3866→1220 rows, ~1020ms→418ms).
+//
+// The `.or()` is intentionally CONSERVATIVE: it keeps every truly-visible card
+// (incl. null-rarity and any alt-art/manga/wanted variant) and only drops the
+// unambiguous hidden bulk. The prb-01 Event/Stage stragglers it can't express
+// here are removed by the authoritative isHiddenCard pass in the getters below —
+// so isHiddenCard stays the single source of truth and this filter can never
+// hide a card that should show. Mirror of src/lib/card-visibility clause 1.
+const fetchVisibleCardRows = cache(async (): Promise<Card[]> => {
+  if (!supabase) return [];
+  const rows = await paginated<Record<string, unknown>>((from, to) =>
+    supabase!
+      .from('cards')
+      .select('*')
+      .order('id')
+      .or('rarity.is.null,rarity.not.in.(C,UC,R,P,SR,L),and(art_style.neq.standard,art_style.not.is.null)')
+      .range(from, to),
+  );
+  return rows.map(rowToCard);
+});
+
 interface SetMeta {
   id: string;
   name: string;
@@ -288,10 +311,16 @@ export async function getAllCards(): Promise<Card[]> {
 }
 
 /** All cards excluding low-rarity standard prints — used for browsing,
- *  search, and carousels. Alt arts / manga / wanted variants stay in. */
+ *  search, and carousels. Alt arts / manga / wanted variants stay in.
+ *  Fetches visible rows DB-side (fetchVisibleCardRows) so the hidden ~69% never
+ *  crosses the wire, then applies isHiddenCard for exactness. */
+export async function getVisibleCards(): Promise<Card[]> {
+  const [cards, prices] = await Promise.all([fetchVisibleCardRows(), fetchPrices()]);
+  return cards.map(card => mergePrice(card, prices)).filter(card => !isHiddenCard(card));
+}
+
 export async function getBrowsableCards(): Promise<Card[]> {
-  const all = await getAllCards();
-  return all.filter(card => !isHiddenCard(card));
+  return getVisibleCards();
 }
 
 export async function getCardById(cardId: string): Promise<Card | undefined> {
@@ -444,9 +473,9 @@ export async function searchCards(query: string, nameOnly = false): Promise<Card
   if (searchTokens.length === 0) return [];
 
   const matcher = nameOnly ? tokenMatchesCardName : tokenMatchesCard;
-  const [allCards, setNameLookup] = await Promise.all([getAllCards(), fetchSetNameLookup()]);
+  // getVisibleCards already excludes hidden cards (DB-side + isHiddenCard).
+  const [allCards, setNameLookup] = await Promise.all([getVisibleCards(), fetchSetNameLookup()]);
   return allCards
-    .filter(card => !isHiddenCard(card))
     .filter(card => searchTokens.every(token => matcher(token, card, setNameLookup)))
     .sort((a, b) => (b.price?.marketPrice ?? 0) - (a.price?.marketPrice ?? 0));
 }
