@@ -524,9 +524,17 @@ let currentRunId: number | null = null;
 
 async function startRun(jobType: string, scope: Record<string, unknown>): Promise<void> {
   if (!adminClient) return;
-  const trigger = process.env.GITHUB_EVENT_NAME
-    ? (process.env.GITHUB_EVENT_NAME === 'schedule' ? 'cron' : 'manual')
-    : 'local';
+  // Trigger label, most-specific first:
+  //  - TRIGGER_SOURCE (workflow_dispatch input): 'cron' = Supabase pg_cron
+  //    5-min schedule, 'manual' = HQ "Run now" button.
+  //  - GITHUB_EVENT_NAME 'schedule' = GitHub's own throttled cron (fallback).
+  //  - else a local dev run.
+  const src = process.env.TRIGGER_SOURCE?.trim();
+  const trigger = src
+    ? src
+    : process.env.GITHUB_EVENT_NAME
+      ? (process.env.GITHUB_EVENT_NAME === 'schedule' ? 'github-cron' : 'manual')
+      : 'local';
   const logUrl =
     process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
       ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`

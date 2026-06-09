@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       'X-GitHub-Api-Version': '2022-11-28',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ref: REF }),
+    body: JSON.stringify({ ref: REF, inputs: { trigger_source: 'manual' } }),
   })
 
   if (res.status === 204) return NextResponse.json({ ok: true })

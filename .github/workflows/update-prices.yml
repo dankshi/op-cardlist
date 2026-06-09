@@ -5,7 +5,13 @@ on:
     # Run daily at 6 AM UTC (1 AM EST, 10 PM PST)
     - cron: '0 6 * * *'
   workflow_dispatch:
-    # Allow manual trigger from GitHub UI
+    # trigger_source labels the run in scraper_runs ('manual' = HQ "Run now"
+    # button). A `schedule` event leaves it empty → recorded as 'github-cron'.
+    inputs:
+      trigger_source:
+        description: 'Run label (manual)'
+        required: false
+        default: 'manual'
 
 jobs:
   update-prices:
@@ -28,6 +34,8 @@ jobs:
         run: npm run scrape:prices
         env:
           NODE_ENV: production
+          # Empty for `schedule` events → scraper labels those 'github-cron'.
+          TRIGGER_SOURCE: ${{ github.event.inputs.trigger_source }}
           # Daily run does PRICES only — fast and rate-limit-free. Sales are
           # handled continuously by the Update Sales workflow (small windows).
           SCRAPE_PHASE: prices

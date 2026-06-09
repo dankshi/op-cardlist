@@ -8,7 +8,15 @@ on:
     # rate-limits. The rotation cursor is the products' sales_scraped_at.
     - cron: '*/5 * * * *'
   workflow_dispatch:
-    # Allow manual trigger from GitHub UI
+    # Allow manual trigger from GitHub UI / API. trigger_source labels the run
+    # in scraper_runs: 'cron' = Supabase pg_cron 5-min schedule, 'manual' = HQ
+    # "Run now" button (the default). A `schedule` event leaves it empty, which
+    # the scraper records as 'github-cron' (the throttled native fallback).
+    inputs:
+      trigger_source:
+        description: 'Run label (cron | manual)'
+        required: false
+        default: 'manual'
 
 # Never let runs pile up: if a window is still going when the next tick fires,
 # queue at most one and drop the rest.
@@ -37,6 +45,8 @@ jobs:
         run: npm run scrape:prices
         env:
           NODE_ENV: production
+          # Empty for `schedule` events → scraper labels those 'github-cron'.
+          TRIGGER_SOURCE: ${{ github.event.inputs.trigger_source }}
           # Sales-only — skips the price scrape, rotates the stalest products.
           SCRAPE_PHASE: sales
           SALES_ROTATION_LIMIT: '30'
