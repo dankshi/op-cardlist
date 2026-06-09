@@ -50,3 +50,6 @@ jobs:
           # Rotate when expired: log out + back in on tcgplayer.com, grab new
           # TCGAuthTicket_Production cookie, `gh secret set TCGPLAYER_AUTH_COOKIE -b "..."`.
           TCGPLAYER_AUTH_COOKIE: ${{ secrets.TCGPLAYER_AUTH_COOKIE }}
+          # Discord webhook — posts a per-run embed (status + stats + run link).
+          # Only wired into the sales job, so prices stays silent. Unset = no-op.
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

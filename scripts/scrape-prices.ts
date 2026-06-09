@@ -511,10 +511,60 @@ async function startRun(jobType: string, scope: Record<string, unknown>): Promis
   currentRunId = data.id as number;
 }
 
+// Fire-and-forget Discord ping for each run. Gated purely on DISCORD_WEBHOOK_URL
+// being present, which it only is for the sales workflow (the secret isn't wired
+// into update-prices.yml) — so prices stays silent without any phase branching.
+// A webhook failure must never break the scrape, hence the swallowed catch.
+async function notifyDiscord(
+  status: 'success' | 'partial' | 'failed',
+  patch: { error?: string | null; error_code?: string | null; stats?: Record<string, unknown> },
+): Promise<void> {
+  const webhook = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhook) return;
+  const stats = (patch.stats ?? {}) as Record<string, number>;
+  const phase = process.env.SCRAPE_PHASE ?? 'both';
+  const color = status === 'success' ? 0x2ecc71 : status === 'partial' ? 0xf1c40f : 0xe74c3c;
+  const runUrl =
+    process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
+      ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+      : null;
+  const durationS = stats.durationMs ? `${(stats.durationMs / 1000).toFixed(1)}s` : '—';
+  const fields = [
+    { name: 'Status', value: status, inline: true },
+    { name: 'Duration', value: durationS, inline: true },
+    { name: 'Processed', value: String(stats.totalProcessed ?? '—'), inline: true },
+    { name: 'Sales stored', value: String(stats.salesStored ?? '—'), inline: true },
+    { name: 'Products w/ sales', value: String(stats.productsWithSales ?? '—'), inline: true },
+  ];
+  if (patch.error) fields.push({ name: 'Error', value: String(patch.error).slice(0, 1000), inline: false });
+  if (patch.error_code) fields.push({ name: 'Error code', value: patch.error_code, inline: true });
+  const body = {
+    embeds: [
+      {
+        title: `Scraper · ${phase} · ${status}`,
+        url: runUrl ?? undefined,
+        color,
+        fields,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+  try {
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    console.warn(`  (discord notify failed: ${(err as Error).message})`);
+  }
+}
+
 async function finishRun(
   status: 'success' | 'partial' | 'failed',
   patch: { error?: string | null; error_code?: string | null; stats?: Record<string, unknown> } = {},
 ): Promise<void> {
+  await notifyDiscord(status, patch);
   if (!adminClient || currentRunId == null) return;
   await adminClient
     .from('scraper_runs')
