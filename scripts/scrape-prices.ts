@@ -539,8 +539,8 @@ async function notifyDiscord(
     fields.push({ name: 'Processed', value: String(stats.totalProcessed), inline: true });
   }
   fields.push(
+    { name: 'Cards scraped', value: String(stats.productsScraped ?? '—'), inline: true },
     { name: 'Sales stored', value: String(stats.salesStored ?? '—'), inline: true },
-    { name: 'Products w/ sales', value: String(stats.productsWithSales ?? '—'), inline: true },
   );
   if (patch.error) fields.push({ name: 'Error', value: String(patch.error).slice(0, 1000), inline: false });
   if (patch.error_code) fields.push({ name: 'Error code', value: patch.error_code, inline: true });
@@ -705,6 +705,7 @@ async function main() {
   // (the sales block reassigns these).
   let lastSoldFound = 0;
   let totalSalesStored = 0;
+  let salesProductsScraped = 0;
   // Exact cards touched this run (for the HQ run drill-down).
   const scrapedCards: { cardId: string; productId: number; sales: number }[] = [];
   const matchedProductIds: { cardId: string; productId: number }[] = [];
@@ -936,6 +937,7 @@ async function main() {
     });
 
     const targets = matchedProductIds.slice(0, ROTATION_LIMIT);
+    salesProductsScraped = targets.length;
     const skipped = matchedProductIds.length - targets.length;
     console.log(
       `\nFetching sales for ${targets.length} stalest products${skipped > 0 ? ` (skipping ${skipped} fresh ones)` : ''}...`,
@@ -1117,7 +1119,6 @@ async function main() {
 
   // Health signals for the run record + HQ.
   const authExpired = !!authCookie && fetchStats.authedPages === 0 && fetchStats.ok > 0;
-  const rateLimitedHard = fetchStats.giveUp > 0;
   const runStats = {
     durationMs: Date.now() - startTime,
     totalCards,
@@ -1126,6 +1127,7 @@ async function main() {
     totalNotFound,
     totalManualPreserved,
     salesStored: totalSalesStored,
+    productsScraped: salesProductsScraped,
     productsWithSales: lastSoldFound,
     fetch: { ...fetchStats },
     dbWriteErrors,
@@ -1147,7 +1149,10 @@ async function main() {
     process.exit(1);
   }
 
-  await finishRun(authExpired || rateLimitedHard ? 'partial' : 'success', {
+  // Transient rate-limiting (some products give up after retries) is normal for
+  // the small rotating sales window — those products just get picked up next
+  // rotation, so it does NOT degrade the run. Only an expired auth cookie does.
+  await finishRun(authExpired ? 'partial' : 'success', {
     error_code: authExpired ? 'auth_expired' : null,
     stats: runStats,
   });
