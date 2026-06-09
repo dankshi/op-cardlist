@@ -532,10 +532,16 @@ async function notifyDiscord(
   const fields = [
     { name: 'Status', value: status, inline: true },
     { name: 'Duration', value: durationS, inline: true },
-    { name: 'Processed', value: String(stats.totalProcessed ?? '—'), inline: true },
+  ];
+  // 'Processed' counts the price-scrape pass, which is skipped on sales-only
+  // runs (so it's always 0 there). Only show it when it's actually meaningful.
+  if (Number(stats.totalProcessed) > 0) {
+    fields.push({ name: 'Processed', value: String(stats.totalProcessed), inline: true });
+  }
+  fields.push(
     { name: 'Sales stored', value: String(stats.salesStored ?? '—'), inline: true },
     { name: 'Products w/ sales', value: String(stats.productsWithSales ?? '—'), inline: true },
-  ];
+  );
   if (patch.error) fields.push({ name: 'Error', value: String(patch.error).slice(0, 1000), inline: false });
   if (patch.error_code) fields.push({ name: 'Error code', value: patch.error_code, inline: true });
   const body = {
