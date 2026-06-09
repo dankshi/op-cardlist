@@ -173,6 +173,12 @@ export function CardMainPanel({
     })
     setCollectionState(rows)
   }, [supabase, currentUserId, cardId, asksState, marketPrice, slabValues])
+
+  // Keep the panel in sync when the server re-sends holdings (e.g. after a
+  // router.refresh() following a save), not just after a client reloadCollection.
+  useEffect(() => {
+    setCollectionState(collection)
+  }, [collection])
   // Initial selection mirrors what CardBuyPanel would have picked: the
   // cheapest variant with a listing, fall back to Raw. We compute it here
   // so the inline drawer's filter starts in sync.

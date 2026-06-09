@@ -2,7 +2,11 @@
 
 import { useState } from 'react'
 import { gradeLabel } from '@/lib/gradingStyle'
+import { GRADING_SCALES, type GradingCompany } from '@/types/database'
 import { AddEditCardModal, type EditItem } from './AddEditCardModal'
+import { CollectionHistoryDrawer } from './CollectionHistoryDrawer'
+
+const REGRADE_COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
 
 export interface PositionRow {
   id: string
@@ -47,6 +51,38 @@ export function CollectionPositionPanel({
 }) {
   const [editRow, setEditRow] = useState<PositionRow | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  // "Got it graded": move a raw line to a slab grade + capitalize the fee.
+  const [regradeRow, setRegradeRow] = useState<PositionRow | null>(null)
+  const [regradeCompany, setRegradeCompany] = useState<GradingCompany>('PSA')
+  const [regradeGrade, setRegradeGrade] = useState<string>(GRADING_SCALES.PSA[0])
+  const [regradeFee, setRegradeFee] = useState('')
+  const [regrading, setRegrading] = useState(false)
+
+  function openRegrade(row: PositionRow) {
+    setRegradeCompany('PSA')
+    setRegradeGrade(GRADING_SCALES.PSA[0])
+    setRegradeFee('')
+    setRegradeRow(row)
+  }
+  async function submitRegrade() {
+    if (!regradeRow || !regradeCompany || !regradeGrade || regrading) return
+    setRegrading(true)
+    const res = await fetch('/api/collection/adjustments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'regrade',
+        collection_id: regradeRow.id,
+        grading_company: regradeCompany,
+        grade: regradeGrade,
+        grading_cost: regradeFee === '' ? 0 : Number(regradeFee),
+      }),
+    })
+    setRegrading(false)
+    if (res.ok) { setRegradeRow(null); onChanged() }
+    else { const b = await res.json().catch(() => ({})); alert(b.error || 'Failed to mark as graded.') }
+  }
   // Row id currently mid-update from a quantity step, so we can disable its
   // buttons and avoid double-fires while the PATCH + reload round-trips.
   const [pendingId, setPendingId] = useState<string | null>(null)
@@ -90,6 +126,13 @@ export function CollectionPositionPanel({
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18" />
         </svg>
         <h3 className="text-sm font-bold text-zinc-900 truncate">In your collection</h3>
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(true)}
+          className="ml-auto flex-shrink-0 text-xs font-semibold text-zinc-500 hover:text-zinc-900 cursor-pointer"
+        >
+          History
+        </button>
       </div>
 
       {/* Per-line holdings */}
@@ -181,6 +224,16 @@ export function CollectionPositionPanel({
                 >
                   List for sale
                 </button>
+                {!row.gradingCompany && (
+                  <button
+                    type="button"
+                    onClick={() => openRegrade(row)}
+                    title="Sent this card off and got it graded"
+                    className="rounded-md px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 ring-1 ring-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer"
+                  >
+                    Got graded
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -232,6 +285,62 @@ export function CollectionPositionPanel({
         } satisfies EditItem : null}
         presetCard={editRow ? null : { id: cardId, name: cardName, image: imageUrl }}
       />
+
+      <CollectionHistoryDrawer
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        cardId={cardId}
+        cardName={cardName}
+        lines={rows.map(r => ({ id: r.id, gradingCompany: r.gradingCompany, grade: r.grade, quantity: r.quantity }))}
+        onChanged={onChanged}
+      />
+
+      {/* "Got it graded" — convert a raw line to a slab + capitalize the fee. */}
+      {regradeRow && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8" onClick={() => { if (!regrading) setRegradeRow(null) }} role="dialog" aria-modal="true">
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-5 pb-4 border-b border-zinc-100">
+              <h2 className="text-lg font-bold text-zinc-900">Mark as graded</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">Moves your {cardName} to a slab and logs it in history.</p>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Grader</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {REGRADE_COMPANIES.map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => { setRegradeCompany(c); setRegradeGrade(GRADING_SCALES[c][0]) }}
+                      className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${regradeCompany === c ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-700 ring-1 ring-zinc-200 hover:ring-zinc-400'}`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Grade</label>
+                <select value={regradeGrade} onChange={e => setRegradeGrade(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border-2 border-zinc-200 text-sm text-zinc-900 focus:outline-none focus:border-orange-500">
+                  {GRADING_SCALES[regradeCompany].map(g => <option key={g} value={g}>{regradeCompany} {g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Grading cost <span className="text-zinc-400 font-normal normal-case">(optional)</span></label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base font-bold text-zinc-400">$</span>
+                  <input type="number" step="0.01" min="0" value={regradeFee} onChange={e => setRegradeFee(e.target.value)} placeholder="Grading fee paid" className="w-full pl-7 px-3 py-2.5 rounded-lg border-2 border-zinc-200 text-sm font-semibold tabular-nums text-zinc-900 focus:outline-none focus:border-orange-500" />
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-1">Folds into the card&rsquo;s cost basis.</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-2xl">
+              <button onClick={() => setRegradeRow(null)} disabled={regrading} className="px-4 py-2 rounded-lg text-sm font-semibold text-zinc-700 hover:bg-zinc-100 cursor-pointer disabled:opacity-50">Cancel</button>
+              <button onClick={submitRegrade} disabled={regrading} className="px-5 py-2.5 rounded-lg text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white cursor-pointer disabled:opacity-50">{regrading ? 'Saving…' : 'Mark as graded'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

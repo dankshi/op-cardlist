@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { CollectionCardSearch, type CardPick } from './CollectionCardSearch'
 import { GRADING_SCALES, type GradingCompany } from '@/types/database'
 
@@ -53,6 +54,7 @@ export function AddEditCardModal({
   presetCard?: { id: string; name: string; image: string } | null
 }) {
   const isEdit = !!editItem
+  const router = useRouter()
   const [card, setCard] = useState<CardPick | null>(null)
   const [company, setCompany] = useState('')
   const [grade, setGrade] = useState('')
@@ -66,6 +68,9 @@ export function AddEditCardModal({
   const committed = lineId != null
   const [customValue, setCustomValue] = useState('')
   const [serial, setSerial] = useState('')
+  // Optional grading fee (graded variants only) — capitalized into the line's
+  // cost basis on the first lot. Maps to collection_lots.grading_cost.
+  const [gradingCost, setGradingCost] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -101,6 +106,7 @@ export function AddEditCardModal({
       setGrade(editItem.grade ?? '')
       setCustomValue(editItem.customValue != null ? String(editItem.customValue) : '')
       setSerial(editItem.serialNumber ?? '')
+      setGradingCost('')
       setLots([])
       setLoadedLots([])
       setLineId(editItem.id)
@@ -110,6 +116,7 @@ export function AddEditCardModal({
       setGrade('')
       setCustomValue('')
       setSerial('')
+      setGradingCost('')
       setLots([{ quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }])
       setLoadedLots([])
       setLineId(null)
@@ -128,7 +135,8 @@ export function AddEditCardModal({
       .then(r => r.json())
       .then(d => {
         if (cancelled) return
-        const drafts: LotDraft[] = (d.lots ?? []).map((l: { id: string; quantity: number; price_paid: number | null; acquired_date: string | null }) => ({
+        const raw = (d.lots ?? []) as { id: string; quantity: number; price_paid: number | null; acquired_date: string | null; grading_cost: number | null }[]
+        const drafts: LotDraft[] = raw.map(l => ({
           id: l.id,
           quantity: l.quantity,
           price: l.price_paid != null ? String(l.price_paid) : '',
@@ -137,6 +145,9 @@ export function AddEditCardModal({
         const safe = drafts.length ? drafts : [{ quantity: editItem.quantity || 1, price: '', date: '' }]
         setLots(safe)
         setLoadedLots(safe)
+        // Grading fee is carried on the first lot.
+        const gc = raw[0]?.grading_cost
+        setGradingCost(gc != null && gc > 0 ? String(gc) : '')
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoadingLots(false) })
@@ -170,6 +181,7 @@ export function AddEditCardModal({
       setSubmitting(false)
       if (id == null) return // error shown; the user's rows are kept intact
       onSaved()
+      router.refresh()
       setFlash('Saved ✓')
     }
     setLots(prev => [...prev, { quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }])
@@ -279,13 +291,23 @@ export function AddEditCardModal({
 
     // Resync drafts with the server so saved lots carry real ids — further
     // edits diff correctly and nothing is re-created.
+    let firstLotId: string | null = null
     try {
       const d = await (await fetch(`/api/collection/lots?collection_id=${id}`)).json()
       const drafts: LotDraft[] = (d.lots ?? []).map((l: { id: string; quantity: number; price_paid: number | null; acquired_date: string | null }) => ({
         id: l.id, quantity: l.quantity, price: l.price_paid != null ? String(l.price_paid) : '', date: l.acquired_date ?? '',
       }))
-      if (drafts.length) { setLots(drafts); setLoadedLots(drafts) }
+      if (drafts.length) { setLots(drafts); setLoadedLots(drafts); firstLotId = drafts[0].id ?? null }
     } catch { /* keep local drafts */ }
+
+    // Capitalize the grading fee onto the first lot (graded variants only).
+    if (company && firstLotId) {
+      await fetch('/api/collection/lots', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: firstLotId, grading_cost: gradingCost === '' ? 0 : Number(gradingCost) }),
+      }).catch(() => {})
+    }
 
     return id
   }
@@ -300,6 +322,7 @@ export function AddEditCardModal({
       const id = await persistAll()
       if (id == null) return
       onSaved()
+      router.refresh()
 
       if (keepOpen && !isEdit) {
         // Reset for the next card (add-another-CARD). New card → new line.
@@ -504,6 +527,20 @@ export function AddEditCardModal({
               </div>
             )}
           </div>
+
+          {/* Grading fee — only for slabs. Capitalized into the cost basis. */}
+          {company && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                Grading cost <span className="text-zinc-400 font-normal normal-case">(optional)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base font-bold text-zinc-400">$</span>
+                <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => { setGradingCost(e.target.value); setError(null) }} disabled={submitting} placeholder="Grading fee paid" className={`${fieldClass} pl-7 font-semibold tabular-nums`} />
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-1 leading-snug">Folds into this card&rsquo;s cost basis.</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
