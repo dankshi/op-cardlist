@@ -574,6 +574,23 @@ async function notifyDiscord(
     { name: 'Cards scraped', value: String(stats.productsScraped ?? '—'), inline: true },
     { name: 'Sales stored', value: String(stats.salesStored ?? '—'), inline: true },
   );
+  // List the actual cards scraped (id + sales found), capped to Discord's
+  // 1024-char field limit so a big window doesn't get the message rejected.
+  const scraped = (patch.stats?.cards ?? []) as { cardId: string; sales: number }[];
+  if (scraped.length > 0) {
+    const parts: string[] = [];
+    let used = 0;
+    let shown = 0;
+    for (const c of scraped) {
+      const piece = `${c.cardId} (${c.sales})`;
+      if (used + piece.length + 2 > 950) break; // leave room for the "+N more" tail
+      parts.push(piece);
+      used += piece.length + 2;
+      shown++;
+    }
+    const tail = shown < scraped.length ? ` …+${scraped.length - shown} more` : '';
+    fields.push({ name: `Cards (${scraped.length})`, value: parts.join(', ') + tail, inline: false });
+  }
   if (patch.error) fields.push({ name: 'Error', value: String(patch.error).slice(0, 1000), inline: false });
   if (patch.error_code) fields.push({ name: 'Error code', value: patch.error_code, inline: true });
   const body = {

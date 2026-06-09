@@ -27,7 +27,7 @@ interface Status {
   token: { source: string; dbUpdatedAt: string | null; health: 'valid' | 'expired' | 'anon' | 'unknown' }
   jobs: { prices: RunRow | null; sales: RunRow | null }
   priceFreshness: { latestDate: string | null; rowsOnLatest: number }
-  salesCoverage: { totalProducts: number; scrapedLast24h: number; neverScraped: number; oldestScrapedAt: string | null }
+  salesCoverage: { totalProducts: number; scrapedLast24h: number; neverScraped: number; oldestScrapedAt: string | null; cycleDays: number | null }
   triggers: { githubTokenSet: boolean; repo: string; ref: string }
   sets: { set_id: string; name: string; release_date: string | null; last_scraped_at: string | null; total_cards: number; mapped_cards: number }[]
   recentRuns: RunRow[]
@@ -268,7 +268,13 @@ export default function ScraperHqPage() {
           cadence="Every 5 min · rotating window"
           run={data.jobs.sales}
           extra={[
-            ['Scraped (24h)', `${data.salesCoverage.scrapedLast24h.toLocaleString()} / ${data.salesCoverage.totalProducts.toLocaleString()}`],
+            ['Scrape universe', data.salesCoverage.totalProducts.toLocaleString()],
+            ['Scraped (last 24h)', data.salesCoverage.scrapedLast24h.toLocaleString()],
+            ['Full cycle (est)', data.salesCoverage.cycleDays != null
+              ? data.salesCoverage.cycleDays < 1
+                ? `~${Math.round(data.salesCoverage.cycleDays * 24)}h`
+                : `~${data.salesCoverage.cycleDays.toFixed(1)}d`
+              : '—'],
             ['Never scraped', data.salesCoverage.neverScraped.toLocaleString()],
             ['Stalest card', timeAgo(data.salesCoverage.oldestScrapedAt)],
           ]}
