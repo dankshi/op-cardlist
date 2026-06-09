@@ -16,7 +16,12 @@ export async function POST(request: Request) {
   if (!profile?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json().catch(() => ({}))
-  const cardId = typeof body.cardId === 'string' ? body.cardId.trim().toUpperCase() : ''
+  // Card IDs are uppercase base + lowercase variant suffix, e.g. "OP14-084_p1".
+  // Uppercasing the whole string corrupts the suffix and misses the mapping row,
+  // so normalize only the part before the first underscore.
+  const raw = typeof body.cardId === 'string' ? body.cardId.trim() : ''
+  const us = raw.indexOf('_')
+  const cardId = us === -1 ? raw.toUpperCase() : raw.slice(0, us).toUpperCase() + raw.slice(us).toLowerCase()
   if (!cardId) return NextResponse.json({ error: 'cardId is required' }, { status: 400 })
 
   const admin = getSupabaseAdmin()
