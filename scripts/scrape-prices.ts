@@ -1213,6 +1213,11 @@ async function main() {
 
   // Health signals for the run record + HQ.
   const authExpired = !!authCookie && fetchStats.authedPages === 0 && fetchStats.ok > 0;
+  // Total wipeout: we had products to scrape but EVERY fetch failed (all 429'd
+  // and gave up). The run accomplished nothing — must not report success, even
+  // though no exception was thrown. Distinct from a few products giving up,
+  // which is normal.
+  const salesWipeout = salesProductsScraped > 0 && fetchStats.ok === 0;
   const runStats = {
     durationMs: Date.now() - startTime,
     totalCards,
@@ -1244,11 +1249,11 @@ async function main() {
     process.exit(1);
   }
 
-  // Transient rate-limiting (some products give up after retries) is normal for
-  // the small rotating sales window — those products just get picked up next
-  // rotation, so it does NOT degrade the run. Only an expired auth cookie does.
-  await finishRun(authExpired ? 'partial' : 'success', {
-    error_code: authExpired ? 'auth_expired' : null,
+  // A FEW products giving up to rate-limiting is normal (they cycle back next
+  // rotation) and does NOT degrade the run. But an expired cookie, or a total
+  // wipeout where every fetch failed, must surface as 'partial' with a reason.
+  await finishRun(authExpired || salesWipeout ? 'partial' : 'success', {
+    error_code: authExpired ? 'auth_expired' : salesWipeout ? 'rate_limited' : null,
     stats: runStats,
   });
 }
