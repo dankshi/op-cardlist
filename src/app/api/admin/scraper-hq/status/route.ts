@@ -24,13 +24,15 @@ async function fetchAll<T>(
  *  thousands of hidden-card products we deliberately never scrape, so counting
  *  against it made "scraped (24h)" and "never scraped" meaningless. */
 async function computeSalesCoverage(supabase: SupabaseClient, since24h: string) {
-  const [cardRows, mapRows, prodRows] = await Promise.all([
+  const [cardRows, mapRows, prodRows, newSalesRes] = await Promise.all([
     fetchAll<{ id: string; set_id: string; type: string; rarity: string | null; art_style: string | null }>((from, to) =>
       supabase.from('cards').select('id, set_id, type, rarity, art_style').range(from, to)),
     fetchAll<{ card_id: string; tcgplayer_product_id: number }>((from, to) =>
       supabase.from('card_tcgplayer_mapping').select('card_id, tcgplayer_product_id').range(from, to)),
     fetchAll<{ product_id: number; sales_scraped_at: string | null }>((from, to) =>
       supabase.from('tcgplayer_products').select('product_id, sales_scraped_at').range(from, to)),
+    // True ingestion rate: card_sales rows WE inserted in the last 24h.
+    supabase.from('card_sales').select('*', { count: 'exact', head: true }).gt('created_at', since24h),
   ])
 
   const visibleCardIds = new Set<string>()
@@ -58,7 +60,14 @@ async function computeSalesCoverage(supabase: SupabaseClient, since24h: string) 
   // throttling hurts) — full coverage in 24h is NOT expected at low run rates.
   const cycleDays = scrapedLast24h > 0 ? totalProducts / scrapedLast24h : null
 
-  return { totalProducts, scrapedLast24h, neverScraped, oldestScrapedAt, cycleDays }
+  return {
+    totalProducts,
+    scrapedLast24h,
+    neverScraped,
+    oldestScrapedAt,
+    cycleDays,
+    newSales24h: newSalesRes.count ?? 0,
+  }
 }
 
 /** Aggregated scraper health for the Admin → Scraper HQ master view:

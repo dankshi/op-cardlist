@@ -19,6 +19,8 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import type { Browser, Page } from 'puppeteer'
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
+import { expectedVariant, variantMatch, type ExpectedVariant } from '../src/lib/slab-listing-match'
+import * as cheerio from 'cheerio'
 
 puppeteerExtra.use(StealthPlugin())
 
@@ -149,92 +151,140 @@ export function parsePrice(raw: string): number | null {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Scraping
+// Fetching + parsing
 // ─────────────────────────────────────────────────────────────────────
 
+interface RawListing {
+  title: string
+  priceText: string
+  soldText: string
+  url: string
+}
+
+/** eBay sold/completed search, most-recently-ended first, 120 per page. */
+function buildSearchUrl(query: string): string {
+  return `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Sold=1&LH_Complete=1&_sop=13&_ipg=120`
+}
+
+/** Cheap detection of an eBay bot-challenge / interstitial page. */
+function isChallengeHtml(html: string): boolean {
+  const head = html.slice(0, 6000).toLowerCase()
+  return /<title>[^<]*(security measure|robot|challenge|pardon our interruption|checking your browser)/.test(head)
+    || /please verify yourself|px-captcha|hcaptcha|recaptcha/.test(head)
+}
+
+/**
+ * Extract sold-listing rows from eBay search HTML. Source-independent: the same
+ * parser runs whether the HTML came from local puppeteer or a scraping vendor,
+ * so the fragile fetch and the stable parse evolve separately. Tries legacy
+ * (.s-item) and newer (.s-card / .srp-river-results-item) result selectors.
+ */
+function parseSoldSearchHtml(html: string): { results: RawListing[]; chosen: string; nodeCount: number } {
+  const $ = cheerio.load(html)
+  const results: RawListing[] = []
+  for (const sel of ['li.s-item', 'div.s-card', 'li.srp-river-results-item']) {
+    const found = $(sel)
+    if (found.length === 0) continue
+    found.each((_, el) => {
+      const item = $(el)
+      const pick = (sels: string[]): string => {
+        for (const s of sels) {
+          const t = item.find(s).first().text().trim()
+          if (t) return t
+        }
+        return ''
+      }
+      const title = pick(['.s-item__title', '[class*="title"]'])
+      const priceText = pick(['.s-item__price', '[class*="price"]'])
+      const soldText = pick(['.s-item__caption--signal', '.s-item__title--tagblock', '[class*="caption"]'])
+      const url = item.find('a[href*="/itm/"]').first().attr('href') ?? ''
+      if (!title || /shop on ebay/i.test(title)) return
+      results.push({ title, priceText, soldText, url })
+    })
+    return { results, chosen: sel, nodeCount: found.length }
+  }
+  return { results, chosen: '', nodeCount: 0 }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Fetchers — the one swappable seam. Local puppeteer by default; set
+// EBAY_FETCH_ENDPOINT to route through a scraping vendor (ScraperAPI / Zyte /
+// Bright-Data-style "GET this url → return HTML" endpoint) so the anti-bot layer
+// can change without touching the parse/ingest code. Vendors run on residential
+// IPs; local puppeteer needs one too (datacenter IPs get challenged).
+// ─────────────────────────────────────────────────────────────────────
+
+interface SearchFetcher {
+  readonly label: string
+  fetchHtml(query: string): Promise<string>
+}
+
+class PuppeteerFetcher implements SearchFetcher {
+  readonly label = 'local puppeteer'
+  constructor(private page: Page) {}
+  async fetchHtml(query: string): Promise<string> {
+    await this.page.goto(buildSearchUrl(query), { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS })
+    return this.page.content()
+  }
+}
+
+class HttpEndpointFetcher implements SearchFetcher {
+  readonly label = 'vendor endpoint'
+  constructor(private template: string) {}
+  async fetchHtml(query: string): Promise<string> {
+    const target = buildSearchUrl(query)
+    // Template may contain {url} (substituted, encoded) or be a prefix to append the encoded target to.
+    const endpoint = this.template.includes('{url}')
+      ? this.template.replace('{url}', encodeURIComponent(target))
+      : this.template + encodeURIComponent(target)
+    const res = await fetch(endpoint, { signal: AbortSignal.timeout(PAGE_TIMEOUT_MS) })
+    if (!res.ok) throw new Error(`fetch endpoint returned HTTP ${res.status}`)
+    return res.text()
+  }
+}
+
 async function scrapeCardSoldListings(
-  page: Page,
+  fetcher: SearchFetcher,
   query: string,
   debugDump = false,
-): Promise<{ title: string; priceText: string; soldText: string; url: string }[]> {
-  const searchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Sold=1&LH_Complete=1&_sop=13&_ipg=120`
-
-  await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS })
-
-  const title = await page.title()
-  if (/security|robot|challenge/i.test(title)) {
+): Promise<RawListing[]> {
+  const html = await fetcher.fetchHtml(query)
+  if (isChallengeHtml(html)) {
     throw new Error(`eBay challenge page returned for "${query}"`)
   }
-
-  const result = await page.evaluate(() => {
-    // Try both legacy (.s-item) and newer (.s-card / .srp-river-results-item) selectors.
-    const selectors = [
-      'li.s-item',
-      'div.s-card',
-      'li.srp-river-results-item',
-    ]
-    let chosen = ''
-    let nodes: Element[] = []
-    for (const sel of selectors) {
-      const found = Array.from(document.querySelectorAll(sel))
-      if (found.length > 0) {
-        chosen = sel
-        nodes = found
-        break
-      }
-    }
-
-    const results: { title: string; priceText: string; soldText: string; url: string }[] = []
-    for (const item of nodes) {
-      // Within each item, also try multiple title/price/sold selectors.
-      const titleText =
-        item.querySelector('.s-item__title')?.textContent?.trim() ??
-        item.querySelector('[class*="title"]')?.textContent?.trim() ??
-        ''
-      const priceText =
-        item.querySelector('.s-item__price')?.textContent?.trim() ??
-        item.querySelector('[class*="price"]')?.textContent?.trim() ??
-        ''
-      const soldText =
-        item.querySelector('.s-item__caption--signal')?.textContent?.trim() ??
-        item.querySelector('.s-item__title--tagblock')?.textContent?.trim() ??
-        item.querySelector('[class*="caption"]')?.textContent?.trim() ??
-        ''
-      const linkEl = item.querySelector('a[href*="/itm/"]') as HTMLAnchorElement | null
-      if (!titleText || /shop on ebay/i.test(titleText)) continue
-      results.push({ title: titleText, priceText, soldText, url: linkEl?.href ?? '' })
-    }
-    return { results, chosen, nodeCount: nodes.length }
-  })
-
-  if (debugDump && result.results.length === 0) {
-    const html = await page.content()
+  const { results, chosen, nodeCount } = parseSoldSearchHtml(html)
+  if (debugDump && results.length === 0) {
     const fs = await import('node:fs')
     fs.writeFileSync('ebay-debug.html', html)
-    console.log(
-      `  [debug] No matches. Tried selectors, used "${result.chosen}", got ${result.nodeCount} nodes. HTML written to ebay-debug.html`,
-    )
-  } else if (result.results.length > 0) {
-    console.log(`  [debug] Matched selector: ${result.chosen} (${result.nodeCount} nodes)`)
+    console.log(`  [debug] No matches. Used "${chosen}", got ${nodeCount} nodes. HTML written to ebay-debug.html`)
+  } else if (results.length > 0) {
+    console.log(`  [debug] Matched selector: ${chosen} (${nodeCount} nodes)`)
   }
-
-  return result.results
+  return results
 }
 
 function rowsFromRawResults(
-  cardId: string,
-  raw: { title: string; priceText: string; soldText: string; url: string }[],
+  raw: RawListing[],
   now: Date,
-): ParsedSale[] {
+  expected: ExpectedVariant,
+): { rows: ParsedSale[]; droppedVariant: number } {
   const out: ParsedSale[] = []
+  let droppedVariant = 0
   for (const r of raw) {
     const gradeInfo = parseGradeFromTitle(r.title)
     if (!gradeInfo) continue
+    // Wrong variant leaked into the search (e.g. an alt-art listing returned for
+    // a base-card query) — drop it so it can't pollute this variant's comp.
+    const vm = variantMatch(expected, r.title)
+    if (vm === 'mismatch') { droppedVariant++; continue }
     const price = parsePrice(r.priceText)
     if (price == null || price <= 0) continue
     const soldAt = parseEbaySoldDate(r.soldText, now)
     if (!soldAt) continue
     const ebayItemId = parseEbayItemId(r.url)
+    // Low confidence when the title smells like a lot/bundle OR the variant is
+    // ambiguous (special target, but the title gives no special signal).
+    const confidence = parseConfidence(r.title) === 'low' || vm === 'uncertain' ? 'low' : 'high'
     out.push({
       gradingCompany: gradeInfo.company,
       grade: gradeInfo.grade,
@@ -243,11 +293,10 @@ function rowsFromRawResults(
       title: r.title,
       ebayItemId,
       listingUrl: r.url || null,
-      parseConfidence: parseConfidence(r.title),
+      parseConfidence: confidence,
     })
-    void cardId
   }
-  return out
+  return { rows: out, droppedVariant }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -257,6 +306,9 @@ function rowsFromRawResults(
 interface CardTarget {
   cardId: string
   query: string
+  /** TCGplayer product name — used (with the card_id parallel suffix) to decide
+   *  the expected variant so we can drop listings of the wrong variant. */
+  tcgName: string | null
 }
 
 /**
@@ -300,6 +352,7 @@ async function selectTargets(opts: {
       {
         cardId: opts.cardId,
         query: buildQuery(opts.cardId, data?.tcgplayer_name ?? null),
+        tcgName: data?.tcgplayer_name ?? null,
       },
     ]
   }
@@ -328,7 +381,7 @@ async function selectTargets(opts: {
     }))
     .filter(r => opts.all || opts.threshold == null || r.market >= opts.threshold)
     .sort((a, b) => b.market - a.market)
-    .map(r => ({ cardId: r.cardId, query: buildQuery(r.cardId, r.name) }))
+    .map(r => ({ cardId: r.cardId, query: buildQuery(r.cardId, r.name), tcgName: r.name }))
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -369,18 +422,28 @@ async function main() {
   }
   console.log(`Scraping ${targets.length} card(s)...`)
 
-  const browser = (await puppeteerExtra.launch({
-    headless: true,
-  })) as unknown as Browser
-  const page = await browser.newPage()
-  await page.setUserAgent(
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  )
-  await page.setViewport({ width: 1366, height: 768 })
-  await page.setExtraHTTPHeaders({
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  })
+  // Fetch seam: route through a scraping vendor when EBAY_FETCH_ENDPOINT is set
+  // (runs on the vendor's residential IPs), else local puppeteer.
+  const endpoint = process.env.EBAY_FETCH_ENDPOINT
+  let browser: Browser | null = null
+  let fetcher: SearchFetcher
+  if (endpoint) {
+    fetcher = new HttpEndpointFetcher(endpoint)
+    console.log('Fetcher: vendor endpoint (EBAY_FETCH_ENDPOINT).')
+  } else {
+    browser = (await puppeteerExtra.launch({ headless: true })) as unknown as Browser
+    const page = await browser.newPage()
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    )
+    await page.setViewport({ width: 1366, height: 768 })
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    })
+    fetcher = new PuppeteerFetcher(page)
+    console.log('Fetcher: local puppeteer (needs a residential IP — datacenter IPs get challenged).')
+  }
 
   let totalParsed = 0
   let totalInserted = 0
@@ -388,11 +451,14 @@ async function main() {
 
   for (const [i, t] of targets.entries()) {
     try {
-      const raw = await scrapeCardSoldListings(page, t.query, !!opts.dryRun)
-      const parsed = rowsFromRawResults(t.cardId, raw, now)
+      const raw = await scrapeCardSoldListings(fetcher, t.query, !!opts.dryRun)
+      const expected = expectedVariant(t.cardId, t.tcgName)
+      const { rows: parsed, droppedVariant } = rowsFromRawResults(raw, now, expected)
       totalParsed += parsed.length
       console.log(
-        `[${i + 1}/${targets.length}] ${t.cardId} (query: "${t.query}"): ${raw.length} raw → ${parsed.length} graded`,
+        `[${i + 1}/${targets.length}] ${t.cardId} (query: "${t.query}", ${expected}): ` +
+          `${raw.length} raw → ${parsed.length} graded` +
+          `${droppedVariant > 0 ? ` (${droppedVariant} wrong-variant dropped)` : ''}`,
       )
       if (opts.dryRun && parsed.length > 0) {
         const sample = parsed.slice(0, 3)
@@ -435,7 +501,7 @@ async function main() {
     }
   }
 
-  await browser.close()
+  if (browser) await browser.close()
 
   console.log(`\nDone. Parsed: ${totalParsed}. Inserted (or upserted): ${totalInserted}.`)
 }

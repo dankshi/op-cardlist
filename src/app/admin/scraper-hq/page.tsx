@@ -27,7 +27,7 @@ interface Status {
   token: { source: string; dbUpdatedAt: string | null; health: 'valid' | 'expired' | 'anon' | 'unknown' }
   jobs: { prices: RunRow | null; sales: RunRow | null }
   priceFreshness: { latestDate: string | null; rowsOnLatest: number }
-  salesCoverage: { totalProducts: number; scrapedLast24h: number; neverScraped: number; oldestScrapedAt: string | null; cycleDays: number | null }
+  salesCoverage: { totalProducts: number; scrapedLast24h: number; neverScraped: number; oldestScrapedAt: string | null; cycleDays: number | null; newSales24h: number }
   triggers: { githubTokenSet: boolean; repo: string; ref: string }
   sets: { set_id: string; name: string; release_date: string | null; last_scraped_at: string | null; total_cards: number; mapped_cards: number }[]
   recentRuns: RunRow[]
@@ -269,6 +269,7 @@ export default function ScraperHqPage() {
           run={data.jobs.sales}
           extra={[
             ['Scrape universe', data.salesCoverage.totalProducts.toLocaleString()],
+            ['New sales (24h)', data.salesCoverage.newSales24h.toLocaleString()],
             ['Scraped (last 24h)', data.salesCoverage.scrapedLast24h.toLocaleString()],
             ['Full cycle (est)', data.salesCoverage.cycleDays != null
               ? data.salesCoverage.cycleDays < 1
