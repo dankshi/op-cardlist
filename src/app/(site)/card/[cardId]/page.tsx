@@ -354,6 +354,14 @@ export default async function CardPage({ params }: PageProps) {
         sales={combinedSales}
         currentUserId={userRes.data.user?.id ?? null}
         isAdmin={isAdmin}
+        recentSales={
+          (sales.length > 0 || gradedSales.length > 0) ? (
+            <div className="mt-8 border-t border-zinc-200 pt-5">
+              <h2 className="text-sm font-bold text-zinc-900 mb-3">Recent sales</h2>
+              <RecentSales sales={sales} gradedSales={gradedSales} />
+            </div>
+          ) : null
+        }
         image={
           <Card3DPreview
             card={card}
@@ -435,24 +443,8 @@ export default async function CardPage({ params }: PageProps) {
         )}
       />
 
-      {/* Recent Sales — driven by the grade selected in the ladder above.
-          Snapshot for at-a-glance signal; the full table lives on /market. */}
-      {(sales.length > 0 || gradedSales.length > 0) && (
-        <section className="mt-16 mb-16">
-          <div className="flex items-baseline justify-between border-t border-zinc-200 pt-6 mb-6">
-            <h2 className="text-lg font-bold text-zinc-900">Recent Sales</h2>
-            <Link
-              href={`/card/${card.id.toLowerCase()}/market`}
-              className="text-xs font-semibold text-orange-600 hover:text-orange-700"
-            >
-              View all →
-            </Link>
-          </div>
-          <div className="bg-white border border-zinc-100 rounded-xl p-4">
-            <RecentSales sales={sales} gradedSales={gradedSales} />
-          </div>
-        </section>
-      )}
+      {/* Recent Sales now lives inside CardMainPanel, right under the grade
+          ladder (so the grade filter drives the chart directly). */}
 
       {/* Other Versions — full width so on wide displays we get more cards
           per row instead of leaving large gutters. */}

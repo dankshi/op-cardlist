@@ -193,22 +193,29 @@ function RawSalesView({ sales }: { sales: RawSale[] }) {
         </span>
       </div>
 
-      {oldestFirst.length >= 2 ? (
-        <PriceHistoryChart data={oldestFirst} />
-      ) : (
-        <div className="py-8 text-center text-xs text-zinc-400">Not enough sales in this window to chart.</div>
-      )}
+      {/* Chart + list side by side on wide screens so more is visible without
+          scrolling; stacks on narrow. */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-4 items-start">
+        <div className="min-w-0">
+          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Price trend</h3>
+          {oldestFirst.length >= 2 ? (
+            <PriceHistoryChart data={oldestFirst} />
+          ) : (
+            <div className="py-8 text-center text-xs text-zinc-400">Not enough sales in this window to chart.</div>
+          )}
+        </div>
 
-      <SalesList
-        rows={newestFirst.slice(0, 30).map(s => ({
-          date: s.date,
-          price: s.price,
-          label: s.condition ?? undefined,
-          source: 'TCG' as const,
-          quantity: s.quantity,
-        }))}
-        emptyText={`No Near Mint sales in the last ${period} days.`}
-      />
+        <SalesList
+          rows={newestFirst.slice(0, 30).map(s => ({
+            date: s.date,
+            price: s.price,
+            label: s.condition ?? undefined,
+            source: 'TCG' as const,
+            quantity: s.quantity,
+          }))}
+          emptyText={`No Near Mint sales in the last ${period} days.`}
+        />
+      </div>
     </div>
   );
 }
@@ -274,25 +281,30 @@ function GradedSalesView({ sales, company, grade }: { sales: GradedSale[]; compa
         </span>
       </div>
 
-      {oldestFirst.length >= 2 ? (
-        <PriceHistoryChart data={oldestFirst.map(s => ({ date: s.date, price: s.price, condition: `${s.grading_company} ${s.grade}`, quantity: 1 }))} />
-      ) : (
-        <div className="py-8 text-center text-xs text-zinc-400">
-          Not enough {company} {grade} sales in the last {period} days.
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-4 items-start">
+        <div className="min-w-0">
+          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Price trend</h3>
+          {oldestFirst.length >= 2 ? (
+            <PriceHistoryChart data={oldestFirst.map(s => ({ date: s.date, price: s.price, condition: `${s.grading_company} ${s.grade}`, quantity: 1 }))} />
+          ) : (
+            <div className="py-8 text-center text-xs text-zinc-400">
+              Not enough {company} {grade} sales in the last {period} days.
+            </div>
+          )}
         </div>
-      )}
 
-      <SalesList
-        rows={newestFirst.slice(0, 30).map(s => ({
-          date: s.date,
-          price: s.price,
-          label: `${s.grading_company} ${s.grade}`,
-          source: 'eBay' as const,
-          quantity: 1,
-          href: s.listing_url ?? undefined,
-        }))}
-        emptyText={`No ${company} ${grade} sales in the last ${period} days.`}
-      />
+        <SalesList
+          rows={newestFirst.slice(0, 30).map(s => ({
+            date: s.date,
+            price: s.price,
+            label: `${s.grading_company} ${s.grade}`,
+            source: 'eBay' as const,
+            quantity: 1,
+            href: s.listing_url ?? undefined,
+          }))}
+          emptyText={`No ${company} ${grade} sales in the last ${period} days.`}
+        />
+      </div>
     </div>
   );
 }
@@ -317,7 +329,7 @@ function StatsRow({
   trendPct: number | null;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-2 mb-4">
+    <div className="grid grid-cols-3 divide-x divide-zinc-200 border-y border-zinc-100 mb-4 [&>div:first-child]:pl-0">
       <Stat label="Last sale" value={formatCurrency(lastSale)} />
       <Stat
         label={avgCount < 5 ? `Avg last ${avgCount || 0}` : 'Avg last 5'}
@@ -338,7 +350,7 @@ function Stat({
   trend?: number | null;
 }) {
   return (
-    <div className="bg-zinc-50 rounded-lg px-3 py-2.5 min-w-0">
+    <div className="px-4 py-2 min-w-0">
       <div className="text-[10px] sm:text-xs uppercase tracking-wide text-zinc-400 truncate">{label}</div>
       <div className="text-base sm:text-lg font-bold text-zinc-900 tabular-nums">{value}</div>
       {trend != null && Math.abs(trend) >= 0.5 && (
@@ -393,70 +405,63 @@ interface SaleRow {
 
 function SalesList({ rows, emptyText }: { rows: SaleRow[]; emptyText: string }) {
   return (
-    <div className="mt-6">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-          Recent Transactions
-        </h3>
-        {rows.length > 0 && (
-          <span className="text-xs text-zinc-400">{rows.length} shown</span>
-        )}
-      </div>
+    <div className="min-w-0">
+      <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Sales</h3>
       {rows.length === 0 ? (
-        <div className="py-8 text-center text-xs text-zinc-400 border border-zinc-200 rounded-lg">
-          {emptyText}
-        </div>
+        <div className="py-8 text-center text-xs text-zinc-400">{emptyText}</div>
       ) : (
-        <div className="border border-zinc-200 rounded-lg overflow-hidden">
-          <ul className="divide-y divide-zinc-100 max-h-96 overflow-y-auto">
-            {rows.map((r, i) => (
-              <SaleListItem key={`${r.date}-${i}`} row={r} />
-            ))}
-          </ul>
-        </div>
+        // Clean divided rows (Robinhood-style), no heavy box — matches the
+        // /collection transactions list.
+        <ul className="divide-y divide-zinc-100 max-h-96 overflow-y-auto overflow-x-hidden">
+          {rows.map((r, i) => (
+            <SaleListItem key={`${r.date}-${i}`} row={r} />
+          ))}
+        </ul>
       )}
     </div>
   );
 }
 
 function SaleListItem({ row }: { row: SaleRow }) {
+  const isEbay = row.source === 'eBay';
+  const linkable = isEbay && !!row.href;
   const inner = (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 transition-colors">
-      <SourceBadge source={row.source} />
+    <div className="flex items-center gap-3 py-3">
+      {/* Source dot: blue = eBay graded sale, zinc = TCGplayer raw sale. */}
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isEbay ? 'bg-blue-500' : 'bg-zinc-300'}`} aria-hidden />
       <div className="flex-1 min-w-0">
-        {row.label && (
-          <div className="text-sm font-medium text-zinc-900 truncate">{row.label}</div>
-        )}
-        <div className="text-xs text-zinc-500 mt-0.5">{formatSaleDate(row.date)}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-zinc-900 truncate">
+            {row.label ?? (isEbay ? 'Graded sale' : 'Sale')}
+          </span>
+          {linkable && <span className="flex-shrink-0 text-[11px] font-medium text-blue-600">eBay ↗</span>}
+        </div>
+        <div className="text-xs text-zinc-400 mt-0.5">
+          {formatSaleDate(row.date)} · {row.source}
+        </div>
       </div>
       <div className="text-right flex-shrink-0">
-        <div className="text-sm font-bold text-zinc-900 tabular-nums">
-          ${row.price.toFixed(2)}
-        </div>
-        {row.quantity > 1 && (
-          <div className="text-[10px] text-zinc-400">×{row.quantity}</div>
-        )}
+        <div className="text-sm font-bold text-zinc-900 tabular-nums">${row.price.toFixed(2)}</div>
+        {row.quantity > 1 && <div className="text-[10px] text-zinc-400">×{row.quantity}</div>}
       </div>
     </div>
   );
 
   return (
     <li>
-      {row.href ? (
-        <a href={row.href} target="_blank" rel="noopener noreferrer" className="block">
+      {linkable ? (
+        <a
+          href={row.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View this sale on eBay"
+          className="block rounded-lg hover:bg-zinc-50 transition-colors"
+        >
           {inner}
         </a>
       ) : (
         inner
       )}
     </li>
-  );
-}
-
-function SourceBadge({ source }: { source: SaleSource }) {
-  return (
-    <span className="flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 bg-zinc-50 border border-zinc-200 rounded px-1.5 py-0.5">
-      {source}
-    </span>
   );
 }

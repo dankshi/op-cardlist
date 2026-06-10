@@ -67,6 +67,7 @@ export function CardMainPanel({
   isAdmin,
   image,
   debug,
+  recentSales,
 }: {
   cardId: string
   cardName: string
@@ -90,6 +91,9 @@ export function CardMainPanel({
   /** Optional admin debug block, rendered in the action column under the
    *  title. Server-gated upstream — non-admins never receive it. */
   debug?: ReactNode
+  /** The Recent Sales block, rendered right under the grade ladder so the
+   *  grade filter and the sales chart/list sit together. Server-rendered slot. */
+  recentSales?: ReactNode
 }) {
   // Local mirror of server-passed bids + listings so inline mutations
   // (cancel / quick-action update / new placements) reflect in the UI
@@ -217,7 +221,12 @@ export function CardMainPanel({
         </div>
 
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">{cardName}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-bold text-zinc-900">{cardName}</h1>
+            <div className="flex-shrink-0 mt-1">
+              <AddToCollectionButton cardId={cardId} cardName={cardName} variant="minimal" />
+            </div>
+          </div>
 
           {debug && <div className="mt-3">{debug}</div>}
 
@@ -236,12 +245,6 @@ export function CardMainPanel({
             />
           </div>
 
-          {/* Quick-add to collection. Managing owned copies (quantity, edit,
-              list, history) lives in /collection now, not here. */}
-          <div className="mt-5">
-            <AddToCollectionButton cardId={cardId} cardName={cardName} variant="button" />
-          </div>
-
           <div className="mt-6">
             <TrustBadges />
           </div>
@@ -254,6 +257,10 @@ export function CardMainPanel({
             selectedKey={selectedKey}
             onSelect={setSelectedKey}
           />
+
+          {/* Recent sales sit right under the grade ladder so picking a grade
+              drives the chart + list immediately below it. */}
+          {recentSales}
         </div>
       </div>
 
