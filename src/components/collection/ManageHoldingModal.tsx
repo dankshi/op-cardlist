@@ -44,7 +44,6 @@ export function ManageHoldingModal({
   const [cert, setCert] = useState(row.certNumber ?? '')
   const [gradingCost, setGradingCost] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
-  const [editFlash, setEditFlash] = useState<string | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
 
   // History
@@ -102,13 +101,13 @@ export function ManageHoldingModal({
   }
   function openHistory() { setView('history'); if (!historyLoaded) loadHistory() }
 
-  function updateLot(i: number, patch: Partial<LotDraft>) { setLots(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l)); setEditError(null); setEditFlash(null) }
+  function updateLot(i: number, patch: Partial<LotDraft>) { setLots(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l)); setEditError(null) }
   function addLot() { setLots(prev => [...prev, { quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }]) }
   function removeLot(i: number) { setLots(prev => prev.filter((_, idx) => idx !== i)) }
 
   async function saveEdit() {
     if (savingEdit) return
-    setSavingEdit(true); setEditError(null); setEditFlash(null)
+    setSavingEdit(true); setEditError(null)
     try {
       const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null }) })
       if (!v.ok) { setEditError('Couldn’t save.'); return }
@@ -138,8 +137,8 @@ export function ManageHoldingModal({
         if (firstId) await fetch('/api/collection/lots', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: firstId, grading_cost: gradingCost === '' ? 0 : Number(gradingCost) }) }).catch(() => {})
       }
       onChanged()
-      await loadLots()
-      setEditFlash('Saved ✓')
+      // One save, then we're done — close out so there's a single, obvious action.
+      onClose()
     } finally { setSavingEdit(false) }
   }
 
@@ -280,20 +279,20 @@ export function ManageHoldingModal({
                   <div>
                     <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Value override /ea</label>
                     <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
-                      <input type="number" step="0.01" min="0" value={customValue} onChange={e => { setCustomValue(e.target.value); setEditFlash(null) }} placeholder="Market" className={`${field} pl-6 tabular-nums`} />
+                      <input type="number" step="0.01" min="0" value={customValue} onChange={e => setCustomValue(e.target.value)} placeholder="Market" className={`${field} pl-6 tabular-nums`} />
                     </div>
                   </div>
                   {isGraded ? (
                     <div>
                       <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading cost</label>
                       <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
-                        <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => { setGradingCost(e.target.value); setEditFlash(null) }} placeholder="Fee" className={`${field} pl-6 tabular-nums`} />
+                        <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => setGradingCost(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} />
                       </div>
                     </div>
                   ) : (
                     <div>
                       <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Serial</label>
-                      <input type="text" value={serial} onChange={e => { setSerial(e.target.value); setEditFlash(null) }} placeholder="012/100" className={field} />
+                      <input type="text" value={serial} onChange={e => setSerial(e.target.value)} placeholder="012/100" className={field} />
                     </div>
                   )}
                 </div>
@@ -301,21 +300,16 @@ export function ManageHoldingModal({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Serial</label>
-                      <input type="text" value={serial} onChange={e => { setSerial(e.target.value); setEditFlash(null) }} placeholder="012/100" className={field} />
+                      <input type="text" value={serial} onChange={e => setSerial(e.target.value)} placeholder="012/100" className={field} />
                     </div>
                     <div>
                       <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Cert number</label>
-                      <input type="text" inputMode="numeric" value={cert} onChange={e => { setCert(e.target.value); setEditFlash(null) }} placeholder="0011590232" className={`${field} tabular-nums`} />
+                      <input type="text" inputMode="numeric" value={cert} onChange={e => setCert(e.target.value)} placeholder="0011590232" className={`${field} tabular-nums`} />
                     </div>
                   </div>
                 )}
 
                 {editError && <p className="text-xs text-red-600">{editError}</p>}
-                <div className="flex items-center gap-2">
-                  {editFlash && <span className="text-xs font-semibold text-emerald-600">{editFlash}</span>}
-                  <div className="flex-1" />
-                  <button type="button" onClick={saveEdit} disabled={savingEdit} className="px-4 py-2 rounded-lg text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white cursor-pointer disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save changes'}</button>
-                </div>
               </div>
             )
           )}
@@ -394,11 +388,17 @@ export function ManageHoldingModal({
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — one primary action. On the Acquisitions tab it saves
+            everything and closes; other tabs have their own action button, so
+            here it just dismisses. */}
         <div className="flex items-center px-6 py-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-2xl">
           <button type="button" onClick={remove} disabled={removing} className="px-3 py-2 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50">{removing ? 'Removing…' : 'Remove'}</button>
           <div className="flex-1" />
-          <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-bold bg-zinc-900 hover:bg-zinc-800 text-white cursor-pointer">Done</button>
+          {view === 'edit' ? (
+            <button type="button" onClick={saveEdit} disabled={savingEdit} className="px-5 py-2 rounded-lg text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white cursor-pointer disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save changes'}</button>
+          ) : (
+            <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-bold bg-zinc-900 hover:bg-zinc-800 text-white cursor-pointer">Done</button>
+          )}
         </div>
       </div>
     </div>
