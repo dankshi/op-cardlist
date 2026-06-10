@@ -210,7 +210,16 @@ export function ManageHoldingModal({
         {/* Summary */}
         <div className="px-6 py-4 border-b border-zinc-100 flex items-end justify-between gap-3">
           <div>
-            <p className="text-2xl font-bold tabular-nums text-zinc-900 leading-none">{perItem != null ? fmtUSD(perItem) : '—'}<span className="text-xs font-medium text-zinc-400"> /ea</span></p>
+            <p className="text-2xl font-bold tabular-nums leading-none flex items-center gap-1.5">
+              <span className={row.customValue != null ? 'text-amber-600' : 'text-zinc-900'}>{perItem != null ? fmtUSD(perItem) : '—'}</span>
+              <span className="text-xs font-medium text-zinc-400">/ea</span>
+              {row.customValue != null && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide text-amber-700 bg-amber-100 ring-1 ring-amber-200">
+                  <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
+                  Set value
+                </span>
+              )}
+            </p>
             <p className="text-[11px] text-zinc-500 tabular-nums mt-1">{row.acquiredPrice != null ? `Avg ${fmtUSD(row.acquiredPrice)} ea` : 'No cost basis'}</p>
           </div>
           <div className="text-right">

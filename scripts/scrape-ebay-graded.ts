@@ -243,6 +243,34 @@ class HttpEndpointFetcher implements SearchFetcher {
   }
 }
 
+/**
+ * Bright Data Web Unlocker (direct API). POSTs the target URL and gets the raw
+ * unblocked HTML back — Bright Data handles residential proxies, CAPTCHA, and
+ * retries server-side, so this runs fine from any host (incl. datacenter IPs).
+ * It can be slow (internal retries), hence the longer timeout.
+ * Docs: https://docs.brightdata.com/scraping-automation/web-unlocker
+ */
+class BrightDataFetcher implements SearchFetcher {
+  readonly label = 'Bright Data Web Unlocker'
+  constructor(private apiToken: string, private zone: string) {}
+  async fetchHtml(query: string): Promise<string> {
+    const res = await fetch('https://api.brightdata.com/request', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiToken}`,
+      },
+      body: JSON.stringify({ zone: this.zone, url: buildSearchUrl(query), format: 'raw' }),
+      signal: AbortSignal.timeout(90_000),
+    })
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => '')).slice(0, 200)
+      throw new Error(`Bright Data returned HTTP ${res.status}${detail ? `: ${detail}` : ''}`)
+    }
+    return res.text()
+  }
+}
+
 async function scrapeCardSoldListings(
   fetcher: SearchFetcher,
   query: string,
@@ -393,6 +421,7 @@ interface CliOptions {
   threshold?: number
   all?: boolean
   dryRun?: boolean
+  limit?: number
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -402,6 +431,7 @@ function parseArgs(argv: string[]): CliOptions {
     if (a === '--all') out.all = true
     else if (a === '--dry-run') out.dryRun = true
     else if (a === '--threshold') out.threshold = Number(argv[++i])
+    else if (a === '--limit') out.limit = Number(argv[++i])
     else if (!a.startsWith('--')) out.cardId = a
   }
   if (!out.cardId && out.threshold == null && !out.all) {
@@ -415,19 +445,28 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2))
   console.log('Options:', opts)
 
-  const targets = await selectTargets(opts)
+  const allTargets = await selectTargets(opts)
+  // --limit caps the run to the top-N highest-value targets (they're sorted by
+  // market price desc) — keeps trial runs small + cheap on a paid vendor.
+  const targets = opts.limit ? allTargets.slice(0, opts.limit) : allTargets
   if (targets.length === 0) {
     console.log('No matching cards found.')
     return
   }
   console.log(`Scraping ${targets.length} card(s)...`)
 
-  // Fetch seam: route through a scraping vendor when EBAY_FETCH_ENDPOINT is set
-  // (runs on the vendor's residential IPs), else local puppeteer.
+  // Fetch seam, in priority order: Bright Data Web Unlocker (BRIGHTDATA_API_TOKEN
+  // + BRIGHTDATA_ZONE) → generic vendor endpoint (EBAY_FETCH_ENDPOINT) → local
+  // puppeteer. The first two run on vendor residential IPs; puppeteer needs one.
+  const bdToken = process.env.BRIGHTDATA_API_TOKEN
+  const bdZone = process.env.BRIGHTDATA_ZONE
   const endpoint = process.env.EBAY_FETCH_ENDPOINT
   let browser: Browser | null = null
   let fetcher: SearchFetcher
-  if (endpoint) {
+  if (bdToken && bdZone) {
+    fetcher = new BrightDataFetcher(bdToken, bdZone)
+    console.log(`Fetcher: Bright Data Web Unlocker (zone "${bdZone}").`)
+  } else if (endpoint) {
     fetcher = new HttpEndpointFetcher(endpoint)
     console.log('Fetcher: vendor endpoint (EBAY_FETCH_ENDPOINT).')
   } else {
@@ -447,11 +486,15 @@ async function main() {
 
   let totalParsed = 0
   let totalInserted = 0
+  let succeeded = 0
+  let challenged = 0
+  let errored = 0
   const now = new Date()
 
   for (const [i, t] of targets.entries()) {
     try {
       const raw = await scrapeCardSoldListings(fetcher, t.query, !!opts.dryRun)
+      succeeded++
       const expected = expectedVariant(t.cardId, t.tcgName)
       const { rows: parsed, droppedVariant } = rowsFromRawResults(raw, now, expected)
       totalParsed += parsed.length
@@ -493,6 +536,8 @@ async function main() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      if (/challenge/i.test(msg)) challenged++
+      else errored++
       console.error(`[${i + 1}/${targets.length}] ${t.cardId}: ${msg}`)
     }
 
@@ -503,7 +548,11 @@ async function main() {
 
   if (browser) await browser.close()
 
-  console.log(`\nDone. Parsed: ${totalParsed}. Inserted (or upserted): ${totalInserted}.`)
+  console.log(
+    `\nDone. Fetch: ${succeeded}/${targets.length} OK` +
+      `${challenged ? `, ${challenged} challenged` : ''}${errored ? `, ${errored} errored` : ''}. ` +
+      `Parsed: ${totalParsed} graded sales. Inserted (or upserted): ${totalInserted}.`,
+  )
 }
 
 main().catch(err => {

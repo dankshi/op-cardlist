@@ -208,8 +208,16 @@ export function HoldingsGrid({
                     (right) so a return never adds a row and shifts the layout. */}
                 <button type="button" onClick={() => setManagingId(row.id)} className="block w-full text-left cursor-pointer">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xl font-bold tabular-nums tracking-tight text-zinc-100 leading-none">
-                      {row.marketPrice != null ? fmtUSD(row.marketPrice) : '—'}
+                    <span className="flex items-center gap-1 min-w-0">
+                      <span className={`text-xl font-bold tabular-nums tracking-tight leading-none ${row.isCustomValue ? 'text-amber-400' : 'text-zinc-100'}`}>
+                        {row.marketPrice != null ? fmtUSD(row.marketPrice) : '—'}
+                      </span>
+                      {row.isCustomValue && (
+                        <svg className="w-3 h-3 flex-shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+                          <title>Your set value (override)</title>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                        </svg>
+                      )}
                     </span>
                     {hasReturn && (
                       <span className={`text-[11px] font-semibold tabular-nums leading-none whitespace-nowrap ${retColor}`}>
