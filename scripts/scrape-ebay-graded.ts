@@ -176,17 +176,25 @@ function isChallengeHtml(html: string): boolean {
 /**
  * Extract sold-listing rows from eBay search HTML. Source-independent: the same
  * parser runs whether the HTML came from local puppeteer or a scraping vendor,
- * so the fragile fetch and the stable parse evolve separately. Tries legacy
- * (.s-item) and newer (.s-card / .srp-river-results-item) result selectors.
+ * so the fragile fetch and the stable parse evolve separately.
+ *
+ * eBay's current search markup is the `.s-card` family (`.s-card__title` /
+ * `.s-card__price` / `.s-card__caption`); the legacy `.s-item` / `srp-river`
+ * selectors are kept as fallbacks in case an older layout is ever served. The
+ * "Shop on eBay" placeholder cards are filtered by title.
  */
 function parseSoldSearchHtml(html: string): { results: RawListing[]; chosen: string; nodeCount: number } {
   const $ = cheerio.load(html)
   const results: RawListing[] = []
-  for (const sel of ['li.s-item', 'div.s-card', 'li.srp-river-results-item']) {
+  for (const sel of ['.s-card', 'li.s-item', 'li.srp-river-results-item']) {
     const found = $(sel)
     if (found.length === 0) continue
     found.each((_, el) => {
       const item = $(el)
+      // eBay hides screen-reader text ("Opens in a new window or tab") in .clipped
+      // spans that get concatenated onto the title and mangle the grade parse
+      // (e.g. "BGS 9.5Opens…" → parsed as "9"). Drop them before reading text.
+      item.find('.clipped').remove()
       const pick = (sels: string[]): string => {
         for (const s of sels) {
           const t = item.find(s).first().text().trim()
@@ -194,9 +202,9 @@ function parseSoldSearchHtml(html: string): { results: RawListing[]; chosen: str
         }
         return ''
       }
-      const title = pick(['.s-item__title', '[class*="title"]'])
-      const priceText = pick(['.s-item__price', '[class*="price"]'])
-      const soldText = pick(['.s-item__caption--signal', '.s-item__title--tagblock', '[class*="caption"]'])
+      const title = pick(['.s-card__title', '.s-item__title', '[class*="title"]'])
+      const priceText = pick(['.s-card__price', '.s-item__price', '[class*="price"]'])
+      const soldText = pick(['.s-card__caption', '.s-item__caption--signal', '.s-item__title--tagblock', '[class*="caption"]'])
       const url = item.find('a[href*="/itm/"]').first().attr('href') ?? ''
       if (!title || /shop on ebay/i.test(title)) return
       results.push({ title, priceText, soldText, url })
@@ -511,28 +519,46 @@ async function main() {
       }
 
       if (!opts.dryRun && parsed.length > 0) {
-        const rows = parsed.map(p => ({
-          card_id: t.cardId,
-          source: 'ebay',
-          source_item_id: p.ebayItemId,
-          grading_company: p.gradingCompany,
-          grade: p.grade,
-          sale_kind: 'sold',
-          sold_at: p.soldAt.toISOString(),
-          price: p.price,
-          title: p.title,
-          ebay_item_id: p.ebayItemId,
-          listing_url: p.listingUrl,
-          parse_confidence: p.parseConfidence,
-        }))
-        // Dedup on ebay_item_id (its partial unique index survived the rename to
-        // slab_sales). ignoreDuplicates means an admin-set status='excluded' on a
-        // previously-seen sale is never resurrected by a re-scrape.
-        const { error } = await supabase
-          .from('slab_sales')
-          .upsert(rows, { onConflict: 'ebay_item_id', ignoreDuplicates: true })
-        if (error) console.error(`  upsert error for ${t.cardId}:`, error.message)
-        else totalInserted += rows.length
+        // Dedup in-app rather than via ON CONFLICT: our unique indexes are
+        // partial (WHERE ...), which Postgres can't infer for an upsert target.
+        // Skip eBay items we already have (ebay_item_id is globally unique, so
+        // check across all cards) — this preserves any admin-set status on them
+        // (an excluded sale won't be re-inserted) — then plain-insert the rest.
+        const itemIds = parsed.map(p => p.ebayItemId).filter((x): x is string => !!x)
+        const existing = new Set<string>()
+        if (itemIds.length) {
+          const { data: have } = await supabase
+            .from('slab_sales')
+            .select('ebay_item_id')
+            .in('ebay_item_id', itemIds)
+          for (const r of have ?? []) if (r.ebay_item_id) existing.add(r.ebay_item_id as string)
+        }
+        const seen = new Set<string>()
+        const fresh = parsed.filter(p => {
+          if (!p.ebayItemId) return true // no id → rely on the natural-key index
+          if (existing.has(p.ebayItemId) || seen.has(p.ebayItemId)) return false
+          seen.add(p.ebayItemId)
+          return true
+        })
+        if (fresh.length > 0) {
+          const rows = fresh.map(p => ({
+            card_id: t.cardId,
+            source: 'ebay',
+            source_item_id: p.ebayItemId,
+            grading_company: p.gradingCompany,
+            grade: p.grade,
+            sale_kind: 'sold',
+            sold_at: p.soldAt.toISOString(),
+            price: p.price,
+            title: p.title,
+            ebay_item_id: p.ebayItemId,
+            listing_url: p.listingUrl,
+            parse_confidence: p.parseConfidence,
+          }))
+          const { error } = await supabase.from('slab_sales').insert(rows)
+          if (error) console.error(`  insert error for ${t.cardId}:`, error.message)
+          else totalInserted += rows.length
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
