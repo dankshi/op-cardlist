@@ -10,7 +10,7 @@ export const WINDOWS_DAYS = [90, 180, 365] // try narrowest first; widen when th
 export const MIN_FOR_WINDOW = 3 // a window "counts" once it has at least this many sales
 export const TRIM_LOW = 0.4 // drop sales below median * TRIM_LOW
 export const TRIM_HIGH = 2.5 // drop sales above median * TRIM_HIGH
-export const RECENCY_HALFLIFE_DAYS = 30 // weight = exp(-ageDays / HALFLIFE)
+export const RECENCY_HALFLIFE_DAYS = 14 // weight = exp(-ageDays / HALFLIFE); shorter ⇒ recent sales dominate
 export const HIGH_MIN_N = 8 // >= this many trimmed sales ...
 export const HIGH_MAX_DISPERSION = 0.25 // ... and dispersion below this → "high"
 export const MEDIUM_MIN_N = 3 // >= this many → "medium"
@@ -97,8 +97,10 @@ export function computeVariantValue(sales: Sale[], now: Date): ComputedValue {
   }
   if (windowed.length === 0) return base
 
-  // Trim outliers relative to the raw median.
-  const med0 = median(windowed.map(s => s.price).sort((a, b) => a - b))
+  // Anchor the outlier trim on the RECENCY-WEIGHTED median, not the flat window
+  // median — so a genuine recent run-up isn't clipped (the band tracks the
+  // current level) while one-off spikes and stale lows still get trimmed.
+  const med0 = weightedMedian(windowed.map(s => ({ v: s.price, w: Math.exp(-ageDays(s) / RECENCY_HALFLIFE_DAYS) })))
   const kept = windowed.filter(s => s.price >= med0 * TRIM_LOW && s.price <= med0 * TRIM_HIGH)
   if (kept.length === 0) return base
 

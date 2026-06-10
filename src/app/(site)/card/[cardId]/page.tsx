@@ -62,9 +62,15 @@ function buildVariants(
     }
   }
 
-  // Union of all known variant keys. Always include 'raw' so it leads the
-  // chip row even when nobody's listed a raw copy.
+  // Union of all known variant keys. Always include 'raw' so it leads the chip
+  // row even when nobody's listed a raw copy. Also seed any variant we have a
+  // computed comp for (slab_market_values): population data is PSA-only and
+  // BGS/CGC/TAG often have no active listings, so without this their comp would
+  // have no chip to attach to and the price would show "—" despite real sales.
   const keys = new Set<string>(['raw', ...listingsByKey.keys(), ...popsByKey.keys()]);
+  for (const v of slabValues.values()) {
+    if (v.gradingCompany && v.grade) keys.add(`${v.gradingCompany}-${v.grade}`);
+  }
 
   const variants: VariantData[] = [];
   for (const key of keys) {

@@ -166,9 +166,12 @@ interface RawListing {
   format: string | null // auction | buy_it_now | best_offer | null
 }
 
-/** eBay sold/completed search, most-recently-ended first, 120 per page. */
-function buildSearchUrl(query: string): string {
-  return `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Sold=1&LH_Complete=1&_sop=13&_ipg=120`
+/** eBay search URL. sold=true → sold/completed, most-recently-ended first.
+ *  sold=false → currently-active listings (used to detect still-live items that
+ *  eBay's sold search wrongly includes — GTC/relisted). 120 per page. */
+function buildSearchUrl(query: string, sold = true): string {
+  const params = sold ? '&LH_Sold=1&LH_Complete=1&_sop=13' : ''
+  return `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}${params}&_ipg=120`
 }
 
 /** Cheap detection of an eBay bot-challenge / interstitial page. */
@@ -220,12 +223,19 @@ function parseSoldSearchHtml(html: string): { results: RawListing[]; chosen: str
         if (/ebayimg\.com/i.test(src)) imageUrl = src
       })
       if (!imageUrl) imageUrl = item.find('img').first().attr('src') ?? ''
-      // Listing format from the attribute rows. Best Offer "sold" prices are the
-      // asking price (eBay hides the accepted offer), so we flag those downstream.
-      const attrs = item.find('.s-card__attribute-row').map((_, a) => $(a).text()).get().join(' ').toLowerCase()
-      const format = /best offer/.test(attrs) ? 'best_offer'
-        : /buy it now/.test(attrs) ? 'buy_it_now'
-        : /\bbids?\b/.test(attrs) ? 'auction'
+      // Listing format. Crucially distinguish a real accepted-offer sale ("Best
+      // offer accepted" — eBay strikes through the original ask and HIDES the
+      // actual lower price, so it's unreliable) from a listing that merely
+      // *offered* Best Offer but sold at the shown price ("or Best Offer" —
+      // reliable). The offer text lives in the price block, not the attribute
+      // rows, so read the whole card.
+      // No \b boundaries: eBay concatenates the price block ("$1,300.00or Best
+      // Offer"), so a boundary before "or" wouldn't match.
+      const cardText = item.text().toLowerCase()
+      const format = /best offer accepted/.test(cardText) ? 'best_offer'
+        : /or best offer/.test(cardText) ? 'buy_it_now'
+        : /buy it now/.test(cardText) ? 'buy_it_now'
+        : /\d+\s*bids?/.test(cardText) ? 'auction'
         : null
       results.push({ title, priceText, soldText, url, imageUrl, format })
     })
@@ -244,14 +254,14 @@ function parseSoldSearchHtml(html: string): { results: RawListing[]; chosen: str
 
 interface SearchFetcher {
   readonly label: string
-  fetchHtml(query: string): Promise<string>
+  fetchHtml(query: string, sold?: boolean): Promise<string>
 }
 
 class PuppeteerFetcher implements SearchFetcher {
   readonly label = 'local puppeteer'
   constructor(private page: Page) {}
-  async fetchHtml(query: string): Promise<string> {
-    await this.page.goto(buildSearchUrl(query), { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS })
+  async fetchHtml(query: string, sold = true): Promise<string> {
+    await this.page.goto(buildSearchUrl(query, sold), { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS })
     return this.page.content()
   }
 }
@@ -259,8 +269,8 @@ class PuppeteerFetcher implements SearchFetcher {
 class HttpEndpointFetcher implements SearchFetcher {
   readonly label = 'vendor endpoint'
   constructor(private template: string) {}
-  async fetchHtml(query: string): Promise<string> {
-    const target = buildSearchUrl(query)
+  async fetchHtml(query: string, sold = true): Promise<string> {
+    const target = buildSearchUrl(query, sold)
     // Template may contain {url} (substituted, encoded) or be a prefix to append the encoded target to.
     const endpoint = this.template.includes('{url}')
       ? this.template.replace('{url}', encodeURIComponent(target))
@@ -281,14 +291,14 @@ class HttpEndpointFetcher implements SearchFetcher {
 class BrightDataFetcher implements SearchFetcher {
   readonly label = 'Bright Data Web Unlocker'
   constructor(private apiToken: string, private zone: string) {}
-  async fetchHtml(query: string): Promise<string> {
+  async fetchHtml(query: string, sold = true): Promise<string> {
     const res = await fetch('https://api.brightdata.com/request', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiToken}`,
       },
-      body: JSON.stringify({ zone: this.zone, url: buildSearchUrl(query), format: 'raw' }),
+      body: JSON.stringify({ zone: this.zone, url: buildSearchUrl(query, sold), format: 'raw' }),
       signal: AbortSignal.timeout(90_000),
     })
     if (!res.ok) {
@@ -340,6 +350,9 @@ function rowsFromRawResults(
     const ebayItemId = parseEbayItemId(r.url)
     // Low confidence when the title smells like a lot/bundle OR the variant is
     // ambiguous (special target, but the title gives no special signal).
+    // An accepted-offer sale (format 'best_offer') shows the struck-through ask,
+    // not the real (hidden, lower) sale price — so its price is unreliable → low.
+    // A plain "or Best Offer" listing that sold at list price is reliable.
     const confidence =
       parseConfidence(r.title) === 'low' || vm === 'uncertain' || r.format === 'best_offer' ? 'low' : 'high'
     out.push({
@@ -382,15 +395,25 @@ function buildQuery(cardId: string, productName: string | null): string {
   const baseCode = cardId.replace(/_[^_]+$/, '')
   if (!productName) return baseCode
 
-  // Pull descriptive bits from the TCGPlayer product name like
-  // "Monkey.D.Luffy (118) (Red Super Alternate Art)" → "Red Super Alt"
-  const variantMatch = productName.match(/\(([^()]+)\)\s*$/)
-  if (!variantMatch) return baseCode
-  const variant = variantMatch[1]
-    .replace(/alternate art/i, 'alt art')
-    .replace(/parallel/i, '')
+  // Human-style search: "<number> <character> <rarity spelled out>", e.g.
+  // "OP07-109 Luffy treasure rare". Two fixes vs the old "<number> TR":
+  //   1. Spell out the rarity — sellers write "Treasure Rare", rarely the "TR"
+  //      abbreviation, so requiring "TR" silently dropped real sales.
+  //   2. Keep the rarity word as the precision filter — eBay tokenizes
+  //      "OP07-109" into OP07 + 109, so number-only matches any OP07 Luffy lot
+  //      mentioning "109"; the rarity word pins it to the right card.
+  const lead = productName.replace(/\s*\(.*$/, '').trim()
+  const name = lead.split(/[.\s]+/).filter(Boolean).pop() ?? '' // "Monkey.D.Luffy" → "Luffy"
+  const tail = productName.match(/\(([^()]+)\)\s*$/)
+  const rarity = (tail?.[1] ?? '')
+    .toLowerCase()
+    .replace(/^tr$/, 'treasure rare')
+    .replace(/^sec$/, 'secret rare')
+    .replace(/^sr$/, 'super rare')
+    .replace(/alternate art/, 'alt art')
+    .replace(/parallel/, '')
     .trim()
-  return `${baseCode} ${variant}`.trim()
+  return [baseCode, name, rarity].filter(Boolean).join(' ')
 }
 
 async function selectTargets(opts: {
@@ -453,6 +476,7 @@ interface CliOptions {
   all?: boolean
   dryRun?: boolean
   limit?: number
+  refresh?: boolean
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -461,6 +485,7 @@ function parseArgs(argv: string[]): CliOptions {
     const a = argv[i]
     if (a === '--all') out.all = true
     else if (a === '--dry-run') out.dryRun = true
+    else if (a === '--refresh') out.refresh = true
     else if (a === '--threshold') out.threshold = Number(argv[++i])
     else if (a === '--limit') out.limit = Number(argv[++i])
     else if (!a.startsWith('--')) out.cardId = a
@@ -524,6 +549,11 @@ async function main() {
 
   for (const [i, t] of targets.entries()) {
     try {
+      // --refresh: clear this card's eBay rows first so a re-scrape re-classifies
+      // them (new grades/formats/active-status) instead of being skipped by dedup.
+      if (opts.refresh && !opts.dryRun) {
+        await supabase.from('slab_sales').delete().eq('card_id', t.cardId).eq('source', 'ebay')
+      }
       const raw = await scrapeCardSoldListings(fetcher, t.query, !!opts.dryRun)
       succeeded++
       const expected = expectedVariant(t.cardId, t.tcgName)

@@ -46,7 +46,7 @@ async function main() {
   since.setDate(since.getDate() - MAX_LOOKBACK_DAYS)
   let query = supabase
     .from('slab_sales')
-    .select('card_id, grading_company, grade, price, sold_at')
+    .select('card_id, grading_company, grade, price, sold_at, listing_format')
     .eq('status', 'visible')
     .eq('sale_kind', 'sold')
     .gte('sold_at', since.toISOString())

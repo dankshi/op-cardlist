@@ -249,6 +249,7 @@ export interface GradedSalePoint {
   grade: string;
   title: string;
   listing_url: string | null;
+  listing_format: string | null;
 }
 
 /**
@@ -370,9 +371,10 @@ export async function getCardGradedSales(
 
   const { data: rows } = await supabase
     .from('slab_sales')
-    .select('sold_at, price, grading_company, grade, title, listing_url')
+    .select('sold_at, price, grading_company, grade, title, listing_url, listing_format')
     .eq('card_id', cardId)
     .eq('status', 'visible')
+    .eq('sale_kind', 'sold') // exclude still-active listings (GTC/relisted) — not real sales
     .gte('sold_at', startDate.toISOString())
     .order('sold_at', { ascending: true });
 
@@ -385,6 +387,7 @@ export async function getCardGradedSales(
     grade: r.grade,
     title: r.title,
     listing_url: r.listing_url,
+    listing_format: r.listing_format,
   }));
 }
 

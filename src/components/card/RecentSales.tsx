@@ -23,6 +23,7 @@ interface GradedSale {
   grade: string;
   title: string;
   listing_url: string | null;
+  listing_format: string | null;
 }
 
 const PERIODS = [
@@ -301,6 +302,7 @@ function GradedSalesView({ sales, company, grade }: { sales: GradedSale[]; compa
             source: 'eBay' as const,
             quantity: 1,
             href: s.listing_url ?? undefined,
+            format: s.listing_format,
           }))}
           emptyText={`No ${company} ${grade} sales in the last ${period} days.`}
         />
@@ -401,6 +403,7 @@ interface SaleRow {
   source: SaleSource;
   quantity: number;
   href?: string;
+  format?: string | null;  // eBay listing format — flag Best Offer
 }
 
 function SalesList({ rows, emptyText }: { rows: SaleRow[]; emptyText: string }) {
@@ -435,6 +438,14 @@ function SaleListItem({ row }: { row: SaleRow }) {
             {row.label ?? (isEbay ? 'Graded sale' : 'Sale')}
           </span>
           {linkable && <span className="flex-shrink-0 text-[11px] font-medium text-blue-600">eBay ↗</span>}
+          {row.format === 'best_offer' && (
+            <span
+              className="flex-shrink-0 text-[10px] font-medium px-1 py-0.5 rounded bg-orange-50 text-orange-600"
+              title="Best Offer — eBay shows the asking price, not the (hidden) accepted offer"
+            >
+              Best Offer
+            </span>
+          )}
         </div>
         <div className="text-xs text-zinc-400 mt-0.5">
           {formatSaleDate(row.date)} · {row.source}
