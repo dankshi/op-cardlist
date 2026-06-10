@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { HoverThumb } from '@/components/admin/HoverThumb'
 
 export interface SlabSaleRow {
   id: string
@@ -15,6 +16,9 @@ export interface SlabSaleRow {
   soldAt: string
   title: string
   listingUrl: string | null
+  cardImageUrl: string | null
+  ebayImageUrl: string | null
+  listingFormat: string | null
   status: 'visible' | 'hidden' | 'excluded'
   excludedReason: string | null
   parseConfidence: string | null
@@ -116,6 +120,7 @@ export function SlabSalesTable({ rows }: { rows: SlabSaleRow[] }) {
                 <input type="checkbox" checked={selected.size === rows.length} onChange={toggleAll} aria-label="Select all" />
               </th>
               <th className="px-3 py-2">Card</th>
+              <th className="px-3 py-2">Verify</th>
               <th className="px-3 py-2">Variant</th>
               <th className="px-3 py-2 text-right">Price</th>
               <th className="px-3 py-2">Sold</th>
@@ -144,12 +149,27 @@ export function SlabSalesTable({ rows }: { rows: SlabSaleRow[] }) {
                     </Link>
                     {row.cardName && <div className="text-zinc-500 text-xs">{row.cardName}</div>}
                   </td>
+                  <td className="px-3 py-2 align-top">
+                    {/* Our card vs the eBay listing photo, side by side. Hover
+                        either to expand for quick verification. */}
+                    <div className="flex items-start gap-1.5">
+                      {row.cardImageUrl
+                        ? <HoverThumb src={row.cardImageUrl} alt={`${row.cardId} (ours)`} href={`/card/${row.cardId.toLowerCase()}`} className="w-11 rounded border border-zinc-200" />
+                        : <ImgPlaceholder label="ours" />}
+                      {row.ebayImageUrl
+                        ? <HoverThumb src={row.ebayImageUrl} alt="eBay listing photo" className="w-11 rounded border border-zinc-200" />
+                        : <ImgPlaceholder label="eBay" />}
+                    </div>
+                  </td>
                   <td className="px-3 py-2 align-top whitespace-nowrap">{row.company} {row.grade}</td>
                   <td className="px-3 py-2 align-top text-right tabular-nums">${row.price.toLocaleString()}</td>
                   <td className="px-3 py-2 align-top whitespace-nowrap text-zinc-600">{row.soldAt.slice(0, 10)}</td>
                   <td className="px-3 py-2 align-top">
                     <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">{row.source}</span>
-                    {row.parseConfidence === 'low' && (
+                    {row.listingFormat === 'best_offer' && (
+                      <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-orange-50 text-orange-600" title="Best Offer — eBay shows the asking price, not the (hidden) accepted offer">best offer</span>
+                    )}
+                    {row.parseConfidence === 'low' && row.listingFormat !== 'best_offer' && (
                       <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600" title="Low parse confidence">parse?</span>
                     )}
                   </td>
@@ -186,5 +206,13 @@ export function SlabSalesTable({ rows }: { rows: SlabSaleRow[] }) {
         </table>
       </div>
     </div>
+  )
+}
+
+function ImgPlaceholder({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center justify-center w-11 h-14 rounded border border-dashed border-zinc-200 text-[9px] text-zinc-300">
+      {label}
+    </span>
   )
 }

@@ -37,7 +37,7 @@ export default async function SlabSalesAdminPage({
 
   let query = admin
     .from('slab_sales')
-    .select('id, card_id, source, grading_company, grade, price, sold_at, title, listing_url, status, excluded_reason, parse_confidence')
+    .select('id, card_id, source, grading_company, grade, price, sold_at, title, listing_url, image_url, listing_format, status, excluded_reason, parse_confidence')
     .order('sold_at', { ascending: false })
     .limit(PAGE_LIMIT)
   if (status) query = query.eq('status', status)
@@ -49,25 +49,31 @@ export default async function SlabSalesAdminPage({
   const sales = salesRaw ?? []
   const cardIds = [...new Set(sales.map(s => s.card_id as string))]
   const { data: cardRows } = cardIds.length
-    ? await admin.from('cards').select('id, name').in('id', cardIds)
-    : { data: [] as { id: string; name: string }[] }
-  const nameById = new Map((cardRows ?? []).map(c => [c.id, c.name]))
+    ? await admin.from('cards').select('id, name, image_url').in('id', cardIds)
+    : { data: [] as { id: string; name: string; image_url: string | null }[] }
+  const cardById = new Map((cardRows ?? []).map(c => [c.id, c]))
 
-  const rows: SlabSaleRow[] = sales.map(s => ({
-    id: String(s.id),
-    cardId: s.card_id as string,
-    cardName: nameById.get(s.card_id as string) ?? '',
-    source: s.source as string,
-    company: s.grading_company as string,
-    grade: s.grade as string,
-    price: Number(s.price),
-    soldAt: s.sold_at as string,
-    title: s.title as string,
-    listingUrl: (s.listing_url as string | null) ?? null,
-    status: s.status as SlabSaleRow['status'],
-    excludedReason: (s.excluded_reason as string | null) ?? null,
-    parseConfidence: (s.parse_confidence as string | null) ?? null,
-  }))
+  const rows: SlabSaleRow[] = sales.map(s => {
+    const card = cardById.get(s.card_id as string)
+    return {
+      id: String(s.id),
+      cardId: s.card_id as string,
+      cardName: card?.name ?? '',
+      source: s.source as string,
+      company: s.grading_company as string,
+      grade: s.grade as string,
+      price: Number(s.price),
+      soldAt: s.sold_at as string,
+      title: s.title as string,
+      listingUrl: (s.listing_url as string | null) ?? null,
+      cardImageUrl: (card?.image_url as string | null) ?? null,
+      ebayImageUrl: (s.image_url as string | null) ?? null,
+      listingFormat: (s.listing_format as string | null) ?? null,
+      status: s.status as SlabSaleRow['status'],
+      excludedReason: (s.excluded_reason as string | null) ?? null,
+      parseConfidence: (s.parse_confidence as string | null) ?? null,
+    }
+  })
 
   return (
     <div className="p-6 max-w-6xl">

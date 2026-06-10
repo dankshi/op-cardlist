@@ -48,6 +48,8 @@ interface ParsedSale {
   title: string
   ebayItemId: string | null
   listingUrl: string | null
+  imageUrl: string | null
+  listingFormat: string | null
   parseConfidence: 'high' | 'low'
 }
 
@@ -65,9 +67,10 @@ interface ParsedSale {
 export function parseGradeFromTitle(title: string): { company: GradingCompany; grade: string } | null {
   const upper = title.toUpperCase()
 
-  // Special-case BGS Black Label = 10
+  // BGS Black Label tracked as its own grade ("Black Label 10"), matching the
+  // grade-ladder chip — not folded into BGS 10.
   if (/\bBGS\b.*\bBLACK\s*LABEL\b|\bBLACK\s*LABEL\b.*\bBGS\b/.test(upper)) {
-    return { company: 'BGS', grade: '10' }
+    return { company: 'BGS', grade: 'Black Label 10' }
   }
 
   // Standard pattern: <COMPANY> [optional adjective like GEM MINT] <grade>
@@ -159,6 +162,8 @@ interface RawListing {
   priceText: string
   soldText: string
   url: string
+  imageUrl: string
+  format: string | null // auction | buy_it_now | best_offer | null
 }
 
 /** eBay sold/completed search, most-recently-ended first, 120 per page. */
@@ -203,11 +208,26 @@ function parseSoldSearchHtml(html: string): { results: RawListing[]; chosen: str
         return ''
       }
       const title = pick(['.s-card__title', '.s-item__title', '[class*="title"]'])
+      if (!title || /shop on ebay/i.test(title)) return
       const priceText = pick(['.s-card__price', '.s-item__price', '[class*="price"]'])
       const soldText = pick(['.s-card__caption', '.s-item__caption--signal', '.s-item__title--tagblock', '[class*="caption"]'])
       const url = item.find('a[href*="/itm/"]').first().attr('href') ?? ''
-      if (!title || /shop on ebay/i.test(title)) return
-      results.push({ title, priceText, soldText, url })
+      // Listing image (prefer an i.ebayimg.com URL) for admin verification.
+      let imageUrl = ''
+      item.find('img').each((_, im) => {
+        if (imageUrl) return
+        const src = $(im).attr('src') || $(im).attr('data-src') || ''
+        if (/ebayimg\.com/i.test(src)) imageUrl = src
+      })
+      if (!imageUrl) imageUrl = item.find('img').first().attr('src') ?? ''
+      // Listing format from the attribute rows. Best Offer "sold" prices are the
+      // asking price (eBay hides the accepted offer), so we flag those downstream.
+      const attrs = item.find('.s-card__attribute-row').map((_, a) => $(a).text()).get().join(' ').toLowerCase()
+      const format = /best offer/.test(attrs) ? 'best_offer'
+        : /buy it now/.test(attrs) ? 'buy_it_now'
+        : /\bbids?\b/.test(attrs) ? 'auction'
+        : null
+      results.push({ title, priceText, soldText, url, imageUrl, format })
     })
     return { results, chosen: sel, nodeCount: found.length }
   }
@@ -320,7 +340,8 @@ function rowsFromRawResults(
     const ebayItemId = parseEbayItemId(r.url)
     // Low confidence when the title smells like a lot/bundle OR the variant is
     // ambiguous (special target, but the title gives no special signal).
-    const confidence = parseConfidence(r.title) === 'low' || vm === 'uncertain' ? 'low' : 'high'
+    const confidence =
+      parseConfidence(r.title) === 'low' || vm === 'uncertain' || r.format === 'best_offer' ? 'low' : 'high'
     out.push({
       gradingCompany: gradeInfo.company,
       grade: gradeInfo.grade,
@@ -329,6 +350,8 @@ function rowsFromRawResults(
       title: r.title,
       ebayItemId,
       listingUrl: r.url || null,
+      imageUrl: r.imageUrl || null,
+      listingFormat: r.format,
       parseConfidence: confidence,
     })
   }
@@ -553,6 +576,8 @@ async function main() {
             title: p.title,
             ebay_item_id: p.ebayItemId,
             listing_url: p.listingUrl,
+            image_url: p.imageUrl,
+            listing_format: p.listingFormat,
             parse_confidence: p.parseConfidence,
           }))
           const { error } = await supabase.from('slab_sales').insert(rows)
