@@ -581,7 +581,9 @@ async function notifyDiscord(
   }
   fields.push(
     { name: 'Cards scraped', value: String(stats.productsScraped ?? '—'), inline: true },
-    { name: 'Sales stored', value: String(stats.salesStored ?? '—'), inline: true },
+    // 'New sales' = rows actually inserted; 'seen' = fetched (mostly dupes on a
+    // re-scrape, since each run re-pulls the rolling 90-day window).
+    { name: 'New sales', value: `${stats.salesStored ?? '—'}${stats.salesSeen != null ? ` (of ${stats.salesSeen} seen)` : ''}`, inline: true },
   );
   // List the actual cards scraped (id + sales found), capped to Discord's
   // 1024-char field limit so a big window doesn't get the message rejected.
@@ -762,7 +764,8 @@ async function main() {
   // Hoisted to function scope so the final run-record stats can read them
   // (the sales block reassigns these).
   let lastSoldFound = 0;
-  let totalSalesStored = 0;
+  let totalSalesStored = 0; // sales SEEN this run (fetched + sent to upsert)
+  let totalSalesNew = 0;    // sales actually INSERTED (not already in card_sales)
   let salesProductsScraped = 0;
   // Exact cards touched this run (for the HQ run drill-down).
   const scrapedCards: { cardId: string; productId: number; sales: number }[] = [];
@@ -1017,6 +1020,7 @@ async function main() {
 
     lastSoldFound = 0;
     totalSalesStored = 0;
+    totalSalesNew = 0;
     // last_sold_* and sales_scraped_at live on tcgplayer_products now
     // (keyed by product_id). Multiple cards mapped to the same product
     // share one product-level entry — dedupe on the way in.
@@ -1086,17 +1090,22 @@ async function main() {
         pendingSalesScraped = [];
       }
       if (pendingSales.length > 0) {
-        const { error } = await supabase
+        // ignoreDuplicates → ON CONFLICT DO NOTHING, so .select() returns ONLY
+        // the rows actually inserted. pendingSales.length is "seen" (mostly
+        // dupes on a re-scrape); inserted.length is the genuinely-NEW sales.
+        const { data: inserted, error } = await supabase
           .from('card_sales')
           .upsert(pendingSales, {
             onConflict: 'tcgplayer_product_id,sold_at,price,condition,variant,language',
             ignoreDuplicates: true,
-          });
+          })
+          .select('id');
         if (error) {
           console.error(`  Supabase card_sales upsert error:`, error.message);
           dbWriteErrors++;
         } else {
           totalSalesStored += pendingSales.length;
+          totalSalesNew += inserted?.length ?? 0;
         }
         pendingSales = [];
       }
@@ -1211,7 +1220,8 @@ async function main() {
     totalFound,
     totalNotFound,
     totalManualPreserved,
-    salesStored: totalSalesStored,
+    salesStored: totalSalesNew,    // genuinely-new sales inserted this run
+    salesSeen: totalSalesStored,   // sales fetched + sent (mostly dupes on re-scrape)
     productsScraped: salesProductsScraped,
     productsWithSales: lastSoldFound,
     fetch: { ...fetchStats },
