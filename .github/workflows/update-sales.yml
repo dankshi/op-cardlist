@@ -49,10 +49,12 @@ jobs:
           TRIGGER_SOURCE: ${{ github.event.inputs.trigger_source }}
           # Sales-only — skips the price scrape, rotates the stalest products.
           SCRAPE_PHASE: sales
-          # 20 (not 30) so each run finishes inside the 5-min cron tick instead
-          # of stretching past it and queueing — keeps cadence regular and eases
-          # TCGplayer rate-limiting. Tune against run duration + "Full cycle (est)".
-          SALES_ROTATION_LIMIT: '20'
+          # Small window (10) so each run finishes well inside the 5-min cron tick
+          # and then IDLES until the next one — giving TCGplayer a breather between
+          # runs instead of back-to-back hammering. Fewer concurrent requests also
+          # means far fewer 429 give-ups. Rate-limited-out products aren't marked
+          # scraped, so they just retry next run. Tune vs duration + give-up count.
+          SALES_ROTATION_LIMIT: '10'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           # Service role lets the scraper record runs to scraper_runs and read
