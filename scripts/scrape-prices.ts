@@ -381,11 +381,17 @@ async function fetchSalesPageWithRetry(
 }
 
 // Paginated fetch — walks pages until no more, hits MAX_PAGES, or sales reach
-// the 90-day cutoff. Returns [] on persistent failure.
-async function fetchSales(productId: number): Promise<SaleRecord[]> {
+// the 90-day cutoff. Returns the sales plus `rateLimitedOut`: true when we got
+// ZERO successful pages and the blocker was a 429 (i.e. we scraped nothing
+// because of throttling, not because the product genuinely has no sales). The
+// caller uses that to skip the rotation-cursor bump so the product stays stale
+// and is retried next run instead of waiting a full cycle.
+async function fetchSales(productId: number): Promise<{ sales: SaleRecord[]; rateLimitedOut: boolean }> {
   const all: SaleRecord[] = [];
   const snapshotTime = Date.now();
   const cutoff = Date.now() - CUTOFF_DAYS * 86_400_000;
+  let okPages = 0;
+  let lastBlocker: 'rate_limited' | 'error' | null = null;
 
   for (let page = 0; page < MAX_PAGES_PER_PRODUCT; page++) {
     if (page > 0) {
@@ -400,11 +406,13 @@ async function fetchSales(productId: number): Promise<SaleRecord[]> {
         console.warn(`  ⚠ fetchSales(${productId}): ${result.message}`);
       }
       if (result.kind === 'error') fetchStats.error++;
-      // On rate-limit we return what we already have rather than nothing.
-      return all;
+      lastBlocker = result.kind === 'error' ? 'error' : 'rate_limited';
+      // Stop here — return whatever earlier pages gave us.
+      break;
     }
 
     fetchStats.ok++;
+    okPages++;
     if (result.sales.length === PAGE_SIZE) fetchStats.pagesWith25++;
     if (authCookie && result.totalResults > 5) fetchStats.authedPages++;
 
@@ -416,7 +424,10 @@ async function fetchSales(productId: number): Promise<SaleRecord[]> {
     if (!result.hasMore || oldestMs < cutoff) break;
   }
 
-  return all;
+  // Only a 429 with no successful page counts as "rate-limited out". A clean
+  // empty result (ok page, 0 sales) or a hard HTTP error still bumps the cursor
+  // — the latter so a permanently-broken product can't jam the rotation front.
+  return { sales: all, rateLimitedOut: okPages === 0 && lastBlocker === 'rate_limited' };
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -1119,12 +1130,17 @@ async function main() {
       const now = new Date().toISOString();
       for (let j = 0; j < batch.length; j++) {
         const { productId } = batch[j];
-        const sales = results[j];
-        // Always mark as attempted so rotation moves on, even if no sales returned.
-        pendingSalesScraped.push({
-          product_id: productId,
-          sales_scraped_at: now,
-        });
+        const { sales, rateLimitedOut } = results[j];
+        // Bump the rotation cursor when we actually scraped this product —
+        // including a clean empty result. But if it was rate-limited out (zero
+        // pages fetched due to 429s), DON'T bump: leave it stale so it's retried
+        // on the next run instead of waiting a full cycle for nothing.
+        if (!rateLimitedOut) {
+          pendingSalesScraped.push({
+            product_id: productId,
+            sales_scraped_at: now,
+          });
+        }
         if (scrapedCards.length < 500) {
           scrapedCards.push({ cardId: batch[j].cardId, productId, sales: sales.length });
         }
