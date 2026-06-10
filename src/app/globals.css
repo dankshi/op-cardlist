@@ -8,6 +8,14 @@
   box-sizing: border-box;
 }
 
+/* Dark collection route — CollectionClient toggles `collection-dark` on <html>.
+   Darkens the whole viewport (margins beyond the content container + the area
+   behind the transparent header), not just the inner canvas. */
+html.collection-dark,
+html.collection-dark body {
+  background-color: #18181b; /* zinc-900 */
+}
+
 /* Card color styles */
 .card-color-red { --card-color: #ef4444; }
 .card-color-green { --card-color: #22c55e; }

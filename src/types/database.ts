@@ -404,6 +404,8 @@ export interface CollectionItem {
   custom_value: number | null
   /** Serial / print number for numbered cards (e.g. "012/100"). */
   serial_number: string | null
+  /** Grading cert number for slabbed cards (e.g. Beckett "0011590232"). */
+  cert_number: string | null
   /** How this line entered the collection: a manual add or an auto-add from
    *  a delivered Nomi purchase. */
   acquired_via: 'manual' | 'purchase'

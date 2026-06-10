@@ -19,6 +19,7 @@ export interface EditItem {
   grade: string | null
   customValue: number | null
   serialNumber: string | null
+  certNumber: string | null
 }
 
 /** A draft acquisition row in the editor. `id` present = an existing lot we
@@ -68,6 +69,8 @@ export function AddEditCardModal({
   const committed = lineId != null
   const [customValue, setCustomValue] = useState('')
   const [serial, setSerial] = useState('')
+  // Grading cert number (graded variants only) — maps to collections.cert_number.
+  const [certNumber, setCertNumber] = useState('')
   // Optional grading fee (graded variants only) — capitalized into the line's
   // cost basis on the first lot. Maps to collection_lots.grading_cost.
   const [gradingCost, setGradingCost] = useState('')
@@ -106,6 +109,7 @@ export function AddEditCardModal({
       setGrade(editItem.grade ?? '')
       setCustomValue(editItem.customValue != null ? String(editItem.customValue) : '')
       setSerial(editItem.serialNumber ?? '')
+      setCertNumber(editItem.certNumber ?? '')
       setGradingCost('')
       setLots([])
       setLoadedLots([])
@@ -116,6 +120,7 @@ export function AddEditCardModal({
       setGrade('')
       setCustomValue('')
       setSerial('')
+      setCertNumber('')
       setGradingCost('')
       setLots([{ quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }])
       setLoadedLots([])
@@ -248,6 +253,7 @@ export function AddEditCardModal({
           grade: company ? grade : null,
           custom_value: customValue || null,
           serial_number: serial || null,
+          cert_number: company ? (certNumber || null) : null,
         }),
       })
       if (!createRes.ok) {
@@ -270,7 +276,7 @@ export function AddEditCardModal({
       const res = await fetch('/api/collection', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, custom_value: customValue || null, serial_number: serial || null }),
+        body: JSON.stringify({ id, custom_value: customValue || null, serial_number: serial || null, cert_number: company ? (certNumber || null) : null }),
       })
       if (!res.ok) {
         const b = await res.json().catch(() => ({}))
@@ -531,6 +537,16 @@ export function AddEditCardModal({
                 <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => { setGradingCost(e.target.value); setError(null) }} disabled={submitting} placeholder="Grading fee paid" className={`${fieldClass} pl-7 font-semibold tabular-nums`} />
               </div>
               <p className="text-[11px] text-zinc-400 mt-1 leading-snug">Folds into this card&rsquo;s cost basis.</p>
+            </div>
+          )}
+
+          {/* Cert number — slabs only. Shown on the digital slab. */}
+          {company && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                Cert number <span className="text-zinc-400 font-normal normal-case">(from the slab)</span>
+              </label>
+              <input type="text" inputMode="numeric" value={certNumber} onChange={e => { setCertNumber(e.target.value); setError(null) }} disabled={submitting} placeholder="e.g. 0011590232" className={`${fieldClass} tabular-nums`} />
             </div>
           )}
 

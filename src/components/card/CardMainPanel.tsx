@@ -1,11 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CardBuyPanel, type VariantData } from './CardBuyPanel'
 import { GradeSelector } from './GradeSelector'
 import { TrustBadges } from './TrustBadges'
 import { AddToCollectionButton } from '../collection/AddToCollectionButton'
-import { CollectionPositionPanel, type PositionRow } from '../collection/CollectionPositionPanel'
 import { useGradeSelection } from './GradeSelectionContext'
 import { MarketTabs } from './MarketTabs'
 import { OfferModal } from './OfferModal'
@@ -13,7 +12,6 @@ import { AcceptOfferModal } from './AcceptOfferModal'
 import { ListModal } from './ListModal'
 import { createClient } from '@/lib/supabase/client'
 import { useAdminMarketData } from '@/lib/useAdminMarketData'
-import { holdingMarketPrice } from '@/lib/collection'
 import type { CardCondition } from '@/types/database'
 
 interface AskInput {
@@ -69,9 +67,6 @@ export function CardMainPanel({
   isAdmin,
   image,
   debug,
-  collection = [],
-  slabValues = {},
-  cardImageUrl = '',
 }: {
   cardId: string
   cardName: string
@@ -80,16 +75,6 @@ export function CardMainPanel({
   asks: AskInput[]
   bids: BidInput[]
   sales: SaleInput[]
-  /** The viewer's own holdings of this card (the "In your collection"
-   *  position panel). Empty when signed out or not owned. */
-  collection?: PositionRow[]
-  /** Computed slab comp values keyed "<company> <grade>" (override folded in).
-   *  Used to re-value graded holdings after a client-side mutation so the
-   *  position panel matches the server's valuation. */
-  slabValues?: Record<string, number>
-  /** Plain image URL for the collection editor (the 3D <image> slot can't be
-   *  passed into a client modal). */
-  cardImageUrl?: string
   /** ID of the currently-logged-in user (null if signed out). Used to
    *  tag the buyer's own offers in the Offers tab. */
   currentUserId: string | null
@@ -114,71 +99,7 @@ export function CardMainPanel({
   // away with the component.
   const [bidsState, setBidsState] = useState<BidInput[]>(bids)
   const [asksState, setAsksState] = useState<AskInput[]>(asks)
-  // Local mirror of the viewer's holdings of this card. Mutations (quick-add,
-  // editor save, remove) re-pull + re-value these client-side so the "In your
-  // collection" panel reflects instantly without a server round-trip.
-  const [collectionState, setCollectionState] = useState<PositionRow[]>(collection)
   const supabase = useMemo(() => createClient(), [])
-
-  // Re-pull this card's collection rows and value them exactly like the server
-  // page does: custom override → lowest active graded listing → raw market.
-  const reloadCollection = useCallback(async () => {
-    if (!currentUserId) return
-    const { data } = await supabase
-      .from('collections')
-      .select('*')
-      .eq('user_id', currentUserId)
-      .eq('card_id', cardId)
-      .gt('quantity', 0)
-
-    const gradedMin = new Map<string, number>()
-    for (const a of asksState) {
-      if (a.grading_company && a.grade) {
-        const key = `${a.grading_company}|${a.grade}`
-        const cur = gradedMin.get(key)
-        if (cur == null || a.price < cur) gradedMin.set(key, a.price)
-      }
-    }
-
-    const rows: PositionRow[] = (data ?? []).map((c) => {
-      const isGraded = !!(c.grading_company && c.grade)
-      const market = holdingMarketPrice({
-        customValue: c.custom_value != null ? Number(c.custom_value) : null,
-        isGraded,
-        slabValue: isGraded ? slabValues[`${c.grading_company} ${c.grade}`] ?? null : null,
-        gradedListing: isGraded ? gradedMin.get(`${c.grading_company}|${c.grade}`) ?? null : null,
-        rawMarket: marketPrice,
-      })
-      const qty = c.quantity as number
-      const acq = c.acquired_price != null ? Number(c.acquired_price) : null
-      const currentValue = market != null ? market * qty : null
-      const costBasis = acq != null ? acq * qty : null
-      const gain = currentValue != null && costBasis != null ? currentValue - costBasis : null
-      const gainPct = gain != null && costBasis != null && costBasis > 0 ? gain / costBasis : null
-      return {
-        id: c.id as string,
-        condition: c.condition ?? null,
-        gradingCompany: c.grading_company ?? null,
-        grade: c.grade ?? null,
-        quantity: qty,
-        acquiredPrice: acq,
-        acquiredDate: c.acquired_date ?? null,
-        customValue: c.custom_value != null ? Number(c.custom_value) : null,
-        serialNumber: c.serial_number ?? null,
-        currentValue,
-        costBasis,
-        gain,
-        gainPct,
-      }
-    })
-    setCollectionState(rows)
-  }, [supabase, currentUserId, cardId, asksState, marketPrice, slabValues])
-
-  // Keep the panel in sync when the server re-sends holdings (e.g. after a
-  // router.refresh() following a save), not just after a client reloadCollection.
-  useEffect(() => {
-    setCollectionState(collection)
-  }, [collection])
   // Initial selection mirrors what CardBuyPanel would have picked: the
   // cheapest variant with a listing, fall back to Raw. We compute it here
   // so the inline drawer's filter starts in sync.
@@ -207,7 +128,6 @@ export function CardMainPanel({
   // Collection line driving the open List modal, when "List for sale" was
   // clicked on a holding — threaded to the listing so the sale can close that
   // line's lots for realized P&L. Null when listing from the buy panel.
-  const [listCollectionId, setListCollectionId] = useState<string | null>(null)
   // Mirrors the buy/sell mode in CardBuyPanel so the inline market
   // drawer can default to (and follow) the matching tab — buy → Listings,
   // sell → Offers.
@@ -310,24 +230,17 @@ export function CardMainPanel({
               onViewMarketData={() => setOpen(true)}
               onOfferClick={() => setOfferOpen(true)}
               onAcceptOfferClick={() => setAcceptOpen(true)}
-              onListClick={() => { setListCollectionId(null); setListOpen(true) }}
+              onListClick={() => setListOpen(true)}
               onModeChange={setMode}
               topOfferPrice={topOffer?.price ?? null}
             />
           </div>
 
-          {/* Only offer "Add to collection" when you don't already own it —
-              otherwise the position panel below is the relevant surface. */}
-          {collectionState.length === 0 && (
-            <div className="mt-5">
-              <AddToCollectionButton
-                cardId={cardId}
-                cardName={cardName}
-                variant="button"
-                onAdded={reloadCollection}
-              />
-            </div>
-          )}
+          {/* Quick-add to collection. Managing owned copies (quantity, edit,
+              list, history) lives in /collection now, not here. */}
+          <div className="mt-5">
+            <AddToCollectionButton cardId={cardId} cardName={cardName} variant="button" />
+          </div>
 
           <div className="mt-6">
             <TrustBadges />
@@ -341,26 +254,6 @@ export function CardMainPanel({
             selectedKey={selectedKey}
             onSelect={setSelectedKey}
           />
-
-          {/* "In your collection" — your position on this card (Robinhood
-              model), below the grades. Only renders when you own it. */}
-          {collectionState.length > 0 && (
-            <div className="mt-8">
-              <CollectionPositionPanel
-                cardId={cardId}
-                cardName={cardName}
-                imageUrl={cardImageUrl}
-                rows={collectionState}
-                onChanged={reloadCollection}
-                onList={(row) => {
-                  const key = row.gradingCompany && row.grade ? `${row.gradingCompany}-${row.grade}` : 'raw'
-                  setSelectedKey(key)
-                  setListCollectionId(row.id)
-                  setListOpen(true)
-                }}
-              />
-            </div>
-          )}
         </div>
       </div>
 
@@ -415,7 +308,6 @@ export function CardMainPanel({
         topOfferPrice={topOffer?.price ?? null}
         marketPrice={marketPrice}
         existingOwnListings={existingOwnListings.map(l => ({ id: l.id, price: l.price }))}
-        collectionId={listCollectionId}
         onListed={(placed) => {
           // Optimistic append so the new listing shows up in the
           // Listings tab and (if it's the new lowest) the chip-row

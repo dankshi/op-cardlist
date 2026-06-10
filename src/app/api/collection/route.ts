@@ -45,10 +45,12 @@ export async function POST(request: Request) {
   // Notes + custom value aren't part of the increment RPC; set on the row.
   const customValue = body.custom_value === '' || body.custom_value == null ? null : Number(body.custom_value)
   const serial = typeof body.serial_number === 'string' && body.serial_number.trim() ? body.serial_number.trim() : null
+  const cert = typeof body.cert_number === 'string' && body.cert_number.trim() ? body.cert_number.trim() : null
   const extra: Record<string, unknown> = {}
   if (notes) extra.notes = notes
   if (customValue != null && Number.isFinite(customValue) && customValue >= 0) extra.custom_value = customValue
   if (serial) extra.serial_number = serial
+  if (cert) extra.cert_number = cert
   if (Object.keys(extra).length && row?.id) {
     await supabase.from('collections').update(extra).eq('id', row.id)
   }
@@ -73,6 +75,7 @@ export async function PATCH(request: Request) {
   if ('custom_value' in body) {
     patch.custom_value = body.custom_value === '' || body.custom_value == null ? null : Number(body.custom_value)
   }
+  if ('cert_number' in body) patch.cert_number = body.cert_number?.trim() || null
   if ('serial_number' in body) patch.serial_number = body.serial_number?.trim() || null
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   patch.updated_at = new Date().toISOString()

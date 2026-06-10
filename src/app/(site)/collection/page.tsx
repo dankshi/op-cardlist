@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { getCardsByIds } from '@/lib/cards'
+import { getCardsByIds, getAllSets } from '@/lib/cards'
 import { summarize, holdingMarketPrice, type Holding } from '@/lib/collection'
 import { getPortfolioValueSeries, type Range } from '@/lib/collection-history'
 import { CollectionClient } from '@/components/collection/CollectionClient'
@@ -16,6 +16,12 @@ export const metadata: Metadata = {
 }
 
 const DEFAULT_RANGE: Range = '1M'
+
+/** Drop a leading set-code prefix so we show just the set's name
+ *  ("OP-03 - Pillars of Strength" → "Pillars of Strength"). */
+function setDisplayName(name: string): string {
+  return name.replace(/^[A-Z0-9]+(?:-[A-Z0-9]+)*\s*[-–—]\s*/i, '').trim() || name
+}
 
 export default async function CollectionPage() {
   const supabase = await createClient()
@@ -53,8 +59,12 @@ export default async function CollectionPage() {
 
   // Batch card metadata + current (raw) market price in one call.
   const uniqueIds = [...new Set([...items.map(i => i.card_id), ...activity.map(a => a.card_id)])]
-  const cards = uniqueIds.length ? await getCardsByIds(uniqueIds) : []
+  const [cards, allSets] = await Promise.all([
+    uniqueIds.length ? getCardsByIds(uniqueIds) : Promise.resolve([]),
+    getAllSets(),
+  ])
   const metaByCard = new Map(cards.map(c => [c.id, c]))
+  const setNameById = new Map(allSets.map(s => [s.id, s.name]))
 
   // Graded slabs aren't priced by raw TCGplayer market. Value them by our
   // computed comp (slab_market_values + override); fall back to the lowest
@@ -119,6 +129,9 @@ export default async function CollectionPage() {
       cardName: meta?.name ?? i.card_id,
       imageUrl: meta?.imageUrl ?? '',
       setId: meta?.setId ?? null,
+      setName: meta?.setId
+        ? (setNameById.has(meta.setId) ? setDisplayName(setNameById.get(meta.setId)!) : meta.setId.toUpperCase())
+        : null,
       rarity: meta?.rarity ?? null,
       quantity: qty,
       acquiredPrice,
@@ -128,6 +141,7 @@ export default async function CollectionPage() {
       customValue,
       isCustomValue: customValue != null,
       serialNumber: i.serial_number,
+      certNumber: i.cert_number ?? null,
       marketPrice,
       currentValue,
       costBasis,

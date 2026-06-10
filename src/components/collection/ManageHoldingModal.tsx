@@ -1,0 +1,397 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { GRADING_SCALES, type GradingCompany, type CollectionActivityRow } from '@/types/database'
+import { gradeLabel } from '@/lib/gradingStyle'
+import { Slab } from './Slab'
+import type { HoldingRow } from './HoldingsGrid'
+
+const REGRADE_COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
+
+function fmtUSD(n: number) {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+function fmtDate(s: string) {
+  return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+}
+
+interface LotDraft { id?: string; quantity: number; price: string; date: string }
+type View = 'edit' | 'history' | 'list' | 'regrade'
+
+/** Manage one collection holding from /collection. Everything happens inline in
+ *  one modal via a tab switch — Acquisitions (default, since people land here to
+ *  edit), History, List for sale, and Got graded — no nested modals/drawers. */
+export function ManageHoldingModal({
+  row,
+  onClose,
+  onChanged,
+}: {
+  row: HoldingRow
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const isGraded = !!(row.gradingCompany && row.grade)
+  const [view, setView] = useState<View>('edit')
+  const [removing, setRemoving] = useState(false)
+
+  // Acquisitions editor
+  const [lots, setLots] = useState<LotDraft[]>([])
+  const [loadedLots, setLoadedLots] = useState<LotDraft[]>([])
+  const [loadingLots, setLoadingLots] = useState(true)
+  const [customValue, setCustomValue] = useState(row.customValue != null ? String(row.customValue) : '')
+  const [serial, setSerial] = useState(row.serialNumber ?? '')
+  const [cert, setCert] = useState(row.certNumber ?? '')
+  const [gradingCost, setGradingCost] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editFlash, setEditFlash] = useState<string | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  // History
+  const [activity, setActivity] = useState<CollectionActivityRow[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+
+  // List for sale
+  const [listPrice, setListPrice] = useState(row.marketPrice != null ? row.marketPrice.toFixed(2) : '')
+  const [listQty, setListQty] = useState(1)
+  const [listing, setListing] = useState(false)
+  const [listError, setListError] = useState<string | null>(null)
+  const [listed, setListed] = useState(false)
+
+  // Regrade
+  const [regCompany, setRegCompany] = useState<GradingCompany>('PSA')
+  const [regGrade, setRegGrade] = useState(GRADING_SCALES.PSA[0])
+  const [regFee, setRegFee] = useState('')
+  const [regrading, setRegrading] = useState(false)
+
+  const perItem = row.currentValue != null ? row.currentValue / row.quantity : null
+  const up = (row.gain ?? 0) >= 0
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose])
+
+  async function loadLots() {
+    setLoadingLots(true)
+    try {
+      const d = await (await fetch(`/api/collection/lots?collection_id=${row.id}`)).json()
+      const raw = (d.lots ?? []) as { id: string; quantity: number; price_paid: number | null; acquired_date: string | null; grading_cost: number | null }[]
+      const drafts: LotDraft[] = raw.map(l => ({ id: l.id, quantity: l.quantity, price: l.price_paid != null ? String(l.price_paid) : '', date: l.acquired_date ?? '' }))
+      const safe = drafts.length ? drafts : [{ quantity: row.quantity || 1, price: '', date: '' }]
+      setLots(safe)
+      setLoadedLots(safe)
+      const gc = raw[0]?.grading_cost
+      setGradingCost(gc != null && gc > 0 ? String(gc) : '')
+    } catch { /* keep */ } finally { setLoadingLots(false) }
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadLots() }, [row.id])
+
+  async function loadHistory() {
+    setLoadingHistory(true)
+    try {
+      const d = await (await fetch(`/api/collection/activity?card_id=${encodeURIComponent(row.cardId)}`)).json()
+      setActivity(d.activity ?? [])
+      setHistoryLoaded(true)
+    } finally { setLoadingHistory(false) }
+  }
+  function openHistory() { setView('history'); if (!historyLoaded) loadHistory() }
+
+  function updateLot(i: number, patch: Partial<LotDraft>) { setLots(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l)); setEditError(null); setEditFlash(null) }
+  function addLot() { setLots(prev => [...prev, { quantity: 1, price: '', date: new Date().toISOString().slice(0, 10) }]) }
+  function removeLot(i: number) { setLots(prev => prev.filter((_, idx) => idx !== i)) }
+
+  async function saveEdit() {
+    if (savingEdit) return
+    setSavingEdit(true); setEditError(null); setEditFlash(null)
+    try {
+      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null }) })
+      if (!v.ok) { setEditError('Couldn’t save.'); return }
+      const seen = new Set<string>()
+      for (const lot of lots) {
+        if (lot.id) {
+          seen.add(lot.id)
+          const orig = loadedLots.find(l => l.id === lot.id)
+          if (orig && orig.quantity === lot.quantity && orig.price === lot.price && orig.date === lot.date) continue
+          const r = await fetch('/api/collection/lots', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lot.id, quantity: lot.quantity, price_paid: lot.price, acquired_date: lot.date || null }) })
+          if (!r.ok) { setEditError('Couldn’t save an acquisition.'); return }
+        } else {
+          const r = await fetch('/api/collection/lots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection_id: row.id, quantity: lot.quantity, price_paid: lot.price, acquired_date: lot.date || null }) })
+          if (!r.ok) { setEditError('Couldn’t save an acquisition.'); return }
+        }
+      }
+      for (const orig of loadedLots) {
+        if (orig.id && !seen.has(orig.id)) {
+          const r = await fetch(`/api/collection/lots?id=${orig.id}`, { method: 'DELETE' })
+          if (!r.ok) { setEditError('Couldn’t remove an acquisition.'); return }
+        }
+      }
+      // Capitalize grading fee onto the first lot (graded only).
+      if (isGraded) {
+        const d = await (await fetch(`/api/collection/lots?collection_id=${row.id}`)).json()
+        const firstId = d.lots?.[0]?.id
+        if (firstId) await fetch('/api/collection/lots', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: firstId, grading_cost: gradingCost === '' ? 0 : Number(gradingCost) }) }).catch(() => {})
+      }
+      onChanged()
+      await loadLots()
+      setEditFlash('Saved ✓')
+    } finally { setSavingEdit(false) }
+  }
+
+  async function submitList() {
+    const price = Number(listPrice)
+    if (!Number.isFinite(price) || price <= 0) { setListError('Enter a price'); return }
+    setListing(true); setListError(null)
+    const title = `${row.cardName}${isGraded ? ` (${row.gradingCompany} ${row.grade})` : ' (NM)'}`
+    const res = await fetch('/api/listings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ card_id: row.cardId, title, price, condition: 'near_mint', quantity: listQty, language: 'EN', is_first_edition: false, photo_urls: [], grading_company: row.gradingCompany, grade: row.grade, collection_id: row.id }) })
+    setListing(false)
+    if (res.ok) { setListed(true); onChanged() }
+    else { const b = await res.json().catch(() => ({})); setListError(b.error || 'Failed to list. You may need to finish seller setup.') }
+  }
+
+  async function submitRegrade() {
+    if (regrading) return
+    setRegrading(true)
+    const res = await fetch('/api/collection/adjustments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'regrade', collection_id: row.id, grading_company: regCompany, grade: regGrade, grading_cost: regFee === '' ? 0 : Number(regFee) }) })
+    setRegrading(false)
+    if (res.ok) { onChanged(); onClose() }
+    else { const b = await res.json().catch(() => ({})); alert(b.error || 'Failed to mark as graded.') }
+  }
+
+  async function remove() {
+    if (removing) return
+    if (!confirm('Remove this card from your collection?')) return
+    setRemoving(true)
+    const res = await fetch(`/api/collection?id=${row.id}`, { method: 'DELETE' })
+    setRemoving(false)
+    if (res.ok) { onChanged(); onClose() }
+    else alert('Failed to remove.')
+  }
+
+  const field = 'w-full px-3 py-2 rounded-lg border border-zinc-300 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-orange-500 disabled:opacity-50'
+  const tabs: { v: View; label: string }[] = [
+    { v: 'edit', label: 'Acquisitions' },
+    { v: 'history', label: 'History' },
+    { v: 'list', label: 'List for sale' },
+    ...(!isGraded ? [{ v: 'regrade' as View, label: 'Got graded' }] : []),
+  ]
+  const realizedTotal = activity.filter(a => a.kind === 'sell' && a.realized != null).reduce((s, a) => s + Number(a.realized), 0)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-zinc-100">
+          <div className="w-14 flex-shrink-0">
+            {isGraded
+              ? <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} certNumber={row.certNumber} />
+              : (
+                <div className="relative aspect-[5/7] rounded-md overflow-hidden bg-zinc-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {row.imageUrl && <img src={row.imageUrl} alt={row.cardName} className="absolute inset-0 w-full h-full object-cover" />}
+                </div>
+              )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-bold text-zinc-900 leading-tight line-clamp-2">{row.cardName}</h2>
+            <p className="text-[11px] text-zinc-400 truncate mt-0.5">{[row.rarity, row.cardId, gradeLabel(row.gradingCompany, row.grade)].filter(Boolean).join(' · ')}</p>
+            <Link href={`/card/${row.cardId.toLowerCase()}`} className="text-[11px] font-semibold text-orange-600 hover:text-orange-700 mt-1 inline-block">View on marketplace →</Link>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="flex-shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 cursor-pointer">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Summary */}
+        <div className="px-6 py-4 border-b border-zinc-100 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-2xl font-bold tabular-nums text-zinc-900 leading-none">{perItem != null ? fmtUSD(perItem) : '—'}<span className="text-xs font-medium text-zinc-400"> /ea</span></p>
+            <p className="text-[11px] text-zinc-500 tabular-nums mt-1">{row.acquiredPrice != null ? `Avg ${fmtUSD(row.acquiredPrice)} ea` : 'No cost basis'}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold tabular-nums text-zinc-900">×{row.quantity}{row.currentValue != null ? ` = ${fmtUSD(row.currentValue)}` : ''}</p>
+            {row.gain != null && (
+              <p className={`text-[11px] font-semibold tabular-nums mt-0.5 ${up ? 'text-emerald-600' : 'text-red-600'}`}>{up ? '+' : '−'}{fmtUSD(Math.abs(row.gain))}{row.gainPct != null ? ` (${(Math.abs(row.gainPct) * 100).toFixed(1)}%)` : ''}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 px-4 pt-3">
+          {tabs.map(t => (
+            <button
+              key={t.v}
+              type="button"
+              onClick={() => t.v === 'history' ? openHistory() : setView(t.v)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${view === t.v ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-4 min-h-[180px]">
+          {view === 'edit' && (
+            loadingLots ? <div className="py-10 text-center"><div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" /></div> : (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Acquisitions</p>
+                  <div className="space-y-2">
+                    {lots.map((lot, i) => (
+                      <div key={lot.id ?? `n-${i}`} className="flex items-center gap-2 rounded-lg ring-1 ring-zinc-200 p-2">
+                        <div className="inline-flex items-center rounded-md ring-1 ring-zinc-200 overflow-hidden flex-shrink-0">
+                          <button type="button" onClick={() => updateLot(i, { quantity: Math.max(1, lot.quantity - 1) })} disabled={lot.quantity <= 1} className="px-2 py-1 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30 cursor-pointer">−</button>
+                          <input type="text" inputMode="numeric" value={lot.quantity} onFocus={e => e.currentTarget.select()} onChange={e => { const n = parseInt(e.target.value.replace(/\D/g, ''), 10); updateLot(i, { quantity: Number.isFinite(n) && n >= 1 ? n : 1 }) }} className="w-9 py-1 text-xs font-bold tabular-nums text-zinc-700 text-center border-x border-zinc-200 focus:outline-none focus:bg-orange-50" />
+                          <button type="button" onClick={() => updateLot(i, { quantity: lot.quantity + 1 })} className="px-2 py-1 text-zinc-500 hover:bg-zinc-100 cursor-pointer">+</button>
+                        </div>
+                        <div className="relative flex-1 min-w-0">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-zinc-400">$</span>
+                          <input type="number" step="0.01" min="0" value={lot.price} placeholder="Price ea" onChange={e => updateLot(i, { price: e.target.value })} className="w-full pl-6 pr-2 py-1.5 rounded-md border border-zinc-200 text-sm tabular-nums text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-orange-500" />
+                        </div>
+                        <input type="date" value={lot.date} onChange={e => updateLot(i, { date: e.target.value })} className="flex-shrink-0 w-[8.5rem] px-2 py-1.5 rounded-md border border-zinc-200 text-xs text-zinc-900 focus:outline-none focus:border-orange-500" />
+                        <button type="button" onClick={() => removeLot(i)} disabled={lots.length <= 1} title={lots.length <= 1 ? 'Use Remove to delete the card' : 'Remove acquisition'} className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 cursor-pointer disabled:cursor-default">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={addLot} className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 cursor-pointer">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                      Add acquisition
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Value override /ea</label>
+                    <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
+                      <input type="number" step="0.01" min="0" value={customValue} onChange={e => { setCustomValue(e.target.value); setEditFlash(null) }} placeholder="Market" className={`${field} pl-6 tabular-nums`} />
+                    </div>
+                  </div>
+                  {isGraded ? (
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading cost</label>
+                      <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
+                        <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => { setGradingCost(e.target.value); setEditFlash(null) }} placeholder="Fee" className={`${field} pl-6 tabular-nums`} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Serial</label>
+                      <input type="text" value={serial} onChange={e => { setSerial(e.target.value); setEditFlash(null) }} placeholder="012/100" className={field} />
+                    </div>
+                  )}
+                </div>
+                {isGraded && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Serial</label>
+                      <input type="text" value={serial} onChange={e => { setSerial(e.target.value); setEditFlash(null) }} placeholder="012/100" className={field} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Cert number</label>
+                      <input type="text" inputMode="numeric" value={cert} onChange={e => { setCert(e.target.value); setEditFlash(null) }} placeholder="0011590232" className={`${field} tabular-nums`} />
+                    </div>
+                  </div>
+                )}
+
+                {editError && <p className="text-xs text-red-600">{editError}</p>}
+                <div className="flex items-center gap-2">
+                  {editFlash && <span className="text-xs font-semibold text-emerald-600">{editFlash}</span>}
+                  <div className="flex-1" />
+                  <button type="button" onClick={saveEdit} disabled={savingEdit} className="px-4 py-2 rounded-lg text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white cursor-pointer disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save changes'}</button>
+                </div>
+              </div>
+            )
+          )}
+
+          {view === 'history' && (
+            loadingHistory ? <div className="py-10 text-center"><div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" /></div> : activity.length === 0 ? (
+              <p className="text-sm text-zinc-500 text-center py-8">No activity yet.</p>
+            ) : (
+              <>
+                {Math.abs(realizedTotal) >= 0.005 && (
+                  <p className="text-xs tabular-nums text-right mb-2"><span className="text-zinc-400">Realized </span><span className={`font-semibold ${realizedTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{realizedTotal >= 0 ? '+' : '−'}{fmtUSD(Math.abs(realizedTotal))}</span></p>
+                )}
+                <ol className="relative border-l border-zinc-200 ml-1.5 space-y-4 max-h-[40vh] overflow-y-auto pr-1">
+                  {activity.map(a => {
+                    const qty = a.quantity ?? 1
+                    const realized = a.realized != null ? Number(a.realized) : null
+                    return (
+                      <li key={`${a.kind}-${a.source_id}`} className="ml-4">
+                        <span className={`absolute -left-[5px] w-2.5 h-2.5 rounded-full ${a.kind === 'sell' ? 'bg-emerald-500' : a.kind === 'grade' ? 'bg-purple-500' : 'bg-zinc-400'}`} />
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-zinc-900">
+                              {a.kind === 'buy' ? `Bought ×${qty}` : a.kind === 'sell' ? `Sold ×${qty}` : a.kind === 'grade' ? `Graded ${a.from_grade ?? ''} → ${a.to_grade ?? ''}` : (a.note ?? 'Adjustment')}
+                            </p>
+                            <p className="text-[11px] text-zinc-400">{fmtDate(a.happened_at)}{a.kind === 'sell' ? ` · ${a.ref_order_id ? 'Nomi' : 'Manual'}` : ''}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm tabular-nums text-zinc-900">{a.amount != null ? fmtUSD(Number(a.amount)) : '—'}</p>
+                            {realized != null && <p className={`text-[11px] font-semibold tabular-nums ${realized >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{realized >= 0 ? '+' : '−'}{fmtUSD(Math.abs(realized))}</p>}
+                          </div>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </>
+            )
+          )}
+
+          {view === 'list' && (
+            listed ? (
+              <p className="text-sm text-emerald-700 font-semibold py-4">Listed ✓ <Link href="/sellerhub" className="underline">Manage in seller hub →</Link></p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-zinc-500">List {isGraded ? gradeLabel(row.gradingCompany, row.grade) : 'this card'} on the marketplace.</p>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Price /ea</label>
+                    <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
+                      <input type="number" min="0" step="0.01" value={listPrice} onChange={e => { setListPrice(e.target.value); setListError(null) }} className={`${field} pl-6 tabular-nums`} />
+                    </div>
+                  </div>
+                  <div className="w-20">
+                    <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Qty</label>
+                    <input type="number" min={1} max={row.quantity} value={listQty} onChange={e => setListQty(Math.max(1, Math.min(row.quantity, parseInt(e.target.value) || 1)))} className={`${field} tabular-nums`} />
+                  </div>
+                  <button type="button" onClick={submitList} disabled={listing} className="px-4 py-2 rounded-lg text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer disabled:opacity-50 whitespace-nowrap">{listing ? 'Listing…' : 'List'}</button>
+                </div>
+                {listError && <p className="text-[11px] text-red-600">{listError}</p>}
+              </div>
+            )
+          )}
+
+          {view === 'regrade' && !isGraded && (
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-500">Moves a raw copy to its graded slab; the fee folds into its cost basis.</p>
+              <div className="grid grid-cols-3 gap-2">
+                <select value={regCompany} onChange={e => { const c = e.target.value as GradingCompany; setRegCompany(c); setRegGrade(GRADING_SCALES[c][0]) }} className={field}>{REGRADE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                <select value={regGrade} onChange={e => setRegGrade(e.target.value)} className={field}>{GRADING_SCALES[regCompany].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={regFee} onChange={e => setRegFee(e.target.value)} placeholder="Fee" className={`${field} pl-6`} /></div>
+              </div>
+              <div className="flex justify-end">
+                <button type="button" onClick={submitRegrade} disabled={regrading} className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer disabled:opacity-50">{regrading ? 'Saving…' : 'Mark as graded'}</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center px-6 py-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-2xl">
+          <button type="button" onClick={remove} disabled={removing} className="px-3 py-2 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50">{removing ? 'Removing…' : 'Remove'}</button>
+          <div className="flex-1" />
+          <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-bold bg-zinc-900 hover:bg-zinc-800 text-white cursor-pointer">Done</button>
+        </div>
+      </div>
+    </div>
+  )
+}

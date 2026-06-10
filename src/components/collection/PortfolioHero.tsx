@@ -26,7 +26,7 @@ export function PortfolioHero({
 }) {
   const hasGain = totalGainPct != null && Math.abs(totalGain) >= 0.005
   const up = totalGain >= 0
-  const gainColor = !hasGain ? 'text-zinc-400' : up ? 'text-emerald-600' : 'text-red-600'
+  const gainColor = !hasGain ? 'text-zinc-500' : up ? 'text-emerald-400' : 'text-red-400'
   const sign = up ? '+' : '−'
 
   const hasRealized = Math.abs(realizedGain) >= 0.005
@@ -34,8 +34,8 @@ export function PortfolioHero({
 
   return (
     <div>
-      <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Collection value</p>
-      <p className="text-4xl md:text-5xl font-light tabular-nums tracking-tight text-zinc-900 mt-1 leading-none">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Collection value</p>
+      <p className="text-4xl md:text-5xl font-light tabular-nums tracking-tight text-zinc-100 mt-1 leading-none">
         {fmtUSD(totalValue)}
       </p>
       <div className="mt-2 flex items-center gap-3 text-sm">
@@ -51,11 +51,11 @@ export function PortfolioHero({
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
           <span className="tabular-nums">
             <span className="text-zinc-400">Realized </span>
-            <span className={`font-semibold ${realizedGain >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{signed(realizedGain)}</span>
+            <span className={`font-semibold ${realizedGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{signed(realizedGain)}</span>
           </span>
           <span className="tabular-nums">
             <span className="text-zinc-400">Total return </span>
-            <span className={`font-semibold ${totalReturn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{signed(totalReturn)}</span>
+            <span className={`font-semibold ${totalReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{signed(totalReturn)}</span>
           </span>
         </div>
       )}

@@ -78,10 +78,10 @@ export function PortfolioChart({
 
   return (
     <div>
-      <div className="h-5 mb-1 text-xs text-zinc-500 text-right">
+      <div className="h-5 mb-1 text-xs text-zinc-400 text-right">
         {hoverPoint && (
           <>
-            <span className="font-semibold text-zinc-900 tabular-nums">{fmtUSD(hoverPoint.value)}</span>
+            <span className="font-semibold text-zinc-100 tabular-nums">{fmtUSD(hoverPoint.value)}</span>
             <span className="ml-1.5">
               {new Date(hoverPoint.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </span>
@@ -102,8 +102,8 @@ export function PortfolioChart({
             <path d={linePath} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             {hover && hoverPoint && (
               <>
-                <line x1={hover.x} y1={PADDING.top} x2={hover.x} y2={PADDING.top + CHART_HEIGHT} stroke="#d4d4d8" strokeWidth="1" />
-                <circle cx={hover.x} cy={toY(hoverPoint.value)} r="4" fill="#18181b" stroke="white" strokeWidth="2" />
+                <line x1={hover.x} y1={PADDING.top} x2={hover.x} y2={PADDING.top + CHART_HEIGHT} stroke="#52525b" strokeWidth="1" />
+                <circle cx={hover.x} cy={toY(hoverPoint.value)} r="4" fill="#fafafa" stroke="#18181b" strokeWidth="2" />
               </>
             )}
           </svg>
@@ -113,8 +113,8 @@ export function PortfolioChart({
           </div>
         )}
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/40">
-            <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/40">
+            <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
           </div>
         )}
       </div>
@@ -126,7 +126,7 @@ export function PortfolioChart({
             type="button"
             onClick={() => onRangeChange(r)}
             className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-              r === range ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:bg-zinc-100'
+              r === range ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-400 hover:bg-zinc-700'
             }`}
           >
             {r}

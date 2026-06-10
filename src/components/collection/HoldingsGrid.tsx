@@ -1,10 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import Image from 'next/image'
-import { gradeLabel } from '@/lib/gradingStyle'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Slab } from './Slab'
+import { ManageHoldingModal } from './ManageHoldingModal'
 
 export interface HoldingRow {
   id: string
@@ -12,6 +13,7 @@ export interface HoldingRow {
   cardName: string
   imageUrl: string
   setId: string | null
+  setName: string | null
   rarity: string | null
   quantity: number
   acquiredPrice: number | null
@@ -21,6 +23,7 @@ export interface HoldingRow {
   customValue: number | null
   isCustomValue: boolean
   serialNumber: string | null
+  certNumber: string | null
   marketPrice: number | null
   currentValue: number | null
   costBasis: number | null
@@ -45,6 +48,12 @@ export function HoldingsGrid({
 }: {
   rows: HoldingRow[]
 }) {
+  const router = useRouter()
+  // Track the managed holding by id (not the row object) so it stays fresh
+  // after a router.refresh() re-pulls the rows. Disappears (modal closes) if
+  // the line is removed.
+  const [managingId, setManagingId] = useState<string | null>(null)
+  const managing = managingId ? rows.find(r => r.id === managingId) ?? null : null
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('value')
   // Free filters (no PRO gate): grade source + price range.
@@ -104,13 +113,13 @@ export function HoldingsGrid({
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search your holdings…"
-            className="w-full pl-10 pr-3 py-2 rounded-lg border border-zinc-200 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400"
+            className="w-full pl-10 pr-3 py-2 rounded-lg border border-zinc-700 bg-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500"
           />
         </div>
         <select
           value={sort}
           onChange={e => setSort(e.target.value as Sort)}
-          className="px-3 py-2 rounded-lg border border-zinc-200 bg-white text-sm font-medium text-zinc-900 hover:border-zinc-400 focus:outline-none cursor-pointer"
+          className="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-800 text-sm font-medium text-zinc-100 hover:border-zinc-500 focus:outline-none cursor-pointer"
         >
           {SORTS.map(s => <option key={s.v} value={s.v}>{s.label}</option>)}
         </select>
@@ -127,7 +136,7 @@ export function HoldingsGrid({
                   type="button"
                   onClick={() => setTypeFilter(c.v)}
                   className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                    typeFilter === c.v ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-600 ring-1 ring-zinc-200 hover:ring-zinc-400'
+                    typeFilter === c.v ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-300 ring-1 ring-zinc-700 hover:ring-zinc-500'
                   }`}
                 >
                   {c.label}
@@ -135,24 +144,23 @@ export function HoldingsGrid({
               ))}
             </div>
           )}
-          <div className="flex items-center gap-1.5 text-sm text-zinc-500">
+          <div className="flex items-center gap-1.5 text-sm text-zinc-400">
             <div className="relative">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400">$</span>
-              <input type="number" min="0" value={minPrice} onChange={e => setMinPrice(e.target.value)} placeholder="Min" className="w-20 pl-5 pr-2 py-1 rounded-md border border-zinc-200 text-xs tabular-nums text-zinc-900 focus:outline-none focus:border-zinc-400" />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
+              <input type="number" min="0" value={minPrice} onChange={e => setMinPrice(e.target.value)} placeholder="Min" className="w-20 pl-5 pr-2 py-1 rounded-md border border-zinc-700 bg-zinc-800 text-xs tabular-nums text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500" />
             </div>
-            <span className="text-zinc-300">–</span>
+            <span className="text-zinc-600">–</span>
             <div className="relative">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-400">$</span>
-              <input type="number" min="0" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder="Max" className="w-20 pl-5 pr-2 py-1 rounded-md border border-zinc-200 text-xs tabular-nums text-zinc-900 focus:outline-none focus:border-zinc-400" />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500">$</span>
+              <input type="number" min="0" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder="Max" className="w-20 pl-5 pr-2 py-1 rounded-md border border-zinc-700 bg-zinc-800 text-xs tabular-nums text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500" />
             </div>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-x-7 gap-y-12">
         {visible.map(row => {
           const isGraded = !!(row.gradingCompany && row.grade)
-          const gradeText = gradeLabel(row.gradingCompany, row.grade)
           // Per-card return vs avg cost — sized to match the hero price (the
           // per-unit "quote"), like a brokerage position cell.
           const perCardChange = row.marketPrice != null && row.acquiredPrice != null
@@ -160,72 +168,87 @@ export function HoldingsGrid({
             : null
           const hasReturn = perCardChange != null && Math.abs(perCardChange) >= 0.005
           const up = perCardChange != null ? perCardChange >= 0 : (row.gain ?? 0) >= 0
-          const retColor = perCardChange == null ? 'text-zinc-400' : up ? 'text-emerald-600' : 'text-red-600'
-          const context = [row.rarity, row.cardId, gradeText].filter(Boolean).join(' · ')
+          const retColor = perCardChange == null ? 'text-zinc-500' : up ? 'text-emerald-400' : 'text-red-400'
           return (
-            <Link
-              key={row.id}
-              href={`/card/${row.cardId.toLowerCase()}`}
-              className="group block text-left"
-            >
-              {isGraded ? (
-                <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} cardId={row.cardId} serialNumber={row.serialNumber} />
-              ) : (
-                <div className="relative rounded-lg overflow-hidden bg-zinc-100 aspect-[5/7] ring-1 ring-transparent group-hover:ring-zinc-300 transition-all">
-                  {row.imageUrl && (
-                    <Image src={row.imageUrl} alt={row.cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />
-                  )}
-                </div>
-              )}
+            <div key={row.id} className="group">
+              {/* Fixed-height image stage (a slab's aspect, the tallest tile
+                  type) so raw cards and any slab line up — text always starts at
+                  the same baseline. Bottom-aligned so the card sits flush above
+                  its text (no gap); shorter tiles get their slack on top. */}
+              <button
+                type="button"
+                onClick={() => setManagingId(row.id)}
+                className="flex items-end justify-center w-full aspect-[2004/3116] cursor-pointer"
+              >
+                {isGraded ? (
+                  <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} certNumber={row.certNumber} />
+                ) : (
+                  <div className="relative w-full rounded-lg overflow-hidden bg-zinc-800 aspect-[5/7] ring-1 ring-white/5 group-hover:ring-white/20 transition-all">
+                    {row.imageUrl && (
+                      <Image src={row.imageUrl} alt={row.cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />
+                    )}
+                  </div>
+                )}
+              </button>
 
-              <div className="mt-2.5">
-                {/* Identity */}
-                <p className="text-sm font-bold text-zinc-900 leading-tight line-clamp-2 group-hover:text-orange-600 transition-colors">
-                  {row.cardName}
-                </p>
-                <p className="text-[11px] text-zinc-400 truncate mt-0.5">{context}</p>
+              <div className="mt-2.5 space-y-3 text-left">
+                {/* Collectr-style: the set name, linked to the set (not the card name). */}
+                {row.setId ? (
+                  <Link
+                    href={`/${row.setId.toLowerCase()}`}
+                    className="block text-sm font-semibold text-zinc-200 underline decoration-zinc-600 underline-offset-2 hover:text-orange-400 hover:decoration-orange-400 line-clamp-1 transition-colors"
+                  >
+                    {row.setName ?? row.setId.toUpperCase()}
+                  </Link>
+                ) : (
+                  <p className="text-sm font-semibold text-zinc-300 line-clamp-1">{row.cardName}</p>
+                )}
 
-                {/* Hero — individual (per-card) market price, the quote. */}
-                <div className="mt-1.5 flex items-baseline gap-1.5">
-                  <span className="text-xl font-bold tabular-nums tracking-tight text-zinc-900 leading-none">
-                    {row.marketPrice != null ? fmtUSD(row.marketPrice) : '—'}
-                  </span>
-                  {perCardChange != null && (
-                    <span className={`text-xs leading-none ${retColor}`}>{up ? '▲' : '▼'}</span>
-                  )}
-                </div>
-                {/* Return vs avg cost ($ + %), reserved height so tiles align. */}
-                <div className="min-h-[16px] mt-1 text-[11px] font-semibold tabular-nums">
-                  {hasReturn ? (
-                    <span className={retColor}>
-                      {up ? '+' : '−'}{fmtUSD(Math.abs(perCardChange!))}
-                      {row.gainPct != null ? ` (${up ? '+' : '−'}${(Math.abs(row.gainPct) * 100).toFixed(2)}%)` : ''}
+                {/* Hero — per-card price (left) with the return on the same line
+                    (right) so a return never adds a row and shifts the layout. */}
+                <button type="button" onClick={() => setManagingId(row.id)} className="block w-full text-left cursor-pointer">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xl font-bold tabular-nums tracking-tight text-zinc-100 leading-none">
+                      {row.marketPrice != null ? fmtUSD(row.marketPrice) : '—'}
                     </span>
-                  ) : (
-                    <span className="text-zinc-300">—</span>
-                  )}
-                </div>
+                    {hasReturn && (
+                      <span className={`text-[11px] font-semibold tabular-nums leading-none whitespace-nowrap ${retColor}`}>
+                        {up ? '▲' : '▼'} {up ? '+' : '−'}{row.gainPct != null ? `${(Math.abs(row.gainPct) * 100).toFixed(1)}%` : fmtUSD(Math.abs(perCardChange!))}
+                      </span>
+                    )}
+                  </div>
 
-                {/* Position summary — quantity · total value, then avg cost. */}
-                <div className="mt-1.5 pt-1.5 border-t border-zinc-100 flex items-center justify-between text-[11px] tabular-nums">
-                  <span className="text-zinc-500">
-                    Qty {row.quantity}
-                    {row.serialNumber && <span className="text-zinc-400"> · #{row.serialNumber}</span>}
-                  </span>
-                  <span className="font-semibold text-zinc-900">{row.currentValue != null ? fmtUSD(row.currentValue) : '—'}</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] tabular-nums text-zinc-400 mt-0.5">
-                  <span>Avg cost</span>
-                  <span>{row.acquiredPrice != null ? fmtUSD(row.acquiredPrice) : '—'}</span>
-                </div>
+                  {/* Position summary — quantity · total value, then avg cost. */}
+                  <div className="mt-3 pt-3 border-t border-zinc-700/60 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] tabular-nums">
+                      <span className="text-zinc-400">
+                        Qty {row.quantity}
+                        {row.serialNumber && <span className="text-zinc-500"> · #{row.serialNumber}</span>}
+                      </span>
+                      <span className="font-semibold text-zinc-100">{row.currentValue != null ? fmtUSD(row.currentValue) : '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] tabular-nums text-zinc-500">
+                      <span>Avg cost</span>
+                      <span>{row.acquiredPrice != null ? fmtUSD(row.acquiredPrice) : '—'}</span>
+                    </div>
+                  </div>
+                </button>
               </div>
-            </Link>
+            </div>
           )
         })}
       </div>
 
       {visible.length === 0 && (
         <p className="text-center py-12 text-sm text-zinc-400">No holdings match &ldquo;{query}&rdquo;.</p>
+      )}
+
+      {managing && (
+        <ManageHoldingModal
+          row={managing}
+          onClose={() => setManagingId(null)}
+          onChanged={() => router.refresh()}
+        />
       )}
     </div>
   )

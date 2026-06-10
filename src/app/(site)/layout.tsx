@@ -68,10 +68,13 @@ export default function SiteLayout({
           __html: JSON.stringify(getWebSiteSchema()),
         }}
       />
-      <header className="border-b border-orange-600 sticky top-0 bg-orange-500 z-50">
+      {/* bg/border go transparent on the dark collection route — CollectionClient
+          toggles `collection-dark` on <html>. Other routes keep the orange bar. */}
+      <header className="border-b border-orange-600 sticky top-0 bg-orange-500 z-50 [html.collection-dark_&]:bg-transparent [html.collection-dark_&]:border-transparent">
         <nav className="w-full px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4 sm:gap-6">
           <Link href="/" className="hover:opacity-90 transition-opacity flex-shrink-0">
-            <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto" />
+            <Image src="/nomi-slab.png" alt="nomi" width={80} height={28} className="h-7 w-auto [html.collection-dark_&]:hidden" />
+            <Image src="/nomi-logo-transparent.png" alt="nomi" width={80} height={28} className="h-7 w-auto hidden [html.collection-dark_&]:block" />
           </Link>
           <div className="flex-1 min-w-0">
             <Suspense fallback={<div className="h-9 rounded-lg bg-white/20 animate-pulse" />}>
@@ -98,17 +101,18 @@ export default function SiteLayout({
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
-      <footer className="border-t border-zinc-200 mt-16">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-zinc-500 text-sm space-y-3">
+      <footer className="border-t border-zinc-200 mt-16 [html.collection-dark_&]:border-zinc-800 [html.collection-dark_&]:bg-zinc-900">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-zinc-500 text-sm space-y-3 [html.collection-dark_&]:text-zinc-400">
           <div className="flex items-center justify-center">
-            <Image src="/nomi-slab.png" alt="nomi" width={60} height={20} className="h-5 w-auto" />
+            <Image src="/nomi-slab.png" alt="nomi" width={60} height={20} className="h-5 w-auto [html.collection-dark_&]:hidden" />
+            <Image src="/nomi-logo-transparent.png" alt="nomi" width={60} height={20} className="h-5 w-auto hidden [html.collection-dark_&]:block" />
           </div>
 
           <div className="flex items-center justify-center gap-4 text-xs text-zinc-400">
-            <Link href="/about" className="hover:text-zinc-900 transition-colors">About</Link>
-            <span className="text-zinc-300">|</span>
+            <Link href="/about" className="hover:text-zinc-900 transition-colors [html.collection-dark_&]:hover:text-zinc-100">About</Link>
+            <span className="text-zinc-300 [html.collection-dark_&]:text-zinc-600">|</span>
             <span>One Piece TCG</span>
-            <span className="text-zinc-300">&middot;</span>
+            <span className="text-zinc-300 [html.collection-dark_&]:text-zinc-600">&middot;</span>
             <span>Pokemon TCG</span>
           </div>
         </div>

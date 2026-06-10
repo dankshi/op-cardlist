@@ -14,8 +14,6 @@ import { RecentSales } from "@/components/card/RecentSales";
 import { type VariantData } from "@/components/card/CardBuyPanel";
 import { CardMainPanel } from "@/components/card/CardMainPanel";
 import { GradeSelectionProvider } from "@/components/card/GradeSelectionContext";
-import type { PositionRow as CollectionPositionRow } from "@/components/collection/CollectionPositionPanel";
-import { holdingMarketPrice } from "@/lib/collection";
 import type { PopulationBucket, GradeCompany } from "@/lib/price-history";
 
 // Ordering for the variant chip row: Raw first, then by grading company,
@@ -312,66 +310,6 @@ export default async function CardPage({ params }: PageProps) {
   // shows both "buyable now" and "open to offers" variants together.
   const variants = buildVariants(allListings, populations, slabValues);
 
-  // Serializable slab comp values for the client position panel's re-valuation
-  // after a mutation, keyed "<company> <grade>" (override already folded in).
-  const slabValuesForPanel: Record<string, number> = {};
-  for (const [k, v] of slabValues) {
-    if (v.marketValue != null) slabValuesForPanel[k] = v.marketValue;
-  }
-
-  // The viewer's own holdings of THIS card — powers the "In your collection"
-  // position panel on the card page (unified card + portfolio view). Valued
-  // like the /collection page: custom override, else lowest active listing for
-  // that grade, else raw market.
-  let collectionPosition: CollectionPositionRow[] = [];
-  if (userRes.data.user) {
-    const { data: colRows } = await supabase
-      .from('collections')
-      .select('*')
-      .eq('user_id', userRes.data.user.id)
-      .eq('card_id', card.id)
-      .gt('quantity', 0);
-    const gradedMin = new Map<string, number>();
-    for (const l of allListings) {
-      if (l.grading_company && l.grade) {
-        const key = `${l.grading_company}|${l.grade}`;
-        const cur = gradedMin.get(key);
-        if (cur == null || Number(l.price) < cur) gradedMin.set(key, Number(l.price));
-      }
-    }
-    collectionPosition = (colRows ?? []).map((c) => {
-      const isGraded = !!(c.grading_company && c.grade);
-      const market = holdingMarketPrice({
-        customValue: c.custom_value != null ? Number(c.custom_value) : null,
-        isGraded,
-        slabValue: isGraded ? slabValues.get(`${c.grading_company} ${c.grade}`)?.marketValue ?? null : null,
-        gradedListing: isGraded ? gradedMin.get(`${c.grading_company}|${c.grade}`) ?? null : null,
-        rawMarket: marketPrice,
-      });
-      const qty = c.quantity as number;
-      const acq = c.acquired_price != null ? Number(c.acquired_price) : null;
-      const currentValue = market != null ? market * qty : null;
-      const costBasis = acq != null ? acq * qty : null;
-      const gain = currentValue != null && costBasis != null ? currentValue - costBasis : null;
-      const gainPct = gain != null && costBasis != null && costBasis > 0 ? gain / costBasis : null;
-      return {
-        id: c.id as string,
-        condition: c.condition ?? null,
-        gradingCompany: c.grading_company ?? null,
-        grade: c.grade ?? null,
-        quantity: qty,
-        acquiredPrice: acq,
-        acquiredDate: c.acquired_date ?? null,
-        customValue: c.custom_value != null ? Number(c.custom_value) : null,
-        serialNumber: c.serial_number ?? null,
-        currentValue,
-        costBasis,
-        gain,
-        gainPct,
-      };
-    });
-  }
-
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
   // Drop self + any hidden variants (base C/UC/R/P/SR standards we don't
   // sell). The current card stays visible even if hidden, since the user
@@ -416,9 +354,6 @@ export default async function CardPage({ params }: PageProps) {
         sales={combinedSales}
         currentUserId={userRes.data.user?.id ?? null}
         isAdmin={isAdmin}
-        collection={collectionPosition}
-        slabValues={slabValuesForPanel}
-        cardImageUrl={card.imageUrl}
         image={
           <Card3DPreview
             card={card}

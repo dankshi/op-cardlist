@@ -209,10 +209,10 @@ export function SearchHero({ variant = "hero" }: SearchHeroProps = {}) {
     ? "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
     : "absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500";
   const inputClass = isCompact
-    ? "w-full pl-9 pr-16 py-2 text-sm bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 shadow-sm transition-all"
+    ? "w-full pl-9 pr-16 py-2 text-sm bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 shadow-sm transition-all [html.collection-dark_&]:bg-white/10 [html.collection-dark_&]:border-white/15 [html.collection-dark_&]:text-zinc-100 [html.collection-dark_&]:placeholder:text-zinc-400 [html.collection-dark_&]:shadow-none [html.collection-dark_&]:focus:ring-white/10 [html.collection-dark_&]:focus:border-white/30"
     : "w-full pl-14 pr-20 py-4 text-lg bg-white border border-zinc-200 rounded-2xl text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200 shadow-sm transition-all";
   const kbdClass = isCompact
-    ? "absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-zinc-400 bg-zinc-100 rounded border border-zinc-200 font-mono"
+    ? "absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-zinc-400 bg-zinc-100 rounded border border-zinc-200 font-mono [html.collection-dark_&]:bg-white/10 [html.collection-dark_&]:border-white/15 [html.collection-dark_&]:text-zinc-300"
     : "absolute right-5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 bg-zinc-100 rounded border border-zinc-200 font-mono";
   const clearClass = isCompact
     ? "absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-900 transition-colors"
