@@ -1,0 +1,47 @@
+name: Watch Listings
+
+on:
+  schedule:
+    # Every 5 minutes. Polls the active-listings feed for each row in
+    # listing_watches and Discord-pings any listingId we haven't seen before.
+    # Cheap (a handful of rare products), so a tight cadence = fast buy alerts.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Seed current listings as seen WITHOUT alerting (onboard silently)"
+        required: false
+        type: boolean
+        default: false
+
+# Don't let polls overlap — queue at most one, drop the rest.
+concurrency:
+  group: watch-listings
+  cancel-in-progress: false
+
+jobs:
+  watch-listings:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Poll watched listings
+        run: npm run watch:listings ${{ github.event.inputs.seed == 'true' && '-- --seed' || '' }}
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # Writes to listing_watch_seen need the service role (anon is read-only).
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Same webhook the scraper-run summaries use. Unset = poll silently.
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
