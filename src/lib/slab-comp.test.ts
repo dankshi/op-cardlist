@@ -66,6 +66,22 @@ test('recency weighting favors recent sales when the market moved', () => {
   assert.ok(c.market_value! > 150, `expected >150 from recency weighting, got ${c.market_value}`)
 })
 
+test('strong uptrend leans the value above the plain median', () => {
+  // 12 sales rising ~100 (oldest) → ~300 (newest). Plain median ~199, but the
+  // leading-edge lean should pull the value above it (laggard-priced sales
+  // shouldn't define the value in a clearly rising market).
+  const sales = Array.from({ length: 12 }, (_, i) => sale(100 + i * 18, 12 - i)) // ages 12..1
+  const c = computeVariantValue(sales, NOW)
+  const plainMedian = median(sales.map(s => s.price).sort((a, b) => a - b))
+  assert.ok(c.market_value! > plainMedian, `expected lean above median ${plainMedian}, got ${c.market_value}`)
+})
+
+test('flat market stays at the median (no lean)', () => {
+  const sales = Array.from({ length: 12 }, (_, i) => sale(100 + (i % 2), i)) // ~100, no trend
+  const c = computeVariantValue(sales, NOW)
+  assert.ok(c.market_value! >= 99 && c.market_value! <= 102, `expected ~100, got ${c.market_value}`)
+})
+
 test('trend is positive when recent 30d exceeds prior 30d', () => {
   const sales = [
     sale(100, 45), sale(100, 50), // prior window (31-60d)
