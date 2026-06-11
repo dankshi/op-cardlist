@@ -175,3 +175,61 @@ export function computeVariantValue(sales: Sale[], now: Date): ComputedValue {
     trend_30d_pct: trend == null ? null : Math.round(trend * 1000) / 1000,
   }
 }
+
+// ── Cross-grade imputation ────────────────────────────────────────────────
+const PREMIUM_GRADERS = new Set(['PSA', 'BGS', 'CGC', 'SGC'])
+
+/** Plain numeric grade for cross-grade comparison; null for special tiers
+ *  (Black Label, Pristine) which command their own premium and shouldn't be
+ *  imputed at parity. */
+function numericGrade(grade: string): number | null {
+  if (/black label|pristine/i.test(grade)) return null
+  const m = grade.match(/\d+(?:\.\d+)?/)
+  return m ? parseFloat(m[0]) : null
+}
+
+export interface CardGradeSales {
+  company: string
+  grade: string
+  sales: Sale[]
+}
+
+/** Compute every grade of ONE card, then impute thin grades from a well-
+ *  supported comparable. The gem-10 (or 9, 9.5…) of a card is broadly
+ *  comparable across premium graders (PSA/BGS/CGC/SGC), so a rare grade with
+ *  one stale sale — e.g. BGS 10 — inherits the confident grade's value instead
+ *  of showing a misleading one-off, the way reference pricing apps do. Imputed
+ *  values are flagged low confidence. Cheaper/niche graders (e.g. TAG) keep
+ *  their own data — they trade well below the premium gem-10. */
+export function computeCardValues(
+  rows: CardGradeSales[],
+  now: Date,
+): (CardGradeSales & { value: ComputedValue })[] {
+  type Computed = CardGradeSales & { value: ComputedValue }
+  const out: Computed[] = rows.map(r => ({ ...r, value: computeVariantValue(r.sales, now) }))
+
+  // Group premium graders by numeric grade; within each, a thin/low-confidence
+  // grade inherits the most-supported confident grade's value.
+  const byNum = new Map<number, Computed[]>()
+  for (const o of out) {
+    if (!PREMIUM_GRADERS.has(o.company)) continue
+    const n = numericGrade(o.grade)
+    if (n == null) continue
+    const arr = byNum.get(n) ?? []
+    arr.push(o)
+    byNum.set(n, arr)
+  }
+  for (const group of byNum.values()) {
+    const anchor = group
+      .filter(o => (o.value.confidence === 'high' || o.value.confidence === 'medium') && o.value.market_value != null)
+      .sort((a, b) => b.value.sample_size - a.value.sample_size)[0]
+    if (!anchor) continue
+    for (const o of group) {
+      if (o === anchor) continue
+      if (o.value.confidence === 'low' || o.value.confidence === 'none') {
+        o.value = { ...o.value, market_value: anchor.value.market_value, confidence: 'low' }
+      }
+    }
+  }
+  return out
+}

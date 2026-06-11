@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { computeVariantValue, weightedMedian, median, type Sale } from './slab-comp'
+import { computeVariantValue, computeCardValues, weightedMedian, median, type Sale } from './slab-comp'
 
 const NOW = new Date('2026-06-08T00:00:00Z')
 function daysAgo(n: number): Date {
@@ -80,6 +80,22 @@ test('flat market stays at the median (no lean)', () => {
   const sales = Array.from({ length: 12 }, (_, i) => sale(100 + (i % 2), i)) // ~100, no trend
   const c = computeVariantValue(sales, NOW)
   assert.ok(c.market_value! >= 99 && c.market_value! <= 102, `expected ~100, got ${c.market_value}`)
+})
+
+test('cross-grade imputation lifts a thin premium grade; cheaper graders keep their own', () => {
+  const out = computeCardValues(
+    [
+      { company: 'PSA', grade: '10', sales: Array.from({ length: 10 }, (_, i) => sale(1000, i)) }, // confident anchor
+      { company: 'BGS', grade: '10', sales: [sale(400, 30)] }, // one stale sale → thin
+      { company: 'TAG', grade: '10', sales: [sale(300, 30)] }, // cheaper grader → not imputed
+    ],
+    NOW,
+  )
+  const v = (co: string) => out.find(o => o.company === co)!.value
+  assert.ok(v('PSA').market_value! >= 990 && v('PSA').market_value! <= 1010)
+  assert.equal(v('BGS').market_value, v('PSA').market_value) // BGS 10 inherits PSA 10
+  assert.equal(v('BGS').confidence, 'low') // flagged estimated
+  assert.equal(v('TAG').market_value, 300) // TAG keeps its own — not lifted to the premium gem-10
 })
 
 test('trend is positive when recent 30d exceeds prior 30d', () => {

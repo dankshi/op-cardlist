@@ -16,7 +16,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
-import { computeVariantValue, MAX_LOOKBACK_DAYS, type Sale } from '../src/lib/slab-comp'
+import { computeCardValues, MAX_LOOKBACK_DAYS, type CardGradeSales } from '../src/lib/slab-comp'
 import { recomputeSlabCards } from '../src/lib/slab-comp-recompute'
 
 dotenv.config({ path: '.env.local' })
@@ -58,30 +58,34 @@ async function main() {
   }
   console.log(`Loaded ${rows?.length ?? 0} visible sold sales (last ${MAX_LOOKBACK_DAYS}d${cardId ? `, card ${cardId}` : ''}).`)
 
-  const groups = new Map<string, { cardId: string; company: string; grade: string; sales: Sale[] }>()
+  const cards = new Map<string, { cardId: string; grades: Map<string, CardGradeSales> }>()
   for (const r of rows ?? []) {
     const price = Number(r.price)
     if (!Number.isFinite(price) || price <= 0) continue
-    const k = `${r.card_id}|${r.grading_company}|${r.grade}`
-    let g = groups.get(k)
-    if (!g) {
-      g = { cardId: r.card_id as string, company: r.grading_company as string, grade: r.grade as string, sales: [] }
-      groups.set(k, g)
-    }
+    if (r.listing_format === 'best_offer') continue // "Best offer accepted" = struck ask, not a real price
+    const cardId = r.card_id as string
+    let bucket = cards.get(cardId)
+    if (!bucket) { bucket = { cardId, grades: new Map() }; cards.set(cardId, bucket) }
+    const gk = `${r.grading_company}|${r.grade}`
+    let g = bucket.grades.get(gk)
+    if (!g) { g = { company: r.grading_company as string, grade: r.grade as string, sales: [] }; bucket.grades.set(gk, g) }
     g.sales.push({ price, soldAt: new Date(r.sold_at as string) })
   }
 
   const now = new Date()
-  for (const g of groups.values()) {
-    const c = computeVariantValue(g.sales, now)
-    console.log(
-      `  ${g.cardId} ${g.company} ${g.grade}: ` +
-        `${c.market_value == null ? '—' : '$' + c.market_value.toFixed(2)} ` +
-        `(${c.confidence}, n=${c.sample_size}/${c.window_days}d` +
-        `${c.trend_30d_pct == null ? '' : `, trend ${(c.trend_30d_pct * 100).toFixed(0)}%`})`,
-    )
+  let count = 0
+  for (const bucket of cards.values()) {
+    for (const { company, grade, value: c } of computeCardValues([...bucket.grades.values()], now)) {
+      count++
+      console.log(
+        `  ${bucket.cardId} ${company} ${grade}: ` +
+          `${c.market_value == null ? '—' : '$' + c.market_value.toFixed(2)} ` +
+          `(${c.confidence}, n=${c.sample_size}/${c.window_days}d` +
+          `${c.trend_30d_pct == null ? '' : `, trend ${(c.trend_30d_pct * 100).toFixed(0)}%`})`,
+      )
+    }
   }
-  console.log(`Computed ${groups.size} variant value(s). Dry run — nothing written.`)
+  console.log(`Computed ${count} variant value(s). Dry run — nothing written.`)
 }
 
 main().catch(err => {

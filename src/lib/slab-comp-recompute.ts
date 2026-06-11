@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeVariantValue, MAX_LOOKBACK_DAYS, type Sale } from './slab-comp'
+import { computeCardValues, MAX_LOOKBACK_DAYS, type CardGradeSales } from './slab-comp'
 
 /** Recompute slab_market_values from slab_sales and upsert the results.
  *
@@ -32,28 +32,35 @@ export async function recomputeSlabCards(
   const { data: rows, error } = await query
   if (error) throw error
 
-  interface Group { cardId: string; company: string; grade: string; sales: Sale[] }
-  const groups = new Map<string, Group>()
+  // Group by CARD (then grade) so computeCardValues can impute thin grades from
+  // a comparable confident one.
+  interface CardBucket { cardId: string; grades: Map<string, CardGradeSales> }
+  const cards = new Map<string, CardBucket>()
   for (const r of rows ?? []) {
     const price = Number(r.price)
     if (!Number.isFinite(price) || price <= 0) continue
-    const k = `${r.card_id}|${r.grading_company}|${r.grade}`
-    let g = groups.get(k)
-    if (!g) {
-      g = { cardId: r.card_id as string, company: r.grading_company as string, grade: r.grade as string, sales: [] }
-      groups.set(k, g)
-    }
+    // 'best_offer' here means "Best offer accepted" — eBay shows the struck-out
+    // ask, not the (hidden, lower) accepted price, so it's not a real price.
+    if (r.listing_format === 'best_offer') continue
+    const cardId = r.card_id as string
+    let bucket = cards.get(cardId)
+    if (!bucket) { bucket = { cardId, grades: new Map() }; cards.set(cardId, bucket) }
+    const gk = `${r.grading_company}|${r.grade}`
+    let g = bucket.grades.get(gk)
+    if (!g) { g = { company: r.grading_company as string, grade: r.grade as string, sales: [] }; bucket.grades.set(gk, g) }
     g.sales.push({ price, soldAt: new Date(r.sold_at as string) })
   }
 
   const now = new Date()
-  const upserts = [...groups.values()].map(g => ({
-    card_id: g.cardId,
-    grading_company: g.company,
-    grade: g.grade,
-    ...computeVariantValue(g.sales, now),
-    computed_at: now.toISOString(),
-  }))
+  const upserts = [...cards.values()].flatMap(bucket =>
+    computeCardValues([...bucket.grades.values()], now).map(c => ({
+      card_id: bucket.cardId,
+      grading_company: c.company,
+      grade: c.grade,
+      ...c.value,
+      computed_at: now.toISOString(),
+    })),
+  )
 
   // Targeted mode: clear the affected cards first so variants that lost their
   // last visible sale don't keep a stale value.
