@@ -452,7 +452,13 @@ function SaleListItem({ row }: { row: SaleRow }) {
         </div>
       </div>
       <div className="text-right flex-shrink-0">
-        <div className="text-sm font-bold text-zinc-900 tabular-nums">${row.price.toFixed(2)}</div>
+        {/* Accepted-offer "sold" price is the struck-out ask, not the real
+            (hidden) price — render it crossed out, like eBay does. */}
+        <div
+          className={`text-sm font-bold tabular-nums ${row.format === 'best_offer' ? 'text-zinc-400 line-through' : 'text-zinc-900'}`}
+        >
+          ${row.price.toFixed(2)}
+        </div>
         {row.quantity > 1 && <div className="text-[10px] text-zinc-400">×{row.quantity}</div>}
       </div>
     </div>

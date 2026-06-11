@@ -162,7 +162,7 @@ export function SlabSalesTable({ rows }: { rows: SlabSaleRow[] }) {
                     </div>
                   </td>
                   <td className="px-3 py-2 align-top whitespace-nowrap">{row.company} {row.grade}</td>
-                  <td className="px-3 py-2 align-top text-right tabular-nums">${row.price.toLocaleString()}</td>
+                  <td className={`px-3 py-2 align-top text-right tabular-nums ${row.listingFormat === 'best_offer' ? 'text-zinc-400 line-through' : ''}`} title={row.listingFormat === 'best_offer' ? 'Accepted-offer ask — not the real sale price' : undefined}>${row.price.toLocaleString()}</td>
                   <td className="px-3 py-2 align-top whitespace-nowrap text-zinc-600">{row.soldAt.slice(0, 10)}</td>
                   <td className="px-3 py-2 align-top">
                     <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">{row.source}</span>
