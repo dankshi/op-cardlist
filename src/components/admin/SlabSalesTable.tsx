@@ -19,6 +19,7 @@ export interface SlabSaleRow {
   cardImageUrl: string | null
   ebayImageUrl: string | null
   listingFormat: string | null
+  language: string | null
   status: 'visible' | 'hidden' | 'excluded'
   excludedReason: string | null
   parseConfidence: string | null
@@ -161,7 +162,12 @@ export function SlabSalesTable({ rows }: { rows: SlabSaleRow[] }) {
                         : <ImgPlaceholder label="eBay" />}
                     </div>
                   </td>
-                  <td className="px-3 py-2 align-top whitespace-nowrap">{row.company} {row.grade}</td>
+                  <td className="px-3 py-2 align-top whitespace-nowrap">
+                    {row.company} {row.grade}
+                    {row.language === 'japanese' && (
+                      <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-rose-50 text-rose-600" title="Japanese print">JP</span>
+                    )}
+                  </td>
                   <td className={`px-3 py-2 align-top text-right tabular-nums ${row.listingFormat === 'best_offer' ? 'text-zinc-400 line-through' : ''}`} title={row.listingFormat === 'best_offer' ? 'Accepted-offer ask — not the real sale price' : undefined}>${row.price.toLocaleString()}</td>
                   <td className="px-3 py-2 align-top whitespace-nowrap text-zinc-600">{row.soldAt.slice(0, 10)}</td>
                   <td className="px-3 py-2 align-top">

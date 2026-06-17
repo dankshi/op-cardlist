@@ -37,7 +37,7 @@ export default async function SlabSalesAdminPage({
 
   let query = admin
     .from('slab_sales')
-    .select('id, card_id, source, grading_company, grade, price, sold_at, title, listing_url, image_url, listing_format, status, excluded_reason, parse_confidence')
+    .select('id, card_id, source, grading_company, grade, price, sold_at, title, listing_url, image_url, listing_format, language, status, excluded_reason, parse_confidence')
     .order('sold_at', { ascending: false })
     .limit(PAGE_LIMIT)
   if (status) query = query.eq('status', status)
@@ -69,6 +69,7 @@ export default async function SlabSalesAdminPage({
       cardImageUrl: (card?.image_url as string | null) ?? null,
       ebayImageUrl: (s.image_url as string | null) ?? null,
       listingFormat: (s.listing_format as string | null) ?? null,
+      language: (s.language as string | null) ?? null,
       status: s.status as SlabSaleRow['status'],
       excludedReason: (s.excluded_reason as string | null) ?? null,
       parseConfidence: (s.parse_confidence as string | null) ?? null,

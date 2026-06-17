@@ -50,6 +50,7 @@ interface ParsedSale {
   listingUrl: string | null
   imageUrl: string | null
   listingFormat: string | null
+  language: 'english' | 'japanese'
   parseConfidence: 'high' | 'low'
 }
 
@@ -329,6 +330,13 @@ async function scrapeCardSoldListings(
   return results
 }
 
+/** Print language from the listing title — Japanese versions of the same card
+ *  number trade as a separate market. Default english (JP sellers reliably mark
+ *  "Japanese"/"JP"/日本; English listings often omit "English"). */
+function detectLanguage(title: string): 'english' | 'japanese' {
+  return /\b(japanese|japan|jpn|jp)\b|日本/i.test(title) ? 'japanese' : 'english'
+}
+
 function rowsFromRawResults(
   raw: RawListing[],
   now: Date,
@@ -365,6 +373,7 @@ function rowsFromRawResults(
       listingUrl: r.url || null,
       imageUrl: r.imageUrl || null,
       listingFormat: r.format,
+      language: detectLanguage(r.title),
       parseConfidence: confidence,
     })
   }
@@ -390,30 +399,59 @@ interface CardTarget {
  * keywords parsed from the product name. The set code anchors the search;
  * the keywords narrow it to the right variant.
  */
+/** The trailing rarity code from a TCGplayer product name, e.g. "O-Nami (SP)" → "sp". */
+function cardRarity(productName: string | null): string {
+  return (productName?.match(/\(([^()]+)\)\s*$/)?.[1] ?? '').toLowerCase().trim()
+}
+
+/** A title token a listing MUST contain to be the *right printing*, for a
+ *  variant that shares a card number with another printing AND that eBay can't
+ *  search by. OP06-101 exists as both "Alt Art" (Wings of the Captain) and "SP"
+ *  (500 Years) — only the SP version's title carries a standalone "SP", and
+ *  eBay drops the 2-letter "SP" from search, so we filter on it after fetching.
+ *  null = no extra constraint.
+ *  TODO: when set metadata is available, also match the set title (e.g. "500
+ *  Years" vs "Wings of the Captain") to split hypothetical same-rarity variants. */
+function requiredTitleToken(productName: string | null): RegExp | null {
+  return cardRarity(productName) === 'sp' ? /\bsp\b/i : null
+}
+
 function buildQuery(cardId: string, productName: string | null): string {
   // "OP13-118_p3" → "OP13-118"
   const baseCode = cardId.replace(/_[^_]+$/, '')
   if (!productName) return baseCode
-
-  // Human-style search: "<number> <character> <rarity spelled out>", e.g.
-  // "OP07-109 Luffy treasure rare". Two fixes vs the old "<number> TR":
-  //   1. Spell out the rarity — sellers write "Treasure Rare", rarely the "TR"
-  //      abbreviation, so requiring "TR" silently dropped real sales.
-  //   2. Keep the rarity word as the precision filter — eBay tokenizes
-  //      "OP07-109" into OP07 + 109, so number-only matches any OP07 Luffy lot
-  //      mentioning "109"; the rarity word pins it to the right card.
   const lead = productName.replace(/\s*\(.*$/, '').trim()
-  const name = lead.split(/[.\s]+/).filter(Boolean).pop() ?? '' // "Monkey.D.Luffy" → "Luffy"
-  const tail = productName.match(/\(([^()]+)\)\s*$/)
-  const rarity = (tail?.[1] ?? '')
-    .toLowerCase()
-    .replace(/^tr$/, 'treasure rare')
-    .replace(/^sec$/, 'secret rare')
-    .replace(/^sr$/, 'super rare')
-    .replace(/alternate art/, 'alt art')
-    .replace(/parallel/, '')
-    .trim()
-  return [baseCode, name, rarity].filter(Boolean).join(' ')
+  const rarity = cardRarity(productName)
+
+  // SP shares a card number with other printings (Alt Art / Parallel) and eBay
+  // can't search the 2-letter "SP". Search number + name + alt-art OR-terms: the
+  // alt-art terms surface the alt/SP listings (the SP card *is* an alternate art)
+  // within eBay's 120 cap, and requiredTitleToken() then keeps only the ones whose
+  // title carries a standalone "SP", dropping the Alt-Art/Parallel printing.
+  // The number is KEPT: a bare character name like "Nami" matches many cards
+  // across sets (O-Nami, other Nami alt-arts), so cross-card contamination is a
+  // worse failure than missing the occasional number-less listing.
+  if (rarity === 'sp') {
+    const fullName = lead.replace(/\./g, ' ').replace(/\s+/g, ' ').trim()
+    return [baseCode, fullName, '(sp,parallel,alt)'].filter(Boolean).join(' ')
+  }
+
+  // Otherwise "<number> <surname> <rarity spelled out>": the number + rarity word
+  // pin the right card (eBay tokenizes the number, so the rarity word matters).
+  // Split the name on hyphens too so "O-Nami" → "Nami" (O-Nami / 0-Nami / Nami).
+  const surname = lead.split(/[.\s-]+/).filter(Boolean).pop() ?? ''
+  const RARITY: Record<string, string> = { tr: 'treasure rare', sec: 'secret rare', sr: 'super rare' }
+  const term = RARITY[rarity] ?? rarity.replace(/alternate art/, 'alt art').replace(/parallel/, '').trim()
+  return [baseCode, surname, term].filter(Boolean).join(' ')
+}
+
+/** Fold the canonical card rarity (from the `cards` table) into the product name
+ *  so buildQuery/cardRarity can read it even when the TCGplayer name omits it —
+ *  e.g. "Vinsmoke Sanji" + rarity "TR" → "Vinsmoke Sanji (TR)". The appended
+ *  paren wins (cardRarity reads the last one). */
+function withRarity(name: string | null, rarity: string | null): string | null {
+  if (!name) return null
+  return rarity ? `${name} (${rarity})` : name
 }
 
 async function selectTargets(opts: {
@@ -425,18 +463,15 @@ async function selectTargets(opts: {
   // 20260537): card_tcgplayer_mapping gives card_id → product_id + name, and
   // tcgplayer_current_prices gives the latest market_price per product.
   if (opts.cardId) {
-    const { data } = await supabase
-      .from('card_tcgplayer_mapping')
-      .select('card_id, tcgplayer_name')
-      .eq('card_id', opts.cardId)
-      .single()
-    return [
-      {
-        cardId: opts.cardId,
-        query: buildQuery(opts.cardId, data?.tcgplayer_name ?? null),
-        tcgName: data?.tcgplayer_name ?? null,
-      },
-    ]
+    // The TCGplayer name often omits the rarity (e.g. "Vinsmoke Sanji"), so pull
+    // the canonical rarity from `cards` and fold it in — buildQuery/cardRarity
+    // need it to add the right search term ("treasure rare") and pick the variant.
+    const [{ data: map }, { data: card }] = await Promise.all([
+      supabase.from('card_tcgplayer_mapping').select('tcgplayer_name').eq('card_id', opts.cardId).maybeSingle(),
+      supabase.from('cards').select('name, rarity').eq('id', opts.cardId).maybeSingle(),
+    ])
+    const tcgName = withRarity(map?.tcgplayer_name ?? card?.name ?? null, card?.rarity ?? null)
+    return [{ cardId: opts.cardId, query: buildQuery(opts.cardId, tcgName), tcgName }]
   }
 
   const [{ data: maps, error: mErr }, { data: prices, error: pErr }] = await Promise.all([
@@ -557,12 +592,18 @@ async function main() {
       const raw = await scrapeCardSoldListings(fetcher, t.query, !!opts.dryRun)
       succeeded++
       const expected = expectedVariant(t.cardId, t.tcgName)
-      const { rows: parsed, droppedVariant } = rowsFromRawResults(raw, now, expected)
+      const { rows: parsedAll, droppedVariant } = rowsFromRawResults(raw, now, expected)
+      // Keep only the right printing when a variant needs a specific title token
+      // (e.g. SP — excludes the co-numbered Alt Art version).
+      const token = requiredTitleToken(t.tcgName)
+      const parsed = token ? parsedAll.filter(p => token.test(p.title)) : parsedAll
+      const droppedPrinting = parsedAll.length - parsed.length
       totalParsed += parsed.length
       console.log(
         `[${i + 1}/${targets.length}] ${t.cardId} (query: "${t.query}", ${expected}): ` +
           `${raw.length} raw → ${parsed.length} graded` +
-          `${droppedVariant > 0 ? ` (${droppedVariant} wrong-variant dropped)` : ''}`,
+          `${droppedVariant > 0 ? ` (${droppedVariant} wrong-variant dropped)` : ''}` +
+          `${droppedPrinting > 0 ? ` (${droppedPrinting} wrong-printing dropped)` : ''}`,
       )
       if (opts.dryRun && parsed.length > 0) {
         const sample = parsed.slice(0, 3)
@@ -608,6 +649,7 @@ async function main() {
             listing_url: p.listingUrl,
             image_url: p.imageUrl,
             listing_format: p.listingFormat,
+            language: p.language,
             parse_confidence: p.parseConfidence,
           }))
           const { error } = await supabase.from('slab_sales').insert(rows)
