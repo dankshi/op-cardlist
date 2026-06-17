@@ -1,0 +1,59 @@
+name: Update Catalog
+
+# Keeps the TCGplayer product catalog (tcgplayer_products) in sync with new sets
+# so a fresh set is never left un-cataloged (the gap that left OP16 invisible).
+# Two triggers:
+#   - weekly schedule: discover + full catalog refresh (the "never forget" net)
+#   - manual dispatch: pass a set slug to catalog just that set fast, e.g. when
+#     you know a drop is landing (much quicker than the full pass).
+on:
+  schedule:
+    # Mondays 07:00 UTC.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+    inputs:
+      set:
+        description: 'TCGplayer set slug to scrape (blank = all sets). Use for a known upcoming drop.'
+        required: false
+        default: ''
+
+# Don't let a long full run overlap the next tick.
+concurrency:
+  group: update-catalog
+  cancel-in-progress: false
+
+jobs:
+  update-catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      # Find new TCGplayer sets (registers their slug in tcgplayer_sets) — must
+      # run first so a brand-new set's slug exists before the catalog scrape.
+      - name: Discover TCGplayer sets
+        run: npm run discover:sets
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # Catalog the products (and a price-history snapshot). A specific --set when
+      # dispatched with one, otherwise every set with products.
+      - name: Scrape product catalog
+        run: |
+          if [ -n "${{ inputs.set }}" ]; then
+            npm run scrape:all-sets -- --set="${{ inputs.set }}"
+          else
+            npm run scrape:all-sets
+          fi
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

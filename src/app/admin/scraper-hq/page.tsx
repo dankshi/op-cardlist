@@ -29,7 +29,7 @@ interface Status {
   priceFreshness: { latestDate: string | null; rowsOnLatest: number }
   salesCoverage: { totalProducts: number; scrapedLast24h: number; neverScraped: number; oldestScrapedAt: string | null; cycleDays: number | null; newSales24h: number }
   triggers: { githubTokenSet: boolean; repo: string; ref: string }
-  sets: { set_id: string; name: string; release_date: string | null; last_scraped_at: string | null; total_cards: number; mapped_cards: number }[]
+  sets: { set_id: string; name: string; release_date: string | null; last_scraped_at: string | null; total_cards: number; mapped_cards: number; catalog: { mapped: number; cataloged: number } }[]
   recentRuns: RunRow[]
 }
 
@@ -357,11 +357,14 @@ export default function ScraperHqPage() {
               <th className="px-3 py-2 font-semibold">Last scraped</th>
               <th className="px-3 py-2 font-semibold">Cards</th>
               <th className="px-5 py-2 font-semibold">Mapping</th>
+              <th className="px-5 py-2 font-semibold">TCGplayer catalog</th>
             </tr></thead>
             <tbody className="divide-y divide-zinc-100">
               {data.sets.map(s => {
                 const pct = s.total_cards > 0 ? Math.round((s.mapped_cards / s.total_cards) * 100) : 0
                 const full = s.total_cards > 0 && s.mapped_cards >= s.total_cards
+                const cat = s.catalog ?? { mapped: 0, cataloged: 0 }
+                const catGap = cat.mapped > 0 && cat.cataloged < cat.mapped
                 return (
                   <tr key={s.set_id}>
                     <td className="px-5 py-2 text-zinc-900">{s.name}</td>
@@ -371,6 +374,13 @@ export default function ScraperHqPage() {
                       {full
                         ? <span className="text-emerald-600">✓</span>
                         : <span className={pct >= 60 ? 'text-amber-600' : 'text-red-600'}>{s.mapped_cards}/{s.total_cards} · {pct}%</span>}
+                    </td>
+                    <td className="px-5 py-2 tabular-nums font-semibold">
+                      {cat.mapped === 0
+                        ? <span className="text-zinc-300">—</span>
+                        : catGap
+                          ? <span className="text-red-600" title="Mapped products missing from tcgplayer_products — run Update Catalog (workflow_dispatch) for this set">⚠ {cat.cataloged}/{cat.mapped} cataloged</span>
+                          : <span className="text-emerald-600">✓</span>}
                     </td>
                   </tr>
                 )

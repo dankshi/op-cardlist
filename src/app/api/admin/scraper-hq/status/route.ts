@@ -60,6 +60,27 @@ async function computeSalesCoverage(supabase: SupabaseClient, since24h: string) 
   // throttling hurts) — full coverage in 24h is NOT expected at low run rates.
   const cycleDays = scrapedLast24h > 0 ? totalProducts / scrapedLast24h : null
 
+  // Per-set catalog coverage: of a set's mapped (visible) products, how many are
+  // actually in tcgplayer_products. A set with mapped > cataloged is missing from
+  // the TCGplayer catalog (the gap that hid OP16) — surfaced as a flag in HQ.
+  const setByCard = new Map(cardRows.map(c => [c.id, c.set_id]))
+  const mappedBySet = new Map<string, Set<number>>()
+  for (const m of mapRows) {
+    if (!visibleCardIds.has(m.card_id)) continue
+    const setId = setByCard.get(m.card_id)
+    if (!setId) continue
+    let set = mappedBySet.get(setId)
+    if (!set) { set = new Set(); mappedBySet.set(setId, set) }
+    set.add(m.tcgplayer_product_id)
+  }
+  const prodSet = new Set(prodRows.map(p => p.product_id))
+  const catalogBySet: Record<string, { mapped: number; cataloged: number }> = {}
+  for (const [setId, prods] of mappedBySet) {
+    let cataloged = 0
+    for (const pid of prods) if (prodSet.has(pid)) cataloged++
+    catalogBySet[setId] = { mapped: prods.size, cataloged }
+  }
+
   return {
     totalProducts,
     scrapedLast24h,
@@ -67,6 +88,7 @@ async function computeSalesCoverage(supabase: SupabaseClient, since24h: string) 
     oldestScrapedAt,
     cycleDays,
     newSales24h: newSalesRes.count ?? 0,
+    catalogBySet,
   }
 }
 
@@ -138,7 +160,10 @@ export async function GET() {
       repo: process.env.GITHUB_DISPATCH_REPO ?? 'dankshi/op-cardlist',
       ref: process.env.GITHUB_DISPATCH_REF ?? 'nomi',
     },
-    sets: setsRes.data ?? [],
+    sets: (setsRes.data ?? []).map(s => ({
+      ...s,
+      catalog: coverage.catalogBySet[s.set_id as string] ?? { mapped: 0, cataloged: 0 },
+    })),
     recentRuns: recentRunsRes.data ?? [],
   })
 }
