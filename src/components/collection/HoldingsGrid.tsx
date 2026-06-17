@@ -22,6 +22,9 @@ export interface HoldingRow {
   grade: string | null
   customValue: number | null
   isCustomValue: boolean
+  /** Our market-derived value (slab comp / listing / raw), ignoring any override
+   *  — shown next to a custom price so the owner still sees the calculated one. */
+  calculatedPrice: number | null
   serialNumber: string | null
   certNumber: string | null
   marketPrice: number | null
@@ -225,6 +228,18 @@ export function HoldingsGrid({
                       </span>
                     )}
                   </div>
+
+                  {/* Below the headline: our calculated estimate next to a custom
+                      price, or surface that we have no slab estimate yet. */}
+                  {row.isCustomValue && row.calculatedPrice != null && (
+                    <div className="mt-0.5 text-[11px] text-zinc-500 tabular-nums">Est. {fmtUSD(row.calculatedPrice)}</div>
+                  )}
+                  {row.isCustomValue && row.calculatedPrice == null && row.gradingCompany && row.grade && (
+                    <div className="mt-0.5 text-[11px] text-zinc-500">No slab estimate yet</div>
+                  )}
+                  {!row.isCustomValue && row.marketPrice == null && row.gradingCompany && row.grade && (
+                    <div className="mt-0.5 text-[11px] text-amber-500/80">No slab estimate — set a value</div>
+                  )}
 
                   {/* Position summary — quantity · total value, then avg cost. */}
                   <div className="mt-3 pt-3 border-t border-zinc-700/60 space-y-1.5">

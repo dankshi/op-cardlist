@@ -17,10 +17,12 @@ export interface Holding {
  *    1. explicit custom override (the owner pinned a value)
  *    2. graded only: the computed slab comp value (slab_market_values + override)
  *    3. graded only: the lowest active graded listing for that exact grade
- *    4. the raw TCGplayer market price (the only signal for ungraded cards)
- *  Returns null when nothing is known. Centralized so every surface that values
- *  a collection (the portfolio page, the card-page position panel) agrees — a
- *  PSA 10 should be worth the same number wherever it's shown. */
+ *    4. ungraded only: the raw TCGplayer market price
+ *  A graded slab NEVER falls back to the raw price — a BGS 10 is worth a large
+ *  multiple of the ungraded card, so the raw price is misleading. With no slab
+ *  signal it returns null, so the UI can surface "no estimate" (and prompt for a
+ *  custom value) instead of a wrong number. Centralized so every surface that
+ *  values a collection agrees — a PSA 10 is worth the same number everywhere. */
 export function holdingMarketPrice(opts: {
   customValue: number | null
   isGraded: boolean
@@ -30,7 +32,7 @@ export function holdingMarketPrice(opts: {
 }): number | null {
   const { customValue, isGraded, slabValue, gradedListing, rawMarket } = opts
   if (customValue != null) return customValue
-  if (isGraded) return slabValue ?? gradedListing ?? rawMarket
+  if (isGraded) return slabValue ?? gradedListing
   return rawMarket
 }
 

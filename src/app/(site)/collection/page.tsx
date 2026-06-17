@@ -118,6 +118,15 @@ export default async function CollectionPage() {
       gradedListing: isGraded ? gradedListingMin.get(variantKey) ?? null : null,
       rawMarket,
     })
+    // Same resolution but ignoring the override, so the UI can show the collector
+    // what we'd value it at *alongside* a custom price they pinned.
+    const calculatedPrice = holdingMarketPrice({
+      customValue: null,
+      isGraded,
+      slabValue: isGraded ? slabValueMap.get(variantKey) ?? null : null,
+      gradedListing: isGraded ? gradedListingMin.get(variantKey) ?? null : null,
+      rawMarket,
+    })
     const qty = i.quantity
     const currentValue = marketPrice != null ? marketPrice * qty : null
     const costBasis = acquiredPrice != null ? acquiredPrice * qty : null
@@ -140,6 +149,7 @@ export default async function CollectionPage() {
       grade: i.grade,
       customValue,
       isCustomValue: customValue != null,
+      calculatedPrice,
       serialNumber: i.serial_number,
       certNumber: i.cert_number ?? null,
       marketPrice,
