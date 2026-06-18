@@ -58,12 +58,17 @@ export function ManageHoldingModal({
   const [listError, setListError] = useState<string | null>(null)
   const [listed, setListed] = useState(false)
 
-  // Regrade
+  // Regrade — each card is an individual slab: its own grade + cert.
   const [regCompany, setRegCompany] = useState<GradingCompany>('PSA')
-  const [regGrade, setRegGrade] = useState(GRADING_SCALES.PSA[0])
+  const [regCopies, setRegCopies] = useState<{ grade: string; cert: string }[]>(
+    () => Array.from({ length: Math.max(1, row.quantity) }, () => ({ grade: GRADING_SCALES.PSA[0], cert: '' })),
+  )
   const [regFee, setRegFee] = useState('')
   const [regShip, setRegShip] = useState('')
   const [regrading, setRegrading] = useState(false)
+  function updateCopy(i: number, patch: Partial<{ grade: string; cert: string }>) {
+    setRegCopies(prev => prev.map((c, idx) => idx === i ? { ...c, ...patch } : c))
+  }
 
   const perItem = row.currentValue != null ? row.currentValue / row.quantity : null
   const up = (row.gain ?? 0) >= 0
@@ -157,7 +162,7 @@ export function ManageHoldingModal({
   async function submitRegrade() {
     if (regrading) return
     setRegrading(true)
-    const res = await fetch('/api/collection/adjustments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'regrade', collection_id: row.id, grading_company: regCompany, grade: regGrade, grading_cost: regFee === '' ? 0 : Number(regFee), shipping_cost: regShip === '' ? 0 : Number(regShip) }) })
+    const res = await fetch('/api/collection/adjustments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'regrade', collection_id: row.id, grading_company: regCompany, copies: regCopies.map(c => ({ grade: c.grade, cert: c.cert.trim() || null })), grading_cost: regFee === '' ? 0 : Number(regFee), shipping_cost: regShip === '' ? 0 : Number(regShip) }) })
     setRegrading(false)
     if (res.ok) { onChanged(); onClose() }
     else { const b = await res.json().catch(() => ({})); alert(b.error || 'Failed to mark as graded.') }
@@ -379,32 +384,36 @@ export function ManageHoldingModal({
 
           {view === 'regrade' && !isGraded && (
             <div className="space-y-3">
-              <p className="text-xs text-zinc-500">Moves your raw {row.quantity > 1 ? `×${row.quantity} ` : ''}copy to its graded slab. The grading fee + shipping fold into the cost basis, and it&rsquo;s logged as a transaction in History.</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Company</label>
-                  <select value={regCompany} onChange={e => { const c = e.target.value as GradingCompany; setRegCompany(c); setRegGrade(GRADING_SCALES[c][0]) }} className={field}>{REGRADE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                </div>
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grade</label>
-                  <select value={regGrade} onChange={e => setRegGrade(e.target.value)} className={field}>{GRADING_SCALES[regCompany].map(g => <option key={g} value={g}>{g}</option>)}</select>
-                </div>
+              <p className="text-xs text-zinc-500">Each card is graded individually — set its own grade + cert. The grading fee + shipping split evenly and fold into each slab&rsquo;s cost basis, logged as a transaction in History.</p>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading company</label>
+                <select value={regCompany} onChange={e => { const c = e.target.value as GradingCompany; setRegCompany(c); setRegCopies(prev => prev.map(x => ({ ...x, grade: GRADING_SCALES[c][0] }))) }} className={field}>{REGRADE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold">{regCopies.length} {regCopies.length === 1 ? 'card' : 'cards'} — grade &amp; cert each</p>
+                {regCopies.map((cp, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-[11px] text-zinc-400 w-4 flex-shrink-0 tabular-nums">{i + 1}</span>
+                    <select value={cp.grade} onChange={e => updateCopy(i, { grade: e.target.value })} className={`${field} w-24 flex-shrink-0`}>{GRADING_SCALES[regCompany].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                    <input type="text" inputMode="numeric" value={cp.cert} onChange={e => updateCopy(i, { cert: e.target.value })} placeholder="Cert # (optional)" className={`${field} flex-1 tabular-nums`} />
+                  </div>
+                ))}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading fee</label>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading fee <span className="text-zinc-400 normal-case font-normal">(total)</span></label>
                   <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={regFee} onChange={e => setRegFee(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} /></div>
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Shipping <span className="text-zinc-400 normal-case font-normal">(opt)</span></label>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Shipping <span className="text-zinc-400 normal-case font-normal">(total, opt)</span></label>
                   <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={regShip} onChange={e => setRegShip(e.target.value)} placeholder="Ship" className={`${field} pl-6 tabular-nums`} /></div>
                 </div>
               </div>
               {(Number(regFee) > 0 || Number(regShip) > 0) && (
-                <p className="text-[11px] text-zinc-500">Adds <span className="font-semibold tabular-nums">{fmtUSD((Number(regFee) || 0) + (Number(regShip) || 0))}</span> to cost basis.</p>
+                <p className="text-[11px] text-zinc-500">Adds <span className="font-semibold tabular-nums">{fmtUSD((Number(regFee) || 0) + (Number(regShip) || 0))}</span> to cost basis{regCopies.length > 1 ? <> · <span className="tabular-nums">{fmtUSD(((Number(regFee) || 0) + (Number(regShip) || 0)) / regCopies.length)}</span>/card</> : null}.</p>
               )}
               <div className="flex justify-end">
-                <button type="button" onClick={submitRegrade} disabled={regrading} className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer disabled:opacity-50">{regrading ? 'Saving…' : 'Mark as graded'}</button>
+                <button type="button" onClick={submitRegrade} disabled={regrading} className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer disabled:opacity-50">{regrading ? 'Saving…' : `Mark ${regCopies.length} as graded`}</button>
               </div>
             </div>
           )}
