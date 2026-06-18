@@ -31,7 +31,7 @@ select cron.schedule(
   $job$
   select net.http_post(
     url     := 'https://api.github.com/repos/dankshi/opcg-discord-monitors/actions/workflows/monitor-tcgplayer.yml/dispatches',
-    body    := jsonb_build_object('ref', 'master'),
+    body    := jsonb_build_object('ref', 'master', 'inputs', jsonb_build_object('trigger_source', 'cron')),
     headers := jsonb_build_object(
       'Authorization',         'Bearer ' || coalesce((select value from public.scraper_settings where key = 'github_token'), ''),
       'Accept',                'application/vnd.github+json',
