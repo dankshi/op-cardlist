@@ -424,6 +424,9 @@ export interface CollectionLot {
   quantity: number
   price_paid: number | null
   acquired_date: string | null
+  /** Capitalized cost beyond purchase price (grading fee + grading shipping),
+   *  folded into the line's basis. NOT NULL DEFAULT 0 (migration 20260626). */
+  grading_cost: number
   created_at: string
   updated_at: string
 }
@@ -464,7 +467,10 @@ export interface CollectionAdjustment {
   type: 'grade' | 'basis' | 'note'
   from_grade: string | null
   to_grade: string | null
+  /** Total capitalized cost of the play (grading fee + shipping). */
   amount: number | null
+  /** Shipping slice of `amount` (null when none / non-grade). */
+  shipping_cost: number | null
   happened_at: string
   note: string | null
   created_at: string
@@ -488,6 +494,8 @@ export interface CollectionActivityRow {
   to_grade: string | null
   note: string | null
   source_id: string
+  /** Shipping slice of a grade event's `amount` (null otherwise). */
+  shipping_cost: number | null
 }
 
 export interface WantListItem {

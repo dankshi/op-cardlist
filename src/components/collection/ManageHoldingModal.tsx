@@ -62,6 +62,7 @@ export function ManageHoldingModal({
   const [regCompany, setRegCompany] = useState<GradingCompany>('PSA')
   const [regGrade, setRegGrade] = useState(GRADING_SCALES.PSA[0])
   const [regFee, setRegFee] = useState('')
+  const [regShip, setRegShip] = useState('')
   const [regrading, setRegrading] = useState(false)
 
   const perItem = row.currentValue != null ? row.currentValue / row.quantity : null
@@ -156,7 +157,7 @@ export function ManageHoldingModal({
   async function submitRegrade() {
     if (regrading) return
     setRegrading(true)
-    const res = await fetch('/api/collection/adjustments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'regrade', collection_id: row.id, grading_company: regCompany, grade: regGrade, grading_cost: regFee === '' ? 0 : Number(regFee) }) })
+    const res = await fetch('/api/collection/adjustments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'regrade', collection_id: row.id, grading_company: regCompany, grade: regGrade, grading_cost: regFee === '' ? 0 : Number(regFee), shipping_cost: regShip === '' ? 0 : Number(regShip) }) })
     setRegrading(false)
     if (res.ok) { onChanged(); onClose() }
     else { const b = await res.json().catch(() => ({})); alert(b.error || 'Failed to mark as graded.') }
@@ -339,6 +340,9 @@ export function ManageHoldingModal({
                           <div className="text-right">
                             <p className="text-sm tabular-nums text-zinc-900">{a.amount != null ? fmtUSD(Number(a.amount)) : '—'}</p>
                             {realized != null && <p className={`text-[11px] font-semibold tabular-nums ${realized >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{realized >= 0 ? '+' : '−'}{fmtUSD(Math.abs(realized))}</p>}
+                            {a.kind === 'grade' && a.shipping_cost != null && Number(a.shipping_cost) > 0 && (
+                              <p className="text-[10px] text-zinc-400 tabular-nums">incl. {fmtUSD(Number(a.shipping_cost))} ship</p>
+                            )}
                           </div>
                         </div>
                       </li>
@@ -375,12 +379,30 @@ export function ManageHoldingModal({
 
           {view === 'regrade' && !isGraded && (
             <div className="space-y-3">
-              <p className="text-xs text-zinc-500">Moves a raw copy to its graded slab; the fee folds into its cost basis.</p>
-              <div className="grid grid-cols-3 gap-2">
-                <select value={regCompany} onChange={e => { const c = e.target.value as GradingCompany; setRegCompany(c); setRegGrade(GRADING_SCALES[c][0]) }} className={field}>{REGRADE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                <select value={regGrade} onChange={e => setRegGrade(e.target.value)} className={field}>{GRADING_SCALES[regCompany].map(g => <option key={g} value={g}>{g}</option>)}</select>
-                <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={regFee} onChange={e => setRegFee(e.target.value)} placeholder="Fee" className={`${field} pl-6`} /></div>
+              <p className="text-xs text-zinc-500">Moves your raw {row.quantity > 1 ? `×${row.quantity} ` : ''}copy to its graded slab. The grading fee + shipping fold into the cost basis, and it&rsquo;s logged as a transaction in History.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Company</label>
+                  <select value={regCompany} onChange={e => { const c = e.target.value as GradingCompany; setRegCompany(c); setRegGrade(GRADING_SCALES[c][0]) }} className={field}>{REGRADE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grade</label>
+                  <select value={regGrade} onChange={e => setRegGrade(e.target.value)} className={field}>{GRADING_SCALES[regCompany].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                </div>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading fee</label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={regFee} onChange={e => setRegFee(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} /></div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Shipping <span className="text-zinc-400 normal-case font-normal">(opt)</span></label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={regShip} onChange={e => setRegShip(e.target.value)} placeholder="Ship" className={`${field} pl-6 tabular-nums`} /></div>
+                </div>
+              </div>
+              {(Number(regFee) > 0 || Number(regShip) > 0) && (
+                <p className="text-[11px] text-zinc-500">Adds <span className="font-semibold tabular-nums">{fmtUSD((Number(regFee) || 0) + (Number(regShip) || 0))}</span> to cost basis.</p>
+              )}
               <div className="flex justify-end">
                 <button type="button" onClick={submitRegrade} disabled={regrading} className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer disabled:opacity-50">{regrading ? 'Saving…' : 'Mark as graded'}</button>
               </div>

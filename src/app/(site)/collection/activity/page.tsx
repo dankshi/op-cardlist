@@ -120,7 +120,12 @@ export default async function CollectionActivityPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-zinc-600">{r.quantity ?? ''}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-zinc-900">{r.amount != null ? fmtUSD(Number(r.amount)) : '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-zinc-900">
+                      {r.amount != null ? fmtUSD(Number(r.amount)) : '—'}
+                      {r.kind === 'grade' && r.shipping_cost != null && Number(r.shipping_cost) > 0 && (
+                        <span className="block text-[10px] text-zinc-400">incl. {fmtUSD(Number(r.shipping_cost))} ship</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       {realizedVal != null ? (
                         <span className={`font-semibold ${realizedVal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
