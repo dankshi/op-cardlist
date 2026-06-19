@@ -126,12 +126,16 @@ export function Slab({
   company,
   grade,
   certNumber,
+  subgrades,
 }: {
   imageUrl: string
   cardName: string
   company: string
   grade: string
   certNumber?: string | null
+  /** BGS sub-scores `{centering,corners,edges,surface}` — rendered as the strip
+   *  under the label on constructed (non-photoreal) BGS slabs. */
+  subgrades?: Record<string, number> | null
 }) {
   const tpl = templateFor(company, grade)
   if (tpl) {
@@ -177,6 +181,19 @@ export function Slab({
             {certNumber && <span className="font-mono leading-none text-[5px] mt-[2px]" style={{ color: cfg.cert }}>{certNumber}</span>}
           </div>
         </div>
+
+        {/* BGS subgrade strip — four sub-scores under the label, like the real holder. */}
+        {company.toUpperCase() === 'BGS' && subgrades && (
+          <div className={`relative rounded-[3px] overflow-hidden flex items-stretch h-[7%] ${cfg.barClass}`}>
+            <div className="absolute bottom-0 inset-x-0 h-[1px]" style={{ background: cfg.hairline }} />
+            {([['CEN', 'centering'], ['COR', 'corners'], ['EDG', 'edges'], ['SUR', 'surface']] as const).map(([lab, key], i) => (
+              <div key={key} className="flex-1 flex flex-col items-center justify-center" style={i > 0 ? { borderLeft: `1px solid ${cfg.hairline}` } : undefined}>
+                <span className="font-bold tracking-[0.04em] leading-none" style={{ fontSize: '4px', color: cfg.brand }}>{lab}</span>
+                <span className="font-black tabular-nums leading-none mt-[1px]" style={{ fontSize: '7px', color: cfg.gradeNumColor }}>{subgrades[key] ?? '—'}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Card inside the holder */}
         <div className="relative flex-1 rounded-[2px] overflow-hidden bg-zinc-100 ring-1 ring-black/10">

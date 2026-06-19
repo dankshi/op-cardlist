@@ -200,7 +200,7 @@ export function ManageHoldingModal({
         <div className="flex items-start gap-3 px-6 pt-5 pb-4 border-b border-zinc-100">
           <div className="w-14 flex-shrink-0">
             {isGraded
-              ? <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} certNumber={row.certNumber} />
+              ? <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} certNumber={row.certNumber} subgrades={row.subgrades} />
               : (
                 <div className="relative aspect-[5/7] rounded-md overflow-hidden bg-zinc-100">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

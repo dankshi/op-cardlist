@@ -188,7 +188,7 @@ export function HoldingsGrid({
                 className="flex items-end justify-center w-full aspect-[2004/3116] cursor-pointer"
               >
                 {isGraded ? (
-                  <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} certNumber={row.certNumber} />
+                  <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} certNumber={row.certNumber} subgrades={row.subgrades} />
                 ) : (
                   <div className="relative w-full rounded-lg overflow-hidden bg-zinc-800 aspect-[5/7] ring-1 ring-white/5 group-hover:ring-white/20 transition-all">
                     {row.imageUrl && (
