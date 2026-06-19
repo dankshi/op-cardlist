@@ -48,6 +48,9 @@ export function ManageHoldingModal({
   // The graded date — the grade event's own date, editable from the Grading tab.
   const [gradedDate, setGradedDate] = useState('')
   const [loadedGradedDate, setLoadedGradedDate] = useState('')
+  // The grader's submission/order ID for this slab's batch.
+  const [submissionLabel, setSubmissionLabel] = useState('')
+  const [loadedSubmissionLabel, setLoadedSubmissionLabel] = useState('')
   // Correct a logged grade: the slab's grade + (BGS) subgrades.
   const [editGrade, setEditGrade] = useState(row.grade ?? '')
   const [editSub, setEditSub] = useState<Record<string, string>>(() => {
@@ -137,7 +140,10 @@ export function ManageHoldingModal({
       try {
         const d = await (await fetch(`/api/collection/activity?collection_id=${encodeURIComponent(row.id)}`)).json()
         const g = (d.activity ?? []).find((a: CollectionActivityRow) => a.kind === 'grade')
-        if (!cancel && g?.happened_at) { const ds = new Date(g.happened_at).toISOString().slice(0, 10); setGradedDate(ds); setLoadedGradedDate(ds) }
+        if (!cancel && g) {
+          if (g.happened_at) { const ds = new Date(g.happened_at).toISOString().slice(0, 10); setGradedDate(ds); setLoadedGradedDate(ds) }
+          setSubmissionLabel(g.submission_label ?? ''); setLoadedSubmissionLabel(g.submission_label ?? '')
+        }
       } catch { /* keep */ }
     })()
     return () => { cancel = true }
@@ -164,7 +170,7 @@ export function ManageHoldingModal({
     if (savingEdit) return
     setSavingEdit(true); setEditError(null)
     try {
-      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}) }) })
+      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}), ...(isGraded && submissionLabel !== loadedSubmissionLabel ? { submission_label: submissionLabel.trim() || null } : {}) }) })
       if (!v.ok) { setEditError('Couldn’t save.'); return }
       const seen = new Set<string>()
       for (const lot of lots) {
@@ -391,6 +397,10 @@ export function ManageHoldingModal({
                     <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => setGradingCost(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} />
                   </div>
                 </div>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Submission ID <span className="text-zinc-400 normal-case font-normal">(opt)</span></label>
+                <input type="text" value={submissionLabel} onChange={e => setSubmissionLabel(e.target.value)} placeholder="e.g. BGS order #1234567" className={field} />
               </div>
               <div>
                 <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Value override /ea <span className="text-zinc-400 normal-case font-normal">(opt)</span></label>

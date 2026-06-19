@@ -118,6 +118,16 @@ export async function PATCH(request: Request) {
     if (ga) await supabase.from('collection_adjustments').update({ happened_at: ga }).eq('collection_id', id).eq('type', 'grade')
   }
 
+  // submission_label: apply to the whole batch (by submission_id) so every slab
+  // in the submission stays labeled consistently; fall back to this line alone
+  // if the grade event was logged without a submission group.
+  if ('submission_label' in body) {
+    const lbl = typeof body.submission_label === 'string' && body.submission_label.trim() ? body.submission_label.trim() : null
+    const { data: ga } = await supabase.from('collection_adjustments').select('submission_id').eq('collection_id', id).eq('type', 'grade').limit(1).maybeSingle()
+    if (ga?.submission_id) await supabase.from('collection_adjustments').update({ submission_label: lbl }).eq('submission_id', ga.submission_id)
+    else await supabase.from('collection_adjustments').update({ submission_label: lbl }).eq('collection_id', id).eq('type', 'grade')
+  }
+
   return NextResponse.json({ ok: true, item: data })
 }
 
