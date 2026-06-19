@@ -10,8 +10,10 @@ function fmtUSD(n: number) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-/** One copy in the submission. `holdingId` is the source raw collection line. */
-interface Item { holdingId: string; grade: string; cert: string; fee: string; subgrades: Record<SubgradeKey, string> }
+/** One copy in the submission. `holdingId` is the source raw collection line;
+ *  `lotId` optionally pins WHICH acquisition's basis the slab inherits. */
+interface Item { holdingId: string; grade: string; cert: string; fee: string; subgrades: Record<SubgradeKey, string>; lotId: string }
+interface Lot { id: string; quantity: number; price_paid: number | null; acquired_date: string | null }
 
 function emptySubgrades(): Record<SubgradeKey, string> {
   return { centering: '', corners: '', edges: '', surface: '' }
@@ -38,6 +40,7 @@ export function GradingSubmissionModal({
 }) {
   const [company, setCompany] = useState<GradingCompany>('PSA')
   const [items, setItems] = useState<Item[]>([])
+  const [lotsByHolding, setLotsByHolding] = useState<Map<string, Lot[]>>(new Map())
   const [outbound, setOutbound] = useState('')
   const [ret, setRet] = useState('')
   const [picker, setPicker] = useState('')
@@ -51,7 +54,8 @@ export function GradingSubmissionModal({
     if (!open) return
     setCompany('PSA')
     setOutbound(''); setRet(''); setPicker(''); setError(null); setSubmitting(false)
-    setItems(preset ? [{ holdingId: preset.id, grade: GRADING_SCALES.PSA[0], cert: '', fee: '', subgrades: emptySubgrades() }] : [])
+    setLotsByHolding(new Map())
+    setItems(preset ? [{ holdingId: preset.id, grade: GRADING_SCALES.PSA[0], cert: '', fee: '', subgrades: emptySubgrades(), lotId: '' }] : [])
   }, [open, preset?.id])
 
   useEffect(() => {
@@ -73,11 +77,22 @@ export function GradingSubmissionModal({
 
   if (!open) return null
 
-  function addItem(holdingId: string) {
+  async function addItem(holdingId: string) {
     if (!holdingId) return
-    setItems(prev => [...prev, { holdingId, grade: GRADING_SCALES[company][0], cert: '', fee: '', subgrades: emptySubgrades() }])
     setPicker('')
     setError(null)
+    // Load the card's acquisitions so we can pin which one becomes this slab.
+    let lots = lotsByHolding.get(holdingId)
+    if (!lots) {
+      try {
+        const d = await (await fetch(`/api/collection/lots?collection_id=${holdingId}`)).json()
+        lots = ((d.lots ?? []) as Lot[]).map(l => ({ id: l.id, quantity: l.quantity, price_paid: l.price_paid, acquired_date: l.acquired_date }))
+        setLotsByHolding(prev => new Map(prev).set(holdingId, lots!))
+      } catch { lots = [] }
+    }
+    // Default to the oldest acquisition when there's a choice (lots arrive oldest-first).
+    const lotId = lots.length > 1 ? lots[0].id : ''
+    setItems(prev => [...prev, { holdingId, grade: GRADING_SCALES[company][0], cert: '', fee: '', subgrades: emptySubgrades(), lotId }])
   }
   function updateItem(i: number, patch: Partial<Item>) {
     setItems(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it))
@@ -103,7 +118,7 @@ export function GradingSubmissionModal({
         body: JSON.stringify({
           action: 'grade_submission',
           grading_company: company,
-          items: items.map(it => ({ collection_id: it.holdingId, grade: it.grade, cert: it.cert.trim(), grading_fee: it.fee === '' ? 0 : Number(it.fee), subgrades: company === 'BGS' ? it.subgrades : null })),
+          items: items.map(it => ({ collection_id: it.holdingId, grade: it.grade, cert: it.cert.trim(), grading_fee: it.fee === '' ? 0 : Number(it.fee), subgrades: company === 'BGS' ? it.subgrades : null, lot_id: it.lotId || null })),
           outbound_shipping: outbound === '' ? 0 : Number(outbound),
           return_shipping: ret === '' ? 0 : Number(ret),
         }),
@@ -155,6 +170,14 @@ export function GradingSubmissionModal({
                     <input type="text" inputMode="numeric" value={it.cert} onChange={e => updateItem(i, { cert: e.target.value })} placeholder="Cert # (required)" className={`flex-1 min-w-0 px-3 py-2 rounded-lg border text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none tabular-nums ${it.cert.trim() ? 'border-zinc-300 focus:border-orange-500' : 'border-red-300 focus:border-red-500'}`} />
                     <div className="relative w-24 flex-shrink-0"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={it.fee} onChange={e => updateItem(i, { fee: e.target.value })} placeholder="Fee" className={`${field} w-full pl-6 tabular-nums`} /></div>
                   </div>
+                  {(lotsByHolding.get(it.holdingId)?.length ?? 0) > 1 && (
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold flex-shrink-0">From buy</label>
+                      <select value={it.lotId} onChange={e => updateItem(i, { lotId: e.target.value })} className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-zinc-300 bg-white text-xs tabular-nums text-zinc-900 focus:outline-none focus:border-orange-500">
+                        {(lotsByHolding.get(it.holdingId) ?? []).map(l => <option key={l.id} value={l.id}>{l.price_paid != null ? fmtUSD(Number(l.price_paid)) : 'no cost'}{l.acquired_date ? ` · ${l.acquired_date}` : ''}{l.quantity > 1 ? ` (×${l.quantity})` : ''}</option>)}
+                      </select>
+                    </div>
+                  )}
                   {company === 'BGS' && (
                     <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
                       {SUBGRADE_KEYS.map(k => (

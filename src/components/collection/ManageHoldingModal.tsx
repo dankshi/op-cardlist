@@ -15,7 +15,8 @@ function fmtDate(s: string) {
 }
 
 interface LotDraft { id?: string; quantity: number; price: string; date: string }
-type View = 'edit' | 'history' | 'list' | 'regrade'
+type View = 'edit' | 'history' | 'list' | 'regrade' | 'regradeslab'
+const COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
 
 /** Manage one collection holding from /collection. Everything happens inline in
  *  one modal via a tab switch — Acquisitions (default, since people land here to
@@ -50,6 +51,22 @@ export function ManageHoldingModal({
     const sg = row.subgrades ?? {}
     return Object.fromEntries(SUBGRADE_KEYS.map(k => [k, sg[k] != null ? String(sg[k]) : '']))
   })
+
+  // Re-grade (crossover / bump) — a new logged grade event, distinct from a fix.
+  const [rgCompany, setRgCompany] = useState<GradingCompany>((row.gradingCompany as GradingCompany) || 'PSA')
+  const [rgGrade, setRgGrade] = useState(row.grade ?? '')
+  const [rgCert, setRgCert] = useState('')
+  const [rgSub, setRgSub] = useState<Record<string, string>>(() => Object.fromEntries(SUBGRADE_KEYS.map(k => [k, ''])))
+  const [rgFee, setRgFee] = useState('')
+  const [rgShip, setRgShip] = useState('')
+  const [rgSaving, setRgSaving] = useState(false)
+  async function submitRegradeSlab() {
+    if (rgSaving || !rgGrade || !rgCert.trim()) return
+    setRgSaving(true)
+    const res = await fetch('/api/collection/adjustments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'regrade_slab', collection_id: row.id, grading_company: rgCompany, grade: rgGrade, cert: rgCert.trim(), subgrades: rgCompany === 'BGS' ? rgSub : null, grading_cost: rgFee === '' ? 0 : Number(rgFee), shipping_cost: rgShip === '' ? 0 : Number(rgShip) }) })
+    setRgSaving(false)
+    if (res.ok) { onChanged(); onClose() } else { const b = await res.json().catch(() => ({})); alert(b.error || 'Failed to re-grade.') }
+  }
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -172,7 +189,7 @@ export function ManageHoldingModal({
     { v: 'edit', label: 'Acquisitions' },
     { v: 'history', label: 'History' },
     { v: 'list', label: 'List for sale' },
-    ...(!isGraded ? [{ v: 'regrade' as View, label: 'Got graded' }] : []),
+    ...(!isGraded ? [{ v: 'regrade' as View, label: 'Got graded' }] : [{ v: 'regradeslab' as View, label: 'Re-grade' }]),
   ]
   const realizedTotal = activity.filter(a => a.kind === 'sell' && a.realized != null).reduce((s, a) => s + Number(a.realized), 0)
 
@@ -395,6 +412,49 @@ export function ManageHoldingModal({
               <p className="text-xs text-zinc-500">Got these back from a grader? Log a grading submission — each card becomes its own slab with its own grade + cert, and the grading fees + shipping fold into cost basis. You can add other cards from the same submission too.</p>
               <div className="flex justify-end">
                 <button type="button" onClick={() => onLogGrading?.()} disabled={!onLogGrading} className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer disabled:opacity-50">Log grading submission →</button>
+              </div>
+            </div>
+          )}
+
+          {view === 'regradeslab' && isGraded && (
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-500">Crossover or a new grade on resubmit — logs a new event ({gradeLabel(row.gradingCompany, row.grade)} → new) and adds the cost to basis. To fix a typo instead, use the Acquisitions tab.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">New company</label>
+                  <select value={rgCompany} onChange={e => { const c = e.target.value as GradingCompany; setRgCompany(c); setRgGrade(GRADING_SCALES[c][0]) }} className={field}>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">New grade</label>
+                  <select value={rgGrade} onChange={e => setRgGrade(e.target.value)} className={field}>{GRADING_SCALES[rgCompany].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">New cert # (required)</label>
+                <input type="text" inputMode="numeric" value={rgCert} onChange={e => setRgCert(e.target.value)} placeholder="Cert #" className={`${field} tabular-nums ${rgCert.trim() ? '' : 'border-red-300'}`} />
+              </div>
+              {rgCompany === 'BGS' && (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                  {SUBGRADE_KEYS.map(k => (
+                    <div key={k} className="flex items-center gap-1.5">
+                      <label className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold w-16 flex-shrink-0">{SUBGRADE_LABEL[k]}</label>
+                      <select value={rgSub[k]} onChange={e => setRgSub(prev => ({ ...prev, [k]: e.target.value }))} className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-zinc-300 bg-white text-xs tabular-nums text-zinc-900 focus:outline-none focus:border-orange-500">{SUBGRADE_OPTIONS.map(g => <option key={g} value={g}>{g || '—'}</option>)}</select>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Re-grade fee</label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={rgFee} onChange={e => setRgFee(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} /></div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Shipping <span className="text-zinc-400 normal-case font-normal">(opt)</span></label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={rgShip} onChange={e => setRgShip(e.target.value)} placeholder="Ship" className={`${field} pl-6 tabular-nums`} /></div>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button type="button" onClick={submitRegradeSlab} disabled={rgSaving || !rgCert.trim()} className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer disabled:opacity-50">{rgSaving ? 'Saving…' : 'Re-grade'}</button>
               </div>
             </div>
           )}

@@ -98,6 +98,20 @@ export async function POST(request: Request) {
       if (count > q) return NextResponse.json({ error: `Only ${q} raw copy(ies) available for one of the cards` }, { status: 400 })
     }
 
+    // If specific acquisitions were pinned, don't assign one more times than it
+    // has copies (prevents a partial run that grades some then errors).
+    const byLot = new Map<string, number>()
+    for (const it of items) if (typeof it.lot_id === 'string' && it.lot_id) byLot.set(it.lot_id, (byLot.get(it.lot_id) ?? 0) + 1)
+    if (byLot.size) {
+      const { data: lots } = await supabase.from('collection_lots').select('id, quantity').in('id', [...byLot.keys()])
+      const lotQty = new Map((lots ?? []).map(l => [l.id as string, l.quantity as number]))
+      for (const [lotId, count] of byLot) {
+        const q = lotQty.get(lotId)
+        if (q == null) return NextResponse.json({ error: 'A chosen acquisition no longer exists' }, { status: 400 })
+        if (count > q) return NextResponse.json({ error: 'Assigned a card to one acquisition more times than it has copies' }, { status: 400 })
+      }
+    }
+
     const n = items.length
     const shipEach = Math.round(((outbound + ret) / n) * 100) / 100
     const submissionId = crypto.randomUUID() // ties this batch's slabs together
@@ -117,11 +131,41 @@ export async function POST(request: Request) {
         p_shipping_cost: shipEach,
         p_subgrades: sg && Object.keys(sg).length ? sg : null,
         p_submission_id: submissionId,
+        p_lot_id: typeof it.lot_id === 'string' && it.lot_id ? it.lot_id : null,
       })
       if (error) return NextResponse.json({ error: error.message || 'Failed to grade a copy', graded }, { status: 500 })
       graded++
     }
     return NextResponse.json({ ok: true, graded })
+  }
+
+  // Re-grade an existing slab (crossover / bump on resubmit) — a NEW grade event
+  // that changes the grade in place and capitalizes the re-grade cost.
+  if (action === 'regrade_slab') {
+    const collectionId = typeof body.collection_id === 'string' ? body.collection_id : ''
+    const company = typeof body.grading_company === 'string' && body.grading_company ? body.grading_company : ''
+    const grade = typeof body.grade === 'string' && body.grade ? body.grade : ''
+    const cert = typeof body.cert === 'string' ? body.cert.trim() : ''
+    const fee = body.grading_cost === '' || body.grading_cost == null ? 0 : Number(body.grading_cost)
+    const shipping = body.shipping_cost === '' || body.shipping_cost == null ? 0 : Number(body.shipping_cost)
+    if (!collectionId || !company || !grade) return NextResponse.json({ error: 'collection_id, company, and grade are required' }, { status: 400 })
+    if (!cert) return NextResponse.json({ error: 'Cert number is required' }, { status: 400 })
+    if (![fee, shipping].every(x => Number.isFinite(x) && x >= 0)) return NextResponse.json({ error: 'Invalid cost' }, { status: 400 })
+    const sg = company === 'BGS' && body.subgrades && typeof body.subgrades === 'object'
+      ? Object.fromEntries(Object.entries(body.subgrades).filter(([, v]) => v != null && v !== '').map(([k, v]) => [k, Number(v)]))
+      : null
+    const { data, error } = await supabase.rpc('regrade_existing_slab', {
+      p_collection_id: collectionId,
+      p_grading_company: company,
+      p_grade: grade,
+      p_cert_number: cert,
+      p_subgrades: sg && Object.keys(sg).length ? sg : null,
+      p_grading_cost: fee,
+      p_shipping_cost: shipping,
+      p_submission_id: crypto.randomUUID(),
+    })
+    if (error) return NextResponse.json({ error: error.message || 'Failed to re-grade' }, { status: 500 })
+    return NextResponse.json({ ok: true, line: data })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
