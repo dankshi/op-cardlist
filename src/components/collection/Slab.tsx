@@ -169,7 +169,9 @@ export function Slab({
   // the gold label band. Text scales with the slab via container units (cqw).
   if (company.toUpperCase() === 'BGS' && !/black\s*label|\bbl\b/i.test(grade)) {
     const win = { left: 12.72, top: 24.81, width: 73.5, height: 66.17 } // same holder window as bgs-10
-    const band = { left: 9, top: 5, width: 82, height: 17 }             // gold label area (tweak to match the PNG)
+    // Gold label text area, measured from bgs-gold.png: the gold band is ~5–16.5%
+    // tall; content sits right of the baked Beckett logo (~28.5%) to ~91%.
+    const band = { left: 28.5, top: 5.2, width: 62.5, height: 11.6 }
     const num = /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
     const sg = subgrades ?? {}
     const sub = (k: string) => (sg[k] != null ? String(sg[k]) : '—')
@@ -182,15 +184,15 @@ export function Slab({
           {imageUrl && <Image src={imageUrl} alt={cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />}
         </div>
         <Image src="/slabs/bgs-gold.png" alt="" fill sizes="(max-width:768px) 50vw, 20vw" className="object-contain pointer-events-none select-none" />
-        <div className="absolute flex items-stretch text-[#2a2010]" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%` }}>
-          <div className="flex-1 min-w-0 flex flex-col justify-between">
-            <div className="font-extrabold leading-[1.08]" style={{ fontSize: '3cqw' }}>
+        <div className="absolute flex items-stretch text-left text-black" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%` }}>
+          <div className="flex-1 min-w-0 flex flex-col justify-between text-left">
+            <div className="font-extrabold leading-[1.05]" style={{ fontSize: '2.7cqw' }}>
               <p className="truncate">{setYear ? `${setYear} ` : ''}ONE PIECE</p>
               {setName && <p className="truncate">{setName.toUpperCase()}</p>}
               <p className="truncate">{cardId ? `${cardNoLabel(cardId)} ` : ''}{cardName.toUpperCase()}</p>
               {rarity && <p className="truncate">{rarity.toUpperCase()}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-x-[8%] font-bold" style={{ fontSize: '2.9cqw' }}>
+            <div className="grid grid-cols-2 gap-x-[6%] font-bold" style={{ fontSize: '2.55cqw' }}>
               <Cell label="CENTERING" k="centering" />
               <Cell label="CORNERS" k="corners" />
               <Cell label="EDGES" k="edges" />
@@ -198,10 +200,10 @@ export function Slab({
             </div>
           </div>
           <div className="flex flex-col items-end justify-between pl-[3%] flex-shrink-0">
-            <span className="font-black leading-[0.8]" style={{ fontSize: '13cqw' }}>{num}</span>
-            <div className="text-right leading-tight">
-              <p className="font-black tracking-[0.02em]" style={{ fontSize: '2.9cqw' }}>{bgsGradeWord(grade)}</p>
-              {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.7cqw' }}>{certNumber}</p>}
+            <span className="font-black leading-[0.78]" style={{ fontSize: '12.5cqw' }}>{num}</span>
+            <div className="text-right leading-[1.05]">
+              <p className="font-black tracking-[0.02em]" style={{ fontSize: '2.6cqw' }}>{bgsGradeWord(grade)}</p>
+              {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.4cqw' }}>{certNumber}</p>}
             </div>
           </div>
         </div>
