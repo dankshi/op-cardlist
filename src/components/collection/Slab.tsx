@@ -183,9 +183,9 @@ export function Slab({
     const band = isBL
       ? { left: 28, top: 5.3, width: 57.5, height: 11 }
       : { left: 29, top: 5.3, width: 60.5, height: 11 }
-    // Gold label takes black ink; black label takes Beckett gold ink. The grade
-    // numeral matches the label ink on both holders.
-    const ink = isBL ? '#d9b24c' : '#000000'
+    // Gold label takes black ink; black label takes the OP card-name gold. The
+    // grade numeral matches the label ink on both holders.
+    const ink = isBL ? '#cda23d' : '#000000'
     const numInk = ink
     const num = isBL || /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
     const sg = subgrades ?? {}
