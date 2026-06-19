@@ -14,6 +14,9 @@ function fmtDate(s: string) {
   return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 }
 
+/** Black Label is a flawless 10 across all subgrades — no subgrade entry needed. */
+const isBlackLabel = (grade: string) => /black\s*label|\bbl\b/i.test(grade)
+
 interface LotDraft { id?: string; quantity: number; price: string; date: string }
 type View = 'edit' | 'grading' | 'history' | 'list' | 'regrade' | 'regradeslab' | 'sold'
 const COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
@@ -194,7 +197,7 @@ export function ManageHoldingModal({
     const shipTotal = Math.round(((shipOut === '' ? 0 : Number(shipOut)) + (shipRet === '' ? 0 : Number(shipRet))) * 100) / 100
     const gradingTotal = Math.round(((gradingFee === '' ? 0 : Number(gradingFee)) + shipTotal) * 100) / 100
     try {
-      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}), ...(isGraded && submissionLabel !== loadedSubmissionLabel ? { submission_label: submissionLabel.trim() || null } : {}), ...(isGraded ? { grading_cost: gradingTotal, shipping_cost: shipTotal } : {}) }) })
+      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: isBlackLabel(editGrade) ? null : editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}), ...(isGraded && submissionLabel !== loadedSubmissionLabel ? { submission_label: submissionLabel.trim() || null } : {}), ...(isGraded ? { grading_cost: gradingTotal, shipping_cost: shipTotal } : {}) }) })
       if (!v.ok) { setEditError('Couldn’t save.'); return }
       const seen = new Set<string>()
       for (const lot of lots) {
@@ -408,7 +411,7 @@ export function ManageHoldingModal({
                 <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grade</label>
                 <select value={editGrade} onChange={e => setEditGrade(e.target.value)} className={field}>{(GRADING_SCALES[row.gradingCompany as GradingCompany] ?? []).map(g => <option key={g} value={g}>{g}</option>)}</select>
               </div>
-              {row.gradingCompany === 'BGS' && (
+              {row.gradingCompany === 'BGS' && !isBlackLabel(editGrade) && (
                 <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
                   {SUBGRADE_KEYS.map(k => (
                     <div key={k} className="flex items-center gap-1.5">

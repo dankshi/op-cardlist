@@ -9,6 +9,8 @@ const COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
 function fmtUSD(n: number) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
+/** Black Label is a flawless 10 across all subgrades — no need to ask for them. */
+const isBlackLabel = (grade: string) => /black\s*label|\bbl\b/i.test(grade)
 
 /** One copy in the submission. `holdingId` is the source raw collection line;
  *  `lotId` optionally pins WHICH acquisition's basis the slab inherits. */
@@ -123,7 +125,7 @@ export function GradingSubmissionModal({
           grading_company: company,
           submission_label: submissionLabel.trim() || null,
           graded_at: gradedDate || null,
-          items: items.map(it => ({ collection_id: it.holdingId, grade: it.grade, cert: it.cert.trim(), grading_fee: it.fee === '' ? 0 : Number(it.fee), subgrades: company === 'BGS' ? it.subgrades : null, lot_id: it.lotId || null })),
+          items: items.map(it => ({ collection_id: it.holdingId, grade: it.grade, cert: it.cert.trim(), grading_fee: it.fee === '' ? 0 : Number(it.fee), subgrades: company === 'BGS' && !isBlackLabel(it.grade) ? it.subgrades : null, lot_id: it.lotId || null })),
           outbound_shipping: outbound === '' ? 0 : Number(outbound),
           return_shipping: ret === '' ? 0 : Number(ret),
         }),
@@ -193,7 +195,7 @@ export function GradingSubmissionModal({
                       </select>
                     </div>
                   )}
-                  {company === 'BGS' && (
+                  {company === 'BGS' && !isBlackLabel(it.grade) && (
                     <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
                       {SUBGRADE_KEYS.map(k => (
                         <div key={k} className="flex items-center gap-1.5">

@@ -165,19 +165,30 @@ export function Slab({
   setYear?: number | null
   artStyle?: string | null
 }) {
-  // BGS (non-Black-Label) → the gold holder (/slabs/bgs-gold.png, a full holder
-  // with a BLANK gold label), used exactly like the photoreal black-label path:
-  // card in the window + holder overlay, PLUS the card's real text overlaid on
-  // the gold label band. Text scales with the slab via container units (cqw).
-  if (company.toUpperCase() === 'BGS' && !/black\s*label|\bbl\b/i.test(grade)) {
-    const win = { left: 12.72, top: 24.81, width: 73.5, height: 66.17 } // same holder window as bgs-10
-    // Gold label text area, measured from bgs-gold.png (gold band ~5–16.5% tall,
-    // content right of the baked Beckett logo ~28.5% to ~91%), inset a touch for
-    // padding off the edges.
-    const band = { left: 29, top: 5.3, width: 60.5, height: 11 }
-    const num = /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
+  // BGS → a full holder PNG with a BLANK label (gold for the numeric tiers,
+  // black for Black Label) plus the card's real text overlaid on the label band.
+  // Card in the window + holder overlay + text. Text scales with the slab via
+  // container units (cqw). Black Label is a flawless 10 across all four
+  // subgrades, so it always reads 10s and we never ask the user for subgrades.
+  if (company.toUpperCase() === 'BGS') {
+    const isBL = /black\s*label|\bbl\b/i.test(grade)
+    const holderSrc = isBL ? '/slabs/bgs-black.png' : '/slabs/bgs-gold.png'
+    // Each holder's transparent card window, measured from its alpha channel.
+    const win = isBL
+      ? { left: 13.67, top: 24.23, width: 73.4, height: 65.76 }
+      : { left: 12.72, top: 24.81, width: 73.5, height: 66.17 }
+    // Label text area, right of the baked Beckett logo. The black label's logo
+    // sits a touch further left, so its text band starts further left too (same
+    // right edge keeps the grade numeral aligned).
+    const band = isBL
+      ? { left: 25.5, top: 5.3, width: 64, height: 11 }
+      : { left: 29, top: 5.3, width: 60.5, height: 11 }
+    // Gold label takes black ink; black label takes Beckett gold ink + cream numeral.
+    const ink = isBL ? '#caa75a' : '#000000'
+    const numInk = isBL ? '#f5ecd6' : '#000000'
+    const num = isBL || /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
     const sg = subgrades ?? {}
-    const sub = (k: string) => (sg[k] != null ? String(sg[k]) : '—')
+    const sub = (k: string) => (isBL ? '10' : sg[k] != null ? String(sg[k]) : '—')
     // Beckett prefixes "FOIL" for foil printings — alt/manga/etc art, or the
     // inherently-foil special rarities (SP/SEC/TR/L/SR).
     const isFoil = (artStyle != null && artStyle !== 'standard') || (rarity != null && ['SP', 'SEC', 'TR', 'L', 'SR'].includes(rarity.toUpperCase()))
@@ -187,8 +198,8 @@ export function Slab({
         <div className="absolute overflow-hidden rounded-[3px]" style={{ left: `${win.left}%`, top: `${win.top}%`, width: `${win.width}%`, height: `${win.height}%` }}>
           {imageUrl && <Image src={imageUrl} alt={cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />}
         </div>
-        <Image src="/slabs/bgs-gold.png" alt="" fill sizes="(max-width:768px) 50vw, 20vw" className="object-contain pointer-events-none select-none" />
-        <div className="absolute flex items-stretch text-left text-black font-mono" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%` }}>
+        <Image src={holderSrc} alt="" fill sizes="(max-width:768px) 50vw, 20vw" className="object-contain pointer-events-none select-none" />
+        <div className="absolute flex items-stretch text-left font-mono" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%`, color: ink }}>
           {/* Name at top, a growing spacer, then the subgrade table at the
               bottom — so the empty space lands between name and subgrades, and
               the two subgrade rows stay tight together (grid keeps its own
@@ -215,9 +226,9 @@ export function Slab({
             <div className="flex-1" />
             {/* Grade numeral (Arial Narrow Bold) sits directly above PRISTINE; the
                 PRISTINE/cert lines bottom-align with the CENTERING/EDGES rows. */}
-            <span className="tracking-tight leading-[0.78]" style={{ fontSize: '11cqw', marginBottom: '1cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
+            <span className="tracking-tight leading-[0.78]" style={{ fontSize: '11cqw', marginBottom: '1cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed', color: numInk }}>{num}</span>
             <div className="font-bold whitespace-pre leading-[1.2] text-center" style={{ fontSize: '2.5cqw' }}>
-              <div>{bgsGradeWord(grade)}</div>
+              <div>{isBL ? 'PRISTINE' : bgsGradeWord(grade)}</div>
               {/* Always render the cert line — a blank one reserves the row so a
                   no-cert slab bottom-aligns identically to one with a cert. */}
               <div className="tabular-nums">{certNumber || ' '}</div>
