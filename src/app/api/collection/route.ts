@@ -98,34 +98,50 @@ export async function PATCH(request: Request) {
 
   if (error) return NextResponse.json({ error: 'Failed to update.' }, { status: 500 })
 
-  // Correcting a slab's grade is a fix, not a re-grade — keep its logged grade
-  // transaction in sync so the grading log shows the corrected grade (RLS scopes
-  // the update to the owner).
-  if ('grade' in patch && data?.grading_company) {
-    await supabase
-      .from('collection_adjustments')
-      .update({ to_grade: `${data.grading_company} ${data.grade}` })
-      .eq('collection_id', id)
-      .eq('type', 'grade')
-  }
-
-  // graded_at backdates the grade event itself (its date is separate from the
-  // slab row) — edited from the Grading tab so the activity feed + P&L reflect
-  // when the slab actually came back.
-  if ('graded_at' in body) {
-    const ga = typeof body.graded_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.graded_at)
+  // ── Grade-event sync (the grading log's single source of truth) ──────────
+  // The grading log is built only from 'grade' rows in collection_adjustments.
+  // So the per-card modal must write to the SAME place the submission builder
+  // does: keep this slab's grade event in lockstep with edits here, and CREATE
+  // one when the user records a self-grade (a grading cost, graded date, or
+  // submission ID) on a slab that has none. A bare grade/cert with no grading
+  // info (i.e. a bought slab) stays out of the log.
+  if (data?.grading_company) {
+    const toGrade = `${data.grading_company} ${data.grade}`
+    const cost = 'grading_cost' in body && body.grading_cost !== '' && body.grading_cost != null && Number.isFinite(Number(body.grading_cost))
+      ? Number(body.grading_cost) : null
+    const gradedAt = typeof body.graded_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.graded_at)
       ? new Date(body.graded_at + 'T12:00:00Z').toISOString() : null
-    if (ga) await supabase.from('collection_adjustments').update({ happened_at: ga }).eq('collection_id', id).eq('type', 'grade')
-  }
+    const hasLabel = 'submission_label' in body
+    const label = hasLabel && typeof body.submission_label === 'string' && body.submission_label.trim() ? body.submission_label.trim() : null
 
-  // submission_label: apply to the whole batch (by submission_id) so every slab
-  // in the submission stays labeled consistently; fall back to this line alone
-  // if the grade event was logged without a submission group.
-  if ('submission_label' in body) {
-    const lbl = typeof body.submission_label === 'string' && body.submission_label.trim() ? body.submission_label.trim() : null
-    const { data: ga } = await supabase.from('collection_adjustments').select('submission_id').eq('collection_id', id).eq('type', 'grade').limit(1).maybeSingle()
-    if (ga?.submission_id) await supabase.from('collection_adjustments').update({ submission_label: lbl }).eq('submission_id', ga.submission_id)
-    else await supabase.from('collection_adjustments').update({ submission_label: lbl }).eq('collection_id', id).eq('type', 'grade')
+    const { data: ev } = await supabase
+      .from('collection_adjustments')
+      .select('id, submission_id')
+      .eq('collection_id', id).eq('type', 'grade')
+      .order('happened_at', { ascending: false }).limit(1).maybeSingle()
+
+    if (ev) {
+      // Keep the existing event aligned with the slab. amount mirrors the lot's
+      // grading_cost (same convention the regrade RPCs use).
+      const upd: Record<string, unknown> = {}
+      if ('grade' in patch) upd.to_grade = toGrade
+      if (cost != null) upd.amount = cost
+      if (gradedAt) upd.happened_at = gradedAt
+      if (Object.keys(upd).length) await supabase.from('collection_adjustments').update(upd).eq('id', ev.id)
+      // The submission ID belongs to the whole batch, not just this slab.
+      if (hasLabel) {
+        if (ev.submission_id) await supabase.from('collection_adjustments').update({ submission_label: label }).eq('submission_id', ev.submission_id)
+        else await supabase.from('collection_adjustments').update({ submission_label: label }).eq('id', ev.id)
+      }
+    } else if ((cost != null && cost > 0) || label != null || gradedAt != null) {
+      // No event yet, but the user recorded grading info → log it so the slab
+      // shows up in the grading log alongside builder-graded cards.
+      await supabase.from('collection_adjustments').insert({
+        user_id: user.id, card_id: data.card_id, collection_id: id, type: 'grade',
+        from_grade: 'Raw', to_grade: toGrade, amount: cost ?? 0, shipping_cost: null,
+        submission_id: null, submission_label: label, happened_at: gradedAt ?? new Date().toISOString(), note: null,
+      })
+    }
   }
 
   return NextResponse.json({ ok: true, item: data })

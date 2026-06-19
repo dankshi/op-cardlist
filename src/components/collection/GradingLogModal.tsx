@@ -35,6 +35,7 @@ export function GradingLogModal({
   const [rawByCard, setRawByCard] = useState<Map<string, number | null>>(new Map())
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [refresh, setRefresh] = useState(0)
 
   const nameByCard = useMemo(() => {
     const m = new Map<string, string>()
@@ -66,7 +67,7 @@ export function GradingLogModal({
       } finally { if (!cancelled) setLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [open])
+  }, [open, refresh])
 
   useEffect(() => {
     if (!open) return
@@ -106,7 +107,7 @@ export function GradingLogModal({
 
   if (!open) return null
   if (editingRow) {
-    return <ManageHoldingModal row={editingRow} onClose={() => setEditingId(null)} onChanged={() => { onChanged(); setEditingId(null) }} />
+    return <ManageHoldingModal row={editingRow} onClose={() => setEditingId(null)} onChanged={() => { onChanged(); setRefresh(x => x + 1); setEditingId(null) }} />
   }
 
   return (

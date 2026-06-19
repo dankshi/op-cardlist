@@ -170,7 +170,7 @@ export function ManageHoldingModal({
     if (savingEdit) return
     setSavingEdit(true); setEditError(null)
     try {
-      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}), ...(isGraded && submissionLabel !== loadedSubmissionLabel ? { submission_label: submissionLabel.trim() || null } : {}) }) })
+      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}), ...(isGraded && submissionLabel !== loadedSubmissionLabel ? { submission_label: submissionLabel.trim() || null } : {}), ...(isGraded ? { grading_cost: gradingCost === '' ? 0 : Number(gradingCost) } : {}) }) })
       if (!v.ok) { setEditError('Couldn’t save.'); return }
       const seen = new Set<string>()
       for (const lot of lots) {
