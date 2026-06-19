@@ -147,6 +147,9 @@ export function Slab({
   certNumber,
   subgrades,
   cardId,
+  setName,
+  rarity,
+  setYear,
 }: {
   imageUrl: string
   cardName: string
@@ -156,7 +159,6 @@ export function Slab({
   /** BGS sub-scores `{centering,corners,edges,surface}`. */
   subgrades?: Record<string, number> | null
   cardId?: string | null
-  /** Accepted (callers pass them) but unused on the label — kept off for space. */
   setName?: string | null
   rarity?: string | null
   setYear?: number | null
@@ -170,7 +172,7 @@ export function Slab({
     // Gold label text area, measured from bgs-gold.png (gold band ~5–16.5% tall,
     // content right of the baked Beckett logo ~28.5% to ~91%), inset a touch for
     // padding off the edges.
-    const band = { left: 30, top: 5.9, width: 58, height: 10.2 }
+    const band = { left: 29, top: 5.4, width: 60.5, height: 11.4 }
     const num = /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
     const sg = subgrades ?? {}
     const sub = (k: string) => (sg[k] != null ? String(sg[k]) : '—')
@@ -182,24 +184,26 @@ export function Slab({
         <Image src="/slabs/bgs-gold.png" alt="" fill sizes="(max-width:768px) 50vw, 20vw" className="object-contain pointer-events-none select-none" />
         <div className="absolute flex items-stretch text-left text-black font-mono" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%` }}>
           <div className="flex-1 min-w-0 flex flex-col justify-between text-left">
-            <div className="font-bold leading-[1.1]" style={{ fontSize: '3cqw' }}>
-              {cardId && <p className="truncate">{cardNoLabel(cardId)}</p>}
-              <p className="truncate">{cardName.toUpperCase()}</p>
+            <div className="font-bold leading-[1.04]" style={{ fontSize: '2.3cqw' }}>
+              <p className="truncate">{setYear ? `${setYear} ` : ''}ONE PIECE</p>
+              {setName && <p className="truncate">{setName.toUpperCase()}</p>}
+              <p className="truncate">{cardId ? `${cardNoLabel(cardId)} ` : ''}{cardName.toUpperCase()}</p>
+              {rarity && <p className="truncate">{rarity.toUpperCase()}</p>}
             </div>
             {/* 4-column table: label / value / label / value. Auto columns make
                 each value column start at the same x, so they line up. */}
-            <div className="grid items-baseline font-bold whitespace-nowrap" style={{ gridTemplateColumns: 'auto auto auto auto', columnGap: '1.3cqw', rowGap: '0.5cqw', fontSize: '2.55cqw' }}>
+            <div className="grid items-baseline font-bold whitespace-nowrap" style={{ gridTemplateColumns: 'auto auto auto auto', columnGap: '1.2cqw', rowGap: '0.4cqw', fontSize: '2.5cqw' }}>
               <span>CENTERING</span><span className="tabular-nums font-black">{sub('centering')}</span>
-              <span style={{ marginLeft: '1.8cqw' }}>CORNERS</span><span className="tabular-nums font-black">{sub('corners')}</span>
+              <span style={{ marginLeft: '2cqw' }}>CORNERS</span><span className="tabular-nums font-black">{sub('corners')}</span>
               <span>EDGES</span><span className="tabular-nums font-black">{sub('edges')}</span>
-              <span style={{ marginLeft: '1.8cqw' }}>SURFACE</span><span className="tabular-nums font-black">{sub('surface')}</span>
+              <span style={{ marginLeft: '2cqw' }}>SURFACE</span><span className="tabular-nums font-black">{sub('surface')}</span>
             </div>
           </div>
-          <div className="flex flex-col items-end justify-between pl-[5%] flex-shrink-0">
-            <span className="font-bold tracking-tight leading-[0.78]" style={{ fontSize: '12.5cqw' }}>{num}</span>
+          <div className="flex flex-col items-end justify-between pl-[4%] flex-shrink-0">
+            <span className="font-bold tracking-tight leading-[0.78]" style={{ fontSize: '14cqw' }}>{num}</span>
             <div className="text-right leading-[1.1]">
               <p className="font-bold" style={{ fontSize: '2.5cqw' }}>{bgsGradeWord(grade)}</p>
-              {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.35cqw' }}>{certNumber}</p>}
+              {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.3cqw' }}>{certNumber}</p>}
             </div>
           </div>
         </div>
