@@ -201,13 +201,11 @@ export function Slab({
               {finish && <p className="truncate">{finish}</p>}
             </div>
             <div className="flex-1" />
-            {/* 4-column table (label / value / label / value); auto columns make
-                each value column start at the same x, so they line up. */}
-            <div className="grid items-baseline font-bold whitespace-nowrap" style={{ gridTemplateColumns: 'auto auto auto auto', columnGap: '1.2cqw', rowGap: '0.3cqw', fontSize: '2.5cqw' }}>
-              <span>CENTERING</span><span className="tabular-nums font-black">{sub('centering')}</span>
-              <span style={{ marginLeft: '2cqw' }}>CORNERS</span><span className="tabular-nums font-black">{sub('corners')}</span>
-              <span>EDGES</span><span className="tabular-nums font-black">{sub('edges')}</span>
-              <span style={{ marginLeft: '2cqw' }}>SURFACE</span><span className="tabular-nums font-black">{sub('surface')}</span>
+            {/* Two tight lines, aligned by monospace padding (no grid — the grid
+                kept stretching its rows apart). */}
+            <div className="font-bold whitespace-pre leading-[1.2]" style={{ fontSize: '2.5cqw' }}>
+              <div>{`${'CENTERING'.padEnd(10)}${sub('centering').padEnd(5)}${'CORNERS'.padEnd(9)}${sub('corners')}`}</div>
+              <div>{`${'EDGES'.padEnd(10)}${sub('edges').padEnd(5)}${'SURFACE'.padEnd(9)}${sub('surface')}`}</div>
             </div>
           </div>
           {/* Grade number, grade word, and cert share a common center axis. */}
