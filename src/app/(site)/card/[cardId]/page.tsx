@@ -40,6 +40,10 @@ function buildVariants(
   listings: Array<{ id: string; price: number; grading_company: string | null; grade: string | null; quantity_available: number }>,
   populations: Partial<Record<GradeCompany, PopulationBucket[]>>,
   slabValues: Map<string, SlabValue>,
+  // Our computed raw (Near Mint) market value + its confidence, so the Raw chip
+  // shows an estimate just like the graded chips do from slab comps.
+  rawValue: number | null,
+  rawConfidence: VariantData['marketConfidence'],
 ): VariantData[] {
   // Group listings by variant key. Listings already arrive price-ascending
   // so listings[0] for any key is its cheapest. We also carry forward
@@ -94,8 +98,8 @@ function buildVariants(
       company,
       grade,
       population: popsByKey.get(key) ?? 0,
-      marketValue: slab?.marketValue ?? null,
-      marketConfidence: slab?.confidence ?? null,
+      marketValue: key === 'raw' ? rawValue : slab?.marketValue ?? null,
+      marketConfidence: key === 'raw' ? rawConfidence : slab?.confidence ?? null,
       lowestListingId: variantListings[0]?.id ?? null,
       lowestListingPrice: variantListings[0]?.price ?? null,
       lowestListingQuantityAvailable: variantListings[0]?.quantity_available ?? 0,
@@ -314,7 +318,7 @@ export default async function CardPage({ params }: PageProps) {
   // listing one) or from population data (someone could theoretically grade
   // theirs and sell it). Either source qualifies — that's why the chip row
   // shows both "buyable now" and "open to offers" variants together.
-  const variants = buildVariants(allListings, populations, slabValues);
+  const variants = buildVariants(allListings, populations, slabValues, card.price?.ourMarketValue ?? null, card.price?.ourConfidence ?? null);
 
   const parallelCards = await getParallelCards(card.baseId ?? card.id);
   // Drop self + any hidden variants (base C/UC/R/P/SR standards we don't

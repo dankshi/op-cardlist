@@ -103,9 +103,10 @@ export function buildChips(variants: VariantData[]): ChipData[] {
     grade: null,
     display: null,
     population: 0,
-    // Raw cards value off the TCGplayer market price elsewhere, not the slab comp.
-    marketValue: null,
-    marketConfidence: null,
+    // Our computed raw (Near Mint) market value, shown as a ~estimate when no
+    // one is actively listing — same treatment as the graded comps.
+    marketValue: raw?.marketValue ?? null,
+    marketConfidence: raw?.marketConfidence ?? null,
     lowestListingId: raw?.lowestListingId ?? null,
     lowestListingPrice: raw?.lowestListingPrice ?? null,
     lowestListingQuantityAvailable: raw?.lowestListingQuantityAvailable ?? 0,
