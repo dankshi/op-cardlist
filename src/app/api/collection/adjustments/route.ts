@@ -100,6 +100,7 @@ export async function POST(request: Request) {
 
     const n = items.length
     const shipEach = Math.round(((outbound + ret) / n) * 100) / 100
+    const submissionId = crypto.randomUUID() // ties this batch's slabs together
     let graded = 0
     for (let i = 0; i < n; i++) {
       const it = items[i]
@@ -115,6 +116,7 @@ export async function POST(request: Request) {
         p_grading_cost: fees[i],
         p_shipping_cost: shipEach,
         p_subgrades: sg && Object.keys(sg).length ? sg : null,
+        p_submission_id: submissionId,
       })
       if (error) return NextResponse.json({ error: error.message || 'Failed to grade a copy', graded }, { status: 500 })
       graded++

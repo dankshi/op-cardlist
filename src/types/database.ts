@@ -504,6 +504,8 @@ export interface CollectionActivityRow {
   source_id: string
   /** Shipping slice of a grade event's `amount` (null otherwise). */
   shipping_cost: number | null
+  /** Groups grade events graded in the same submission (null otherwise). */
+  submission_id: string | null
 }
 
 export interface WantListItem {
