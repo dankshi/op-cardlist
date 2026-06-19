@@ -13,6 +13,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url)
   const cardId = url.searchParams.get('card_id')
+  const collectionId = url.searchParams.get('collection_id')
   const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 200))
 
   let query = supabase
@@ -20,7 +21,10 @@ export async function GET(request: Request) {
     .select('*')
     .order('happened_at', { ascending: false })
     .limit(limit)
-  if (cardId) query = query.eq('card_id', cardId)
+  // collection_id scopes to ONE line (a single slab's own buy/grade/sell history);
+  // card_id is the all-copies view for the card.
+  if (collectionId) query = query.eq('collection_id', collectionId)
+  else if (cardId) query = query.eq('card_id', cardId)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: 'Failed to load activity' }, { status: 500 })

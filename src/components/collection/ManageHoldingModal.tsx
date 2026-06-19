@@ -96,7 +96,9 @@ export function ManageHoldingModal({
   async function loadHistory() {
     setLoadingHistory(true)
     try {
-      const d = await (await fetch(`/api/collection/activity?card_id=${encodeURIComponent(row.cardId)}`)).json()
+      // Scope to THIS line so a single slab shows only its own acquisition +
+      // grade + sales — not every copy's NM purchase that shares the card id.
+      const d = await (await fetch(`/api/collection/activity?collection_id=${encodeURIComponent(row.id)}`)).json()
       setActivity(d.activity ?? [])
       setHistoryLoaded(true)
     } finally { setLoadingHistory(false) }
