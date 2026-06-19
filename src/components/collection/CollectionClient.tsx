@@ -8,6 +8,7 @@ import { PortfolioHero } from './PortfolioHero'
 import { PortfolioChart } from './PortfolioChart'
 import { HoldingsGrid, type HoldingRow } from './HoldingsGrid'
 import { AddEditCardModal } from './AddEditCardModal'
+import { GradingSubmissionModal } from './GradingSubmissionModal'
 
 interface Summary {
   totalValue: number
@@ -47,6 +48,11 @@ export function CollectionClient({
   const [series, setSeries] = useState<ValuePoint[]>(initialSeries)
   const [seriesLoading, setSeriesLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [gradingOpen, setGradingOpen] = useState(false)
+  const [gradingPreset, setGradingPreset] = useState<HoldingRow | null>(null)
+  const rawHoldings = rows.filter(r => !r.gradingCompany)
+
+  function openGrading(preset: HoldingRow | null) { setGradingPreset(preset); setGradingOpen(true) }
 
   async function loadSeries(r: Range) {
     setRange(r)
@@ -90,6 +96,15 @@ export function CollectionClient({
           >
             Transactions
           </Link>
+          {rawHoldings.length > 0 && (
+            <button
+              type="button"
+              onClick={() => openGrading(null)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-zinc-200 ring-1 ring-zinc-600 hover:bg-zinc-800 transition-colors cursor-pointer"
+            >
+              Log grading
+            </button>
+          )}
           <button
             type="button"
             onClick={openAdd}
@@ -138,11 +153,12 @@ export function CollectionClient({
             <h2 className="text-lg font-bold text-zinc-100">Holdings</h2>
             <span className="text-xs text-zinc-400 tabular-nums">{rows.length} {rows.length === 1 ? 'line' : 'lines'}</span>
           </div>
-          <HoldingsGrid rows={rows} />
+          <HoldingsGrid rows={rows} onLogGrading={openGrading} />
         </>
       )}
 
       <AddEditCardModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={refreshAll} editItem={null} />
+      <GradingSubmissionModal open={gradingOpen} onClose={() => setGradingOpen(false)} onSaved={refreshAll} rawHoldings={rawHoldings} preset={gradingPreset} />
     </div>
   )
 }
