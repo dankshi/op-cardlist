@@ -97,6 +97,18 @@ export async function PATCH(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: 'Failed to update.' }, { status: 500 })
+
+  // Correcting a slab's grade is a fix, not a re-grade — keep its logged grade
+  // transaction in sync so the grading log shows the corrected grade (RLS scopes
+  // the update to the owner).
+  if ('grade' in patch && data?.grading_company) {
+    await supabase
+      .from('collection_adjustments')
+      .update({ to_grade: `${data.grading_company} ${data.grade}` })
+      .eq('collection_id', id)
+      .eq('type', 'grade')
+  }
+
   return NextResponse.json({ ok: true, item: data })
 }
 
