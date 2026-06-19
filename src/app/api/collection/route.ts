@@ -107,8 +107,12 @@ export async function PATCH(request: Request) {
   // info (i.e. a bought slab) stays out of the log.
   if (data?.grading_company) {
     const toGrade = `${data.grading_company} ${data.grade}`
+    // amount = the full capitalized grading cost (fee + shipping); shipping is
+    // also stored on its own so history can break it out ("incl. $X ship").
     const cost = 'grading_cost' in body && body.grading_cost !== '' && body.grading_cost != null && Number.isFinite(Number(body.grading_cost))
       ? Number(body.grading_cost) : null
+    const ship = 'shipping_cost' in body && body.shipping_cost !== '' && body.shipping_cost != null && Number.isFinite(Number(body.shipping_cost))
+      ? Number(body.shipping_cost) : null
     const gradedAt = typeof body.graded_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.graded_at)
       ? new Date(body.graded_at + 'T12:00:00Z').toISOString() : null
     const hasLabel = 'submission_label' in body
@@ -126,6 +130,7 @@ export async function PATCH(request: Request) {
       const upd: Record<string, unknown> = {}
       if ('grade' in patch) upd.to_grade = toGrade
       if (cost != null) upd.amount = cost
+      if (ship != null) upd.shipping_cost = ship > 0 ? ship : null
       if (gradedAt) upd.happened_at = gradedAt
       if (Object.keys(upd).length) await supabase.from('collection_adjustments').update(upd).eq('id', ev.id)
       // The submission ID belongs to the whole batch, not just this slab.
@@ -133,12 +138,12 @@ export async function PATCH(request: Request) {
         if (ev.submission_id) await supabase.from('collection_adjustments').update({ submission_label: label }).eq('submission_id', ev.submission_id)
         else await supabase.from('collection_adjustments').update({ submission_label: label }).eq('id', ev.id)
       }
-    } else if ((cost != null && cost > 0) || label != null || gradedAt != null) {
+    } else if ((cost != null && cost > 0) || (ship != null && ship > 0) || label != null || gradedAt != null) {
       // No event yet, but the user recorded grading info → log it so the slab
       // shows up in the grading log alongside builder-graded cards.
       await supabase.from('collection_adjustments').insert({
         user_id: user.id, card_id: data.card_id, collection_id: id, type: 'grade',
-        from_grade: 'Raw', to_grade: toGrade, amount: cost ?? 0, shipping_cost: null,
+        from_grade: 'Raw', to_grade: toGrade, amount: cost ?? 0, shipping_cost: ship != null && ship > 0 ? ship : null,
         submission_id: null, submission_label: label, happened_at: gradedAt ?? new Date().toISOString(), note: null,
       })
     }

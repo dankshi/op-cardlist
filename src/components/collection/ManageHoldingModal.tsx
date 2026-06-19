@@ -44,7 +44,14 @@ export function ManageHoldingModal({
   const [customValue, setCustomValue] = useState(row.customValue != null ? String(row.customValue) : '')
   const [serial, setSerial] = useState(row.serialNumber ?? '')
   const [cert, setCert] = useState(row.certNumber ?? '')
-  const [gradingCost, setGradingCost] = useState('')
+  // Grading cost is split into a fee + outbound/return shipping (like the
+  // submission builder). loadedLotTotal/loadedShip hold what we loaded so the
+  // fee can be derived (fee = capitalized total − shipping).
+  const [gradingFee, setGradingFee] = useState('')
+  const [shipOut, setShipOut] = useState('')
+  const [shipRet, setShipRet] = useState('')
+  const [loadedLotTotal, setLoadedLotTotal] = useState<number | null>(null)
+  const [loadedShip, setLoadedShip] = useState<number | null>(null)
   // The graded date — the grade event's own date, editable from the Grading tab.
   const [gradedDate, setGradedDate] = useState('')
   const [loadedGradedDate, setLoadedGradedDate] = useState('')
@@ -126,7 +133,7 @@ export function ManageHoldingModal({
       setLots(safe)
       setLoadedLots(safe)
       const gc = raw[0]?.grading_cost
-      setGradingCost(gc != null && gc > 0 ? String(gc) : '')
+      setLoadedLotTotal(gc != null ? Number(gc) : 0)
     } catch { /* keep */ } finally { setLoadingLots(false) }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,12 +150,22 @@ export function ManageHoldingModal({
         if (!cancel && g) {
           if (g.happened_at) { const ds = new Date(g.happened_at).toISOString().slice(0, 10); setGradedDate(ds); setLoadedGradedDate(ds) }
           setSubmissionLabel(g.submission_label ?? ''); setLoadedSubmissionLabel(g.submission_label ?? '')
+          // Event stores combined shipping; show it in the outbound field.
+          const sh = g.shipping_cost != null ? Number(g.shipping_cost) : 0
+          setShipOut(sh ? String(sh) : ''); setLoadedShip(sh)
         }
       } catch { /* keep */ }
     })()
     return () => { cancel = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id])
+
+  // Derive the editable grading fee once both loads land: fee = total − shipping.
+  useEffect(() => {
+    if (loadedLotTotal == null) return
+    const fee = Math.max(0, loadedLotTotal - (loadedShip ?? 0))
+    setGradingFee(fee ? String(Math.round(fee * 100) / 100) : '')
+  }, [loadedLotTotal, loadedShip])
 
   async function loadHistory() {
     setLoadingHistory(true)
@@ -169,8 +186,12 @@ export function ManageHoldingModal({
   async function saveEdit() {
     if (savingEdit) return
     setSavingEdit(true); setEditError(null)
+    // Grading cost = fee + outbound + return shipping; capitalized total goes to
+    // the lot, fee/shipping split goes to the grade event.
+    const shipTotal = Math.round(((shipOut === '' ? 0 : Number(shipOut)) + (shipRet === '' ? 0 : Number(shipRet))) * 100) / 100
+    const gradingTotal = Math.round(((gradingFee === '' ? 0 : Number(gradingFee)) + shipTotal) * 100) / 100
     try {
-      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}), ...(isGraded && submissionLabel !== loadedSubmissionLabel ? { submission_label: submissionLabel.trim() || null } : {}), ...(isGraded ? { grading_cost: gradingCost === '' ? 0 : Number(gradingCost) } : {}) }) })
+      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}), ...(isGraded && submissionLabel !== loadedSubmissionLabel ? { submission_label: submissionLabel.trim() || null } : {}), ...(isGraded ? { grading_cost: gradingTotal, shipping_cost: shipTotal } : {}) }) })
       if (!v.ok) { setEditError('Couldn’t save.'); return }
       const seen = new Set<string>()
       for (const lot of lots) {
@@ -191,11 +212,11 @@ export function ManageHoldingModal({
           if (!r.ok) { setEditError('Couldn’t remove an acquisition.'); return }
         }
       }
-      // Capitalize grading fee onto the first lot (graded only).
+      // Capitalize the full grading cost (fee + shipping) onto the first lot.
       if (isGraded) {
         const d = await (await fetch(`/api/collection/lots?collection_id=${row.id}`)).json()
         const firstId = d.lots?.[0]?.id
-        if (firstId) await fetch('/api/collection/lots', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: firstId, grading_cost: gradingCost === '' ? 0 : Number(gradingCost) }) }).catch(() => {})
+        if (firstId) await fetch('/api/collection/lots', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: firstId, grading_cost: gradingTotal }) }).catch(() => {})
       }
       onChanged()
       // One save, then we're done — close out so there's a single, obvious action.
@@ -392,9 +413,23 @@ export function ManageHoldingModal({
                   <input type="date" value={gradedDate} onChange={e => setGradedDate(e.target.value)} className={field} />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading cost</label>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading fee</label>
                   <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
-                    <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => setGradingCost(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} />
+                    <input type="number" step="0.01" min="0" value={gradingFee} onChange={e => setGradingFee(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Submission shipping <span className="text-zinc-400 normal-case font-normal">(to grader)</span></label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
+                    <input type="number" step="0.01" min="0" value={shipOut} onChange={e => setShipOut(e.target.value)} placeholder="Outbound" className={`${field} pl-6 tabular-nums`} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Return shipping <span className="text-zinc-400 normal-case font-normal">(back to you)</span></label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
+                    <input type="number" step="0.01" min="0" value={shipRet} onChange={e => setShipRet(e.target.value)} placeholder="Return" className={`${field} pl-6 tabular-nums`} />
                   </div>
                 </div>
               </div>
