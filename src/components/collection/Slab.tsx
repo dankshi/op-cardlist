@@ -212,9 +212,10 @@ export function Slab({
               + cert at the bottom with the SAME line metrics as the subgrades, so
               PRISTINE lands on the CENTERING row and the cert on the EDGES row. */}
           <div className="flex flex-col items-center pl-[4%] flex-shrink-0">
-            {/* Grade numeral: Arial Narrow Bold, like the real holder. */}
-            <span className="tracking-tight leading-[0.78]" style={{ fontSize: '9cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
             <div className="flex-1" />
+            {/* Grade numeral (Arial Narrow Bold) sits directly above PRISTINE; the
+                PRISTINE/cert lines bottom-align with the CENTERING/EDGES rows. */}
+            <span className="tracking-tight leading-[0.78]" style={{ fontSize: '9cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
             <div className="font-bold whitespace-pre leading-[1.2] text-center" style={{ fontSize: '2.5cqw' }}>
               <div>{bgsGradeWord(grade)}</div>
               {certNumber && <div className="tabular-nums">{certNumber}</div>}
