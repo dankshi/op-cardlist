@@ -65,6 +65,7 @@ export default async function CollectionPage() {
   ])
   const metaByCard = new Map(cards.map(c => [c.id, c]))
   const setNameById = new Map(allSets.map(s => [s.id, s.name]))
+  const setYearById = new Map(allSets.map(s => [s.id, s.releaseDate ? (Number(String(s.releaseDate).slice(0, 4)) || null) : null]))
 
   // Graded slabs aren't priced by raw TCGplayer market. Value them by our
   // computed comp (slab_market_values + override); fall back to the lowest
@@ -141,6 +142,7 @@ export default async function CollectionPage() {
       setName: meta?.setId
         ? (setNameById.has(meta.setId) ? setDisplayName(setNameById.get(meta.setId)!) : meta.setId.toUpperCase())
         : null,
+      setYear: meta?.setId ? (setYearById.get(meta.setId) ?? null) : null,
       rarity: meta?.rarity ?? null,
       quantity: qty,
       acquiredPrice,
