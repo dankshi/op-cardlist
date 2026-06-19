@@ -136,6 +136,15 @@ export async function POST(request: Request) {
       if (error) return NextResponse.json({ error: error.message || 'Failed to grade a copy', graded }, { status: 500 })
       graded++
     }
+    // Stamp the user's submission ID/label + the graded date across the whole
+    // batch (RLS-scoped). graded_at backdates the grade event to when the slab
+    // actually came back, so the activity feed and P&L reflect the real timeline.
+    const label = typeof body.submission_label === 'string' && body.submission_label.trim() ? body.submission_label.trim() : null
+    const gradedAt = typeof body.graded_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.graded_at) ? new Date(body.graded_at + 'T12:00:00Z').toISOString() : null
+    const patch: { submission_label?: string; happened_at?: string } = {}
+    if (label) patch.submission_label = label
+    if (gradedAt) patch.happened_at = gradedAt
+    if (Object.keys(patch).length) await supabase.from('collection_adjustments').update(patch).eq('submission_id', submissionId)
     return NextResponse.json({ ok: true, graded })
   }
 

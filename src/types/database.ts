@@ -506,6 +506,8 @@ export interface CollectionActivityRow {
   shipping_cost: number | null
   /** Groups grade events graded in the same submission (null otherwise). */
   submission_id: string | null
+  /** User-entered submission/order ID for the batch (null otherwise). */
+  submission_label: string | null
 }
 
 export interface WantListItem {

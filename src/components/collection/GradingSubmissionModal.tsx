@@ -39,6 +39,8 @@ export function GradingSubmissionModal({
   preset?: HoldingRow | null
 }) {
   const [company, setCompany] = useState<GradingCompany>('PSA')
+  const [submissionLabel, setSubmissionLabel] = useState('')
+  const [gradedDate, setGradedDate] = useState('')
   const [items, setItems] = useState<Item[]>([])
   const [lotsByHolding, setLotsByHolding] = useState<Map<string, Lot[]>>(new Map())
   const [outbound, setOutbound] = useState('')
@@ -53,6 +55,7 @@ export function GradingSubmissionModal({
   useEffect(() => {
     if (!open) return
     setCompany('PSA')
+    setSubmissionLabel(''); setGradedDate(new Date().toISOString().slice(0, 10))
     setOutbound(''); setRet(''); setPicker(''); setError(null); setSubmitting(false)
     setLotsByHolding(new Map())
     setItems(preset ? [{ holdingId: preset.id, grade: GRADING_SCALES.PSA[0], cert: '', fee: '', subgrades: emptySubgrades(), lotId: '' }] : [])
@@ -118,6 +121,8 @@ export function GradingSubmissionModal({
         body: JSON.stringify({
           action: 'grade_submission',
           grading_company: company,
+          submission_label: submissionLabel.trim() || null,
+          graded_at: gradedDate || null,
           items: items.map(it => ({ collection_id: it.holdingId, grade: it.grade, cert: it.cert.trim(), grading_fee: it.fee === '' ? 0 : Number(it.fee), subgrades: company === 'BGS' ? it.subgrades : null, lot_id: it.lotId || null })),
           outbound_shipping: outbound === '' ? 0 : Number(outbound),
           return_shipping: ret === '' ? 0 : Number(ret),
@@ -144,11 +149,21 @@ export function GradingSubmissionModal({
         </div>
 
         <div className="px-6 py-4 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading company</label>
+              <select value={company} onChange={e => { const c = e.target.value as GradingCompany; setCompany(c); setItems(prev => prev.map(it => ({ ...it, grade: GRADING_SCALES[c][0] }))) }} className={`${field} w-full`}>
+                {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Graded date</label>
+              <input type="date" value={gradedDate} onChange={e => setGradedDate(e.target.value)} className={`${field} w-full`} />
+            </div>
+          </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading company</label>
-            <select value={company} onChange={e => { const c = e.target.value as GradingCompany; setCompany(c); setItems(prev => prev.map(it => ({ ...it, grade: GRADING_SCALES[c][0] }))) }} className={`${field} w-full`}>
-              {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Submission ID <span className="text-zinc-400 normal-case font-normal">(optional)</span></label>
+            <input type="text" value={submissionLabel} onChange={e => setSubmissionLabel(e.target.value)} placeholder="e.g. BGS order #1234567" className={`${field} w-full`} />
           </div>
 
           {/* Cards in the submission */}

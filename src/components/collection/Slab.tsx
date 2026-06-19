@@ -218,7 +218,9 @@ export function Slab({
             <span className="tracking-tight leading-[0.78]" style={{ fontSize: '11cqw', marginBottom: '1cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
             <div className="font-bold whitespace-pre leading-[1.2] text-center" style={{ fontSize: '2.5cqw' }}>
               <div>{bgsGradeWord(grade)}</div>
-              {certNumber && <div className="tabular-nums">{certNumber}</div>}
+              {/* Always render the cert line — a blank one reserves the row so a
+                  no-cert slab bottom-aligns identically to one with a cert. */}
+              <div className="tabular-nums">{certNumber || ' '}</div>
             </div>
           </div>
         </div>

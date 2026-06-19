@@ -89,11 +89,12 @@ export function GradingLogModal({
 
   // Group the grade events by the submission they were graded in.
   const groups = useMemo(() => {
-    const m = new Map<string, { id: string; date: string; company: string; events: CollectionActivityRow[] }>()
+    const m = new Map<string, { id: string; date: string; company: string; label: string | null; events: CollectionActivityRow[] }>()
     for (const e of events) {
       const key = e.submission_id ?? `solo-${e.source_id}`
       let g = m.get(key)
-      if (!g) { g = { id: key, date: e.happened_at, company: (e.to_grade ?? '').split(' ')[0] || 'Grade', events: [] }; m.set(key, g) }
+      if (!g) { g = { id: key, date: e.happened_at, company: (e.to_grade ?? '').split(' ')[0] || 'Grade', label: e.submission_label ?? null, events: [] }; m.set(key, g) }
+      if (!g.label && e.submission_label) g.label = e.submission_label
       g.events.push(e)
       if (e.happened_at > g.date) g.date = e.happened_at
     }
@@ -153,7 +154,7 @@ export function GradingLogModal({
                     <div key={g.id} className="rounded-lg ring-1 ring-zinc-200">
                       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-zinc-100 bg-zinc-50/60 rounded-t-lg">
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-zinc-800">{g.company} submission <span className="text-zinc-400 font-normal">· {g.events.length} {g.events.length === 1 ? 'card' : 'cards'}</span></p>
+                          <p className="text-xs font-bold text-zinc-800 truncate">{g.label ? <>{g.company} <span className="font-mono font-semibold text-zinc-600">{g.label}</span></> : `${g.company} submission`} <span className="text-zinc-400 font-normal">· {g.events.length} {g.events.length === 1 ? 'card' : 'cards'}</span></p>
                           <p className="text-[10px] text-zinc-400">{fmtDate(g.date)}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
