@@ -181,7 +181,7 @@ export function Slab({
     // sits a touch further left, so its text band starts further left too (same
     // right edge keeps the grade numeral aligned).
     const band = isBL
-      ? { left: 25.5, top: 5.3, width: 64, height: 11 }
+      ? { left: 28, top: 5.3, width: 57.5, height: 11 }
       : { left: 29, top: 5.3, width: 60.5, height: 11 }
     // Gold label takes black ink; black label takes Beckett gold ink. The grade
     // numeral matches the label ink on both holders.
