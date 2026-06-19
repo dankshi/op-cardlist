@@ -150,6 +150,7 @@ export function Slab({
   setName,
   rarity,
   setYear,
+  artStyle,
 }: {
   imageUrl: string
   cardName: string
@@ -162,6 +163,7 @@ export function Slab({
   setName?: string | null
   rarity?: string | null
   setYear?: number | null
+  artStyle?: string | null
 }) {
   // BGS (non-Black-Label) → the gold holder (/slabs/bgs-gold.png, a full holder
   // with a BLANK gold label), used exactly like the photoreal black-label path:
@@ -176,6 +178,10 @@ export function Slab({
     const num = /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
     const sg = subgrades ?? {}
     const sub = (k: string) => (sg[k] != null ? String(sg[k]) : '—')
+    // Beckett prefixes "FOIL" for foil printings — alt/manga/etc art, or the
+    // inherently-foil special rarities (SP/SEC/TR/L/SR).
+    const isFoil = (artStyle != null && artStyle !== 'standard') || (rarity != null && ['SP', 'SEC', 'TR', 'L', 'SR'].includes(rarity.toUpperCase()))
+    const finish = rarity ? `${isFoil ? 'FOIL ' : ''}${rarity.toUpperCase()}` : ''
     return (
       <div className="relative w-full group-hover:opacity-95 transition-opacity" style={{ aspectRatio: '2004 / 3116', containerType: 'inline-size' }}>
         <div className="absolute overflow-hidden rounded-[3px]" style={{ left: `${win.left}%`, top: `${win.top}%`, width: `${win.width}%`, height: `${win.height}%` }}>
@@ -188,7 +194,7 @@ export function Slab({
               <p className="truncate">{setYear ? `${setYear} ` : ''}ONE PIECE</p>
               {setName && <p className="truncate">{setName.toUpperCase()}</p>}
               <p className="truncate">{cardId ? `${cardNoLabel(cardId)} ` : ''}{cardName.toUpperCase()}</p>
-              {rarity && <p className="truncate">{rarity.toUpperCase()}</p>}
+              {finish && <p className="truncate">{finish}</p>}
             </div>
             {/* 4-column table: label / value / label / value. Auto columns make
                 each value column start at the same x, so they line up. */}

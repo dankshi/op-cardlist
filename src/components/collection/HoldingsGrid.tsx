@@ -16,6 +16,7 @@ export interface HoldingRow {
   setName: string | null
   setYear: number | null
   rarity: string | null
+  artStyle: string | null
   quantity: number
   acquiredPrice: number | null
   acquiredDate: string | null
@@ -189,7 +190,7 @@ export function HoldingsGrid({
                 className="flex items-end justify-center w-full aspect-[2004/3116] cursor-pointer"
               >
                 {isGraded ? (
-                  <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} certNumber={row.certNumber} subgrades={row.subgrades} setName={row.setName} cardId={row.cardId} rarity={row.rarity} setYear={row.setYear} />
+                  <Slab imageUrl={row.imageUrl} cardName={row.cardName} company={row.gradingCompany!} grade={row.grade!} certNumber={row.certNumber} subgrades={row.subgrades} setName={row.setName} cardId={row.cardId} rarity={row.rarity} setYear={row.setYear} artStyle={row.artStyle} />
                 ) : (
                   <div className="relative w-full rounded-lg overflow-hidden bg-zinc-800 aspect-[5/7] ring-1 ring-white/5 group-hover:ring-white/20 transition-all">
                     {row.imageUrl && (

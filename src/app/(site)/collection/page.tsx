@@ -144,6 +144,7 @@ export default async function CollectionPage() {
         : null,
       setYear: meta?.setId ? (setYearById.get(meta.setId) ?? null) : null,
       rarity: meta?.rarity ?? null,
+      artStyle: meta?.artStyle ?? null,
       quantity: qty,
       acquiredPrice,
       acquiredDate: i.acquired_date,
