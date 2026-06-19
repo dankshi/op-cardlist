@@ -215,7 +215,7 @@ export function Slab({
             <div className="flex-1" />
             {/* Grade numeral (Arial Narrow Bold) sits directly above PRISTINE; the
                 PRISTINE/cert lines bottom-align with the CENTERING/EDGES rows. */}
-            <span className="tracking-tight leading-[0.78]" style={{ fontSize: '9cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
+            <span className="tracking-tight leading-[0.78]" style={{ fontSize: '11cqw', marginBottom: '1cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
             <div className="font-bold whitespace-pre leading-[1.2] text-center" style={{ fontSize: '2.5cqw' }}>
               <div>{bgsGradeWord(grade)}</div>
               {certNumber && <div className="tabular-nums">{certNumber}</div>}
