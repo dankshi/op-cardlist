@@ -120,6 +120,24 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
+  // Guard against erasing history: if this line has recorded sales or grade
+  // events, a hard delete would drop its buy lots and orphan that history. Those
+  // cards should be disposed via "Mark as sold", not deleted. Pure mistakes
+  // (no sales/grades) delete freely. Pass ?force=1 to override intentionally.
+  const force = new URL(request.url).searchParams.get('force') === '1'
+  if (!force) {
+    const [{ count: saleCount }, { count: gradeCount }] = await Promise.all([
+      supabase.from('collection_sales').select('*', { count: 'exact', head: true }).eq('collection_id', id),
+      supabase.from('collection_adjustments').select('*', { count: 'exact', head: true }).eq('collection_id', id).eq('type', 'grade'),
+    ])
+    if ((saleCount ?? 0) > 0 || (gradeCount ?? 0) > 0) {
+      return NextResponse.json({
+        error: 'This card has sale/grade history. Use "Mark as sold" to dispose of it (keeps the history), or remove with force to erase it.',
+        hasHistory: true,
+      }, { status: 409 })
+    }
+  }
+
   const { error } = await supabase.from('collections').delete().eq('id', id)
   if (error) return NextResponse.json({ error: 'Failed to delete' }, { status: 500 })
   return NextResponse.json({ ok: true })

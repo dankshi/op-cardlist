@@ -19,6 +19,7 @@ export async function POST(request: Request) {
   const collectionId = typeof body.collection_id === 'string' ? body.collection_id : ''
   const quantity = Math.max(1, Math.floor(Number(body.quantity) || 0))
   const proceeds = body.proceeds === '' || body.proceeds == null ? null : Number(body.proceeds)
+  const fees = body.fees === '' || body.fees == null ? 0 : Number(body.fees)
   const soldAt = typeof body.sold_at === 'string' && body.sold_at ? body.sold_at : new Date().toISOString()
   const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : null
 
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
   if (proceeds != null && (!Number.isFinite(proceeds) || proceeds < 0)) {
     return NextResponse.json({ error: 'Invalid proceeds' }, { status: 400 })
   }
+  if (!Number.isFinite(fees) || fees < 0) return NextResponse.json({ error: 'Invalid fees' }, { status: 400 })
 
   // Ownership + variant lookup. close_collection_lots is security-definer and
   // doesn't itself check ownership, so the caller must — verify the line is the
@@ -58,8 +60,8 @@ export async function POST(request: Request) {
       channel: 'manual',
       quantity,
       gross_proceeds: proceeds != null ? round2(proceeds) : null,
-      fees: 0,
-      net_proceeds: proceeds != null ? round2(proceeds) : null,
+      fees: round2(fees),
+      net_proceeds: proceeds != null ? round2(proceeds - fees) : null,
       cost_basis: costBasis,
       grading_company: line.grading_company,
       grade: line.grade,

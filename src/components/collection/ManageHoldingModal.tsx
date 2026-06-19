@@ -15,7 +15,7 @@ function fmtDate(s: string) {
 }
 
 interface LotDraft { id?: string; quantity: number; price: string; date: string }
-type View = 'edit' | 'history' | 'list' | 'regrade' | 'regradeslab'
+type View = 'edit' | 'history' | 'list' | 'regrade' | 'regradeslab' | 'sold'
 const COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
 
 /** Manage one collection holding from /collection. Everything happens inline in
@@ -74,6 +74,22 @@ export function ManageHoldingModal({
   const [activity, setActivity] = useState<CollectionActivityRow[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
+
+  // Mark sold (off-platform)
+  const [soldPrice, setSoldPrice] = useState(row.marketPrice != null ? row.marketPrice.toFixed(2) : '')
+  const [soldFees, setSoldFees] = useState('')
+  const [soldDate, setSoldDate] = useState(new Date().toISOString().slice(0, 10))
+  const [soldQty, setSoldQty] = useState(1)
+  const [soldNote, setSoldNote] = useState('')
+  const [selling, setSelling] = useState(false)
+  const [soldError, setSoldError] = useState<string | null>(null)
+  async function submitSold() {
+    if (selling) return
+    setSelling(true); setSoldError(null)
+    const res = await fetch('/api/collection/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ collection_id: row.id, quantity: soldQty, proceeds: soldPrice === '' ? null : Number(soldPrice), fees: soldFees === '' ? 0 : Number(soldFees), sold_at: soldDate ? new Date(soldDate).toISOString() : undefined, note: soldNote.trim() || null }) })
+    setSelling(false)
+    if (res.ok) { onChanged(); onClose() } else { const b = await res.json().catch(() => ({})); setSoldError(b.error || 'Failed to record sale.') }
+  }
 
   // List for sale
   const [listPrice, setListPrice] = useState(row.marketPrice != null ? row.marketPrice.toFixed(2) : '')
@@ -174,21 +190,30 @@ export function ManageHoldingModal({
     else { const b = await res.json().catch(() => ({})); setListError(b.error || 'Failed to list. You may need to finish seller setup.') }
   }
 
-  async function remove() {
+  async function remove(force = false) {
     if (removing) return
-    if (!confirm('Remove this card from your collection?')) return
+    const msg = force
+      ? 'Force-remove and ERASE this card and its history? This cannot be undone.'
+      : 'Remove this card? Use this only if you added it by mistake — if you sold it, use “Mark sold” so the history + profit are kept.'
+    if (!confirm(msg)) return
     setRemoving(true)
-    const res = await fetch(`/api/collection?id=${row.id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/collection?id=${row.id}${force ? '&force=1' : ''}`, { method: 'DELETE' })
     setRemoving(false)
-    if (res.ok) { onChanged(); onClose() }
-    else alert('Failed to remove.')
+    if (res.ok) { onChanged(); onClose(); return }
+    const b = await res.json().catch(() => ({}))
+    if (b.hasHistory && !force) {
+      if (confirm(`${b.error}\n\nErase it and its history anyway?`)) return remove(true)
+      return
+    }
+    alert(b.error || 'Failed to remove.')
   }
 
   const field = 'w-full px-3 py-2 rounded-lg border border-zinc-300 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-orange-500 disabled:opacity-50'
   const tabs: { v: View; label: string }[] = [
     { v: 'edit', label: 'Acquisitions' },
     { v: 'history', label: 'History' },
-    { v: 'list', label: 'List for sale' },
+    { v: 'list', label: 'List' },
+    { v: 'sold', label: 'Mark sold' },
     ...(!isGraded ? [{ v: 'regrade' as View, label: 'Got graded' }] : [{ v: 'regradeslab' as View, label: 'Re-grade' }]),
   ]
   const realizedTotal = activity.filter(a => a.kind === 'sell' && a.realized != null).reduce((s, a) => s + Number(a.realized), 0)
@@ -407,6 +432,42 @@ export function ManageHoldingModal({
             )
           )}
 
+          {view === 'sold' && (
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-500">Record an off-platform sale (eBay, in person…). Keeps the card in your history with realized P&amp;L and removes it from holdings — use this instead of Remove when you sold it.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Sale price /ea</label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={soldPrice} onChange={e => { setSoldPrice(e.target.value); setSoldError(null) }} placeholder="Proceeds" className={`${field} pl-6 tabular-nums`} /></div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Fees <span className="text-zinc-400 normal-case font-normal">(opt)</span></label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={soldFees} onChange={e => setSoldFees(e.target.value)} placeholder="Fees" className={`${field} pl-6 tabular-nums`} /></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Date sold</label>
+                  <input type="date" value={soldDate} onChange={e => setSoldDate(e.target.value)} className={field} />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Qty</label>
+                  <input type="number" min={1} max={row.quantity} value={soldQty} onChange={e => setSoldQty(Math.max(1, Math.min(row.quantity, parseInt(e.target.value) || 1)))} className={`${field} tabular-nums`} />
+                </div>
+              </div>
+              <input type="text" value={soldNote} onChange={e => setSoldNote(e.target.value)} placeholder="Note (optional) — buyer, platform…" className={field} />
+              {Number(soldPrice) > 0 && row.acquiredPrice != null && (() => {
+                const net = Number(soldPrice) * soldQty - (Number(soldFees) || 0)
+                const r = net - row.acquiredPrice! * soldQty
+                return <p className="text-[11px] text-zinc-500 tabular-nums">Net {fmtUSD(net)} · realized <span className={`font-semibold ${r >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{r >= 0 ? '+' : '−'}{fmtUSD(Math.abs(r))}</span></p>
+              })()}
+              {soldError && <p className="text-xs text-red-600">{soldError}</p>}
+              <div className="flex justify-end">
+                <button type="button" onClick={submitSold} disabled={selling} className="px-4 py-2 rounded-lg text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer disabled:opacity-50">{selling ? 'Saving…' : 'Record sale'}</button>
+              </div>
+            </div>
+          )}
+
           {view === 'regrade' && !isGraded && (
             <div className="space-y-3">
               <p className="text-xs text-zinc-500">Got these back from a grader? Log a grading submission — each card becomes its own slab with its own grade + cert, and the grading fees + shipping fold into cost basis. You can add other cards from the same submission too.</p>
@@ -464,7 +525,7 @@ export function ManageHoldingModal({
             everything and closes; other tabs have their own action button, so
             here it just dismisses. */}
         <div className="flex items-center px-6 py-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-2xl">
-          <button type="button" onClick={remove} disabled={removing} className="px-3 py-2 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50">{removing ? 'Removing…' : 'Remove'}</button>
+          <button type="button" onClick={() => remove()} disabled={removing} title="Only for cards added by mistake — to record a sale use Mark sold" className="px-3 py-2 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50">{removing ? 'Removing…' : 'Remove'}</button>
           <div className="flex-1" />
           {view === 'edit' ? (
             <button type="button" onClick={saveEdit} disabled={savingEdit} className="px-5 py-2 rounded-lg text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white cursor-pointer disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save changes'}</button>
