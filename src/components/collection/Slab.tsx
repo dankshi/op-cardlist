@@ -208,13 +208,16 @@ export function Slab({
               <div>{`${'EDGES'.padEnd(10)}${sub('edges').padEnd(5)}${'SURFACE'.padEnd(9)}${sub('surface')}`}</div>
             </div>
           </div>
-          {/* Grade number, grade word, and cert share a common center axis. */}
-          <div className="flex flex-col items-center justify-between pl-[4%] flex-shrink-0">
+          {/* Mirror the left column: grade number up top, a spacer, then PRISTINE
+              + cert at the bottom with the SAME line metrics as the subgrades, so
+              PRISTINE lands on the CENTERING row and the cert on the EDGES row. */}
+          <div className="flex flex-col items-center pl-[4%] flex-shrink-0">
             {/* Grade numeral: Arial Narrow Bold, like the real holder. */}
-            <span className="tracking-tight leading-[0.74]" style={{ fontSize: '13cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
-            <div className="text-center leading-[1.1]">
-              <p className="font-bold" style={{ fontSize: '2.45cqw' }}>{bgsGradeWord(grade)}</p>
-              {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.25cqw' }}>{certNumber}</p>}
+            <span className="tracking-tight leading-[0.78]" style={{ fontSize: '9cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
+            <div className="flex-1" />
+            <div className="font-bold whitespace-pre leading-[1.2] text-center" style={{ fontSize: '2.5cqw' }}>
+              <div>{bgsGradeWord(grade)}</div>
+              {certNumber && <div className="tabular-nums">{certNumber}</div>}
             </div>
           </div>
         </div>
