@@ -79,6 +79,9 @@ export async function POST(request: Request) {
     if (items.some((it: { collection_id?: string; grade?: string }) => !it || typeof it.collection_id !== 'string' || typeof it.grade !== 'string' || !it.grade)) {
       return NextResponse.json({ error: 'Each card needs a grade' }, { status: 400 })
     }
+    if (items.some((it: { cert?: unknown }) => typeof it.cert !== 'string' || !it.cert.trim())) {
+      return NextResponse.json({ error: 'Each card needs a cert number' }, { status: 400 })
+    }
     const fees = items.map((it: { grading_fee?: unknown }) => it.grading_fee === '' || it.grading_fee == null ? 0 : Number(it.grading_fee))
     if (fees.some((f: number) => !Number.isFinite(f) || f < 0)) return NextResponse.json({ error: 'Invalid grading fee' }, { status: 400 })
     if (![outbound, ret].every(x => Number.isFinite(x) && x >= 0)) return NextResponse.json({ error: 'Invalid shipping cost' }, { status: 400 })
@@ -100,6 +103,10 @@ export async function POST(request: Request) {
     let graded = 0
     for (let i = 0; i < n; i++) {
       const it = items[i]
+      // Subgrades only for BGS, and only when at least one is set.
+      const sg = company === 'BGS' && it.subgrades && typeof it.subgrades === 'object'
+        ? Object.fromEntries(Object.entries(it.subgrades).filter(([, v]) => v != null && v !== '').map(([k, v]) => [k, Number(v)]))
+        : null
       const { error } = await supabase.rpc('regrade_one_copy', {
         p_collection_id: it.collection_id,
         p_grading_company: company,
@@ -107,6 +114,7 @@ export async function POST(request: Request) {
         p_cert_number: typeof it.cert === 'string' && it.cert.trim() ? it.cert.trim() : null,
         p_grading_cost: fees[i],
         p_shipping_cost: shipEach,
+        p_subgrades: sg && Object.keys(sg).length ? sg : null,
       })
       if (error) return NextResponse.json({ error: error.message || 'Failed to grade a copy', graded }, { status: 500 })
       graded++

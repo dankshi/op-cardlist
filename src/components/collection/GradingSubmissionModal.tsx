@@ -6,12 +6,22 @@ import type { HoldingRow } from './HoldingsGrid'
 
 const COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
 
+// BGS subgrades (Centering/Corners/Edges/Surface) — numeric, 0.5 steps. '' = unset.
+const SUBGRADE_OPTIONS = ['', '10', '9.5', '9', '8.5', '8', '7.5', '7', '6.5', '6', '5.5', '5', '4.5', '4', '3.5', '3', '2.5', '2', '1.5', '1']
+const SUBGRADE_KEYS = ['centering', 'corners', 'edges', 'surface'] as const
+type SubgradeKey = typeof SUBGRADE_KEYS[number]
+const SUBGRADE_LABEL: Record<SubgradeKey, string> = { centering: 'Cent', corners: 'Corn', edges: 'Edge', surface: 'Surf' }
+
 function fmtUSD(n: number) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 /** One copy in the submission. `holdingId` is the source raw collection line. */
-interface Item { holdingId: string; grade: string; cert: string; fee: string }
+interface Item { holdingId: string; grade: string; cert: string; fee: string; subgrades: Record<SubgradeKey, string> }
+
+function emptySubgrades(): Record<SubgradeKey, string> {
+  return { centering: '', corners: '', edges: '', surface: '' }
+}
 
 /** Log a grading submission: a batch of individual copies — different cards or a
  *  subset of a holding — sent to one grader together. Each gets its own grade +
@@ -47,7 +57,7 @@ export function GradingSubmissionModal({
     if (!open) return
     setCompany('PSA')
     setOutbound(''); setRet(''); setPicker(''); setError(null); setSubmitting(false)
-    setItems(preset ? [{ holdingId: preset.id, grade: GRADING_SCALES.PSA[0], cert: '', fee: '' }] : [])
+    setItems(preset ? [{ holdingId: preset.id, grade: GRADING_SCALES.PSA[0], cert: '', fee: '', subgrades: emptySubgrades() }] : [])
   }, [open, preset?.id])
 
   useEffect(() => {
@@ -71,12 +81,15 @@ export function GradingSubmissionModal({
 
   function addItem(holdingId: string) {
     if (!holdingId) return
-    setItems(prev => [...prev, { holdingId, grade: GRADING_SCALES[company][0], cert: '', fee: '' }])
+    setItems(prev => [...prev, { holdingId, grade: GRADING_SCALES[company][0], cert: '', fee: '', subgrades: emptySubgrades() }])
     setPicker('')
     setError(null)
   }
   function updateItem(i: number, patch: Partial<Item>) {
     setItems(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it))
+  }
+  function updateSub(i: number, key: SubgradeKey, val: string) {
+    setItems(prev => prev.map((it, idx) => idx === i ? { ...it, subgrades: { ...it.subgrades, [key]: val } } : it))
   }
   function removeItem(i: number) { setItems(prev => prev.filter((_, idx) => idx !== i)) }
 
@@ -84,7 +97,7 @@ export function GradingSubmissionModal({
   const shipTotal = (Number(outbound) || 0) + (Number(ret) || 0)
   const grandTotal = feeTotal + shipTotal
   const perCardShip = items.length ? shipTotal / items.length : 0
-  const canSubmit = items.length > 0 && items.every(it => it.grade)
+  const canSubmit = items.length > 0 && items.every(it => it.grade && it.cert.trim())
 
   async function submit() {
     if (!canSubmit || submitting) return
@@ -96,7 +109,7 @@ export function GradingSubmissionModal({
         body: JSON.stringify({
           action: 'grade_submission',
           grading_company: company,
-          items: items.map(it => ({ collection_id: it.holdingId, grade: it.grade, cert: it.cert.trim() || null, grading_fee: it.fee === '' ? 0 : Number(it.fee) })),
+          items: items.map(it => ({ collection_id: it.holdingId, grade: it.grade, cert: it.cert.trim(), grading_fee: it.fee === '' ? 0 : Number(it.fee), subgrades: company === 'BGS' ? it.subgrades : null })),
           outbound_shipping: outbound === '' ? 0 : Number(outbound),
           return_shipping: ret === '' ? 0 : Number(ret),
         }),
@@ -145,9 +158,19 @@ export function GradingSubmissionModal({
                   </div>
                   <div className="flex items-center gap-2">
                     <select value={it.grade} onChange={e => updateItem(i, { grade: e.target.value })} className="w-[4.5rem] flex-shrink-0 px-2 py-2 rounded-lg border border-zinc-300 bg-white text-sm text-zinc-900 focus:outline-none focus:border-orange-500">{GRADING_SCALES[company].map(g => <option key={g} value={g}>{g}</option>)}</select>
-                    <input type="text" inputMode="numeric" value={it.cert} onChange={e => updateItem(i, { cert: e.target.value })} placeholder="Cert # (optional)" className={`${field} flex-1 min-w-0 tabular-nums`} />
+                    <input type="text" inputMode="numeric" value={it.cert} onChange={e => updateItem(i, { cert: e.target.value })} placeholder="Cert # (required)" className={`flex-1 min-w-0 px-3 py-2 rounded-lg border text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none tabular-nums ${it.cert.trim() ? 'border-zinc-300 focus:border-orange-500' : 'border-red-300 focus:border-red-500'}`} />
                     <div className="relative w-24 flex-shrink-0"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={it.fee} onChange={e => updateItem(i, { fee: e.target.value })} placeholder="Fee" className={`${field} w-full pl-6 tabular-nums`} /></div>
                   </div>
+                  {company === 'BGS' && (
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {SUBGRADE_KEYS.map(k => (
+                        <div key={k}>
+                          <label className="block text-[9px] uppercase tracking-wide text-zinc-400 font-semibold mb-0.5">{SUBGRADE_LABEL[k]}</label>
+                          <select value={it.subgrades[k]} onChange={e => updateSub(i, k, e.target.value)} className="w-full px-1.5 py-1.5 rounded-md border border-zinc-300 bg-white text-xs text-zinc-900 focus:outline-none focus:border-orange-500">{SUBGRADE_OPTIONS.map(g => <option key={g} value={g}>{g || '—'}</option>)}</select>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}
