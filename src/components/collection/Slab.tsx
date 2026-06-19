@@ -189,8 +189,10 @@ export function Slab({
         </div>
         <Image src="/slabs/bgs-gold.png" alt="" fill sizes="(max-width:768px) 50vw, 20vw" className="object-contain pointer-events-none select-none" />
         <div className="absolute flex items-stretch text-left text-black font-mono" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%` }}>
-          {/* Name at the top; subgrades pushed to the BOTTOM via mt-auto so the
-              empty space falls between the name and the subgrade table. */}
+          {/* Name at top, a growing spacer, then the subgrade table at the
+              bottom — so the empty space lands between name and subgrades, and
+              the two subgrade rows stay tight together (grid keeps its own
+              intrinsic height instead of stretching). */}
           <div className="flex-1 min-w-0 flex flex-col text-left">
             <div className="font-bold leading-[1.04]" style={{ fontSize: '2.3cqw' }}>
               <p className="truncate">{setYear ? `${setYear} ` : ''}ONE PIECE</p>
@@ -198,19 +200,21 @@ export function Slab({
               <p className="truncate">{cardId ? `${cardNoLabel(cardId)} ` : ''}{cardName.toUpperCase()}</p>
               {finish && <p className="truncate">{finish}</p>}
             </div>
+            <div className="flex-1" />
             {/* 4-column table (label / value / label / value); auto columns make
                 each value column start at the same x, so they line up. */}
-            <div className="mt-auto grid items-baseline font-bold whitespace-nowrap" style={{ gridTemplateColumns: 'auto auto auto auto', columnGap: '1.2cqw', rowGap: '0.4cqw', fontSize: '2.5cqw' }}>
+            <div className="grid items-baseline font-bold whitespace-nowrap" style={{ gridTemplateColumns: 'auto auto auto auto', columnGap: '1.2cqw', rowGap: '0.3cqw', fontSize: '2.5cqw' }}>
               <span>CENTERING</span><span className="tabular-nums font-black">{sub('centering')}</span>
               <span style={{ marginLeft: '2cqw' }}>CORNERS</span><span className="tabular-nums font-black">{sub('corners')}</span>
               <span>EDGES</span><span className="tabular-nums font-black">{sub('edges')}</span>
               <span style={{ marginLeft: '2cqw' }}>SURFACE</span><span className="tabular-nums font-black">{sub('surface')}</span>
             </div>
           </div>
-          <div className="flex flex-col items-end justify-between pl-[4%] flex-shrink-0">
+          {/* Grade number, grade word, and cert share a common center axis. */}
+          <div className="flex flex-col items-center justify-between pl-[4%] flex-shrink-0">
             {/* Grade numeral is the holder's serif figure (not the mono body). */}
             <span className="font-serif font-bold tracking-tight leading-[0.74]" style={{ fontSize: '13cqw' }}>{num}</span>
-            <div className="text-right leading-[1.1]">
+            <div className="text-center leading-[1.1]">
               <p className="font-bold" style={{ fontSize: '2.45cqw' }}>{bgsGradeWord(grade)}</p>
               {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.25cqw' }}>{certNumber}</p>}
             </div>
