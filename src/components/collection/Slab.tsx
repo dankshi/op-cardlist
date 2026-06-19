@@ -212,8 +212,8 @@ export function Slab({
           </div>
           {/* Grade number, grade word, and cert share a common center axis. */}
           <div className="flex flex-col items-center justify-between pl-[4%] flex-shrink-0">
-            {/* Grade numeral is the holder's serif figure (not the mono body). */}
-            <span className="font-serif font-bold tracking-tight leading-[0.74]" style={{ fontSize: '13cqw' }}>{num}</span>
+            {/* Grade numeral: Arial Narrow Bold, like the real holder. */}
+            <span className="tracking-tight leading-[0.74]" style={{ fontSize: '13cqw', fontFamily: "'Arial Narrow', 'Helvetica Neue Condensed', Arial, sans-serif", fontWeight: 700, fontStretch: 'condensed' }}>{num}</span>
             <div className="text-center leading-[1.1]">
               <p className="font-bold" style={{ fontSize: '2.45cqw' }}>{bgsGradeWord(grade)}</p>
               {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.25cqw' }}>{certNumber}</p>}
