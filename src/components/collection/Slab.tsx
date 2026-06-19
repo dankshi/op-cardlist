@@ -163,48 +163,46 @@ export function Slab({
   rarity?: string | null
   setYear?: number | null
 }) {
-  // BGS (non-Black-Label) → the gold label, with the card's real text + subgrades
-  // + cert rendered over /slabs/bgs-gold.png. Text scales with the slab via
-  // container-query units (cqw = % of the label's width).
+  // BGS (non-Black-Label) → the gold holder (/slabs/bgs-gold.png, a full holder
+  // with a BLANK gold label), used exactly like the photoreal black-label path:
+  // card in the window + holder overlay, PLUS the card's real text overlaid on
+  // the gold label band. Text scales with the slab via container units (cqw).
   if (company.toUpperCase() === 'BGS' && !/black\s*label|\bbl\b/i.test(grade)) {
+    const win = { left: 12.72, top: 24.81, width: 73.5, height: 66.17 } // same holder window as bgs-10
+    const band = { left: 9, top: 5, width: 82, height: 17 }             // gold label area (tweak to match the PNG)
     const num = /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
     const sg = subgrades ?? {}
     const sub = (k: string) => (sg[k] != null ? String(sg[k]) : '—')
     const Cell = ({ label, k }: { label: string; k: string }) => (
-      <div className="flex items-baseline gap-[4%]"><span>{label}</span><span className="tabular-nums font-black">{sub(k)}</span></div>
+      <div className="flex items-baseline gap-[5%]"><span>{label}</span><span className="tabular-nums font-black">{sub(k)}</span></div>
     )
     return (
-      <div className="relative w-full aspect-[5/7] rounded-[5px] p-[3.5%] bg-[linear-gradient(160deg,#fafafa_0%,#ececef_45%,#cdced3_100%)] ring-1 ring-zinc-300/80 shadow-sm group-hover:ring-zinc-400 transition-all">
-        <div className="absolute inset-0 rounded-[5px] bg-[linear-gradient(120deg,rgba(255,255,255,0.55)_0%,transparent_30%,transparent_70%,rgba(255,255,255,0.25)_100%)] pointer-events-none" />
-        <div className="relative h-full flex flex-col gap-[2.5%]">
-          <div className="relative w-full" style={{ aspectRatio: '570 / 182', containerType: 'inline-size' }}>
-            <Image src="/slabs/bgs-gold.png" alt="" fill sizes="(max-width:768px) 50vw, 20vw" className="object-fill select-none pointer-events-none" />
-            <div className="absolute inset-0 flex items-stretch text-[#2a2010]" style={{ padding: '4.5% 4.5%' }}>
-              <div className="flex-1 min-w-0 flex flex-col justify-between">
-                <div className="font-extrabold leading-[1.12] truncate" style={{ fontSize: '4.1cqw' }}>
-                  <p className="truncate">{setYear ? `${setYear} ` : ''}ONE PIECE</p>
-                  {setName && <p className="truncate">{setName.toUpperCase()}</p>}
-                  <p className="truncate">{cardId ? `${cardNoLabel(cardId)} ` : ''}{cardName.toUpperCase()}</p>
-                  {rarity && <p className="truncate">{rarity.toUpperCase()}</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-x-[8%] gap-y-[3%] font-bold" style={{ fontSize: '4cqw' }}>
-                  <Cell label="CENTERING" k="centering" />
-                  <Cell label="CORNERS" k="corners" />
-                  <Cell label="EDGES" k="edges" />
-                  <Cell label="SURFACE" k="surface" />
-                </div>
-              </div>
-              <div className="flex flex-col items-end justify-between pl-[3%] flex-shrink-0">
-                <span className="font-black leading-[0.85]" style={{ fontSize: '19cqw' }}>{num}</span>
-                <div className="text-right leading-tight">
-                  <p className="font-black tracking-[0.02em]" style={{ fontSize: '4cqw' }}>{bgsGradeWord(grade)}</p>
-                  {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '3.6cqw' }}>{certNumber}</p>}
-                </div>
-              </div>
+      <div className="relative w-full group-hover:opacity-95 transition-opacity" style={{ aspectRatio: '2004 / 3116', containerType: 'inline-size' }}>
+        <div className="absolute overflow-hidden rounded-[3px]" style={{ left: `${win.left}%`, top: `${win.top}%`, width: `${win.width}%`, height: `${win.height}%` }}>
+          {imageUrl && <Image src={imageUrl} alt={cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />}
+        </div>
+        <Image src="/slabs/bgs-gold.png" alt="" fill sizes="(max-width:768px) 50vw, 20vw" className="object-contain pointer-events-none select-none" />
+        <div className="absolute flex items-stretch text-[#2a2010]" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%` }}>
+          <div className="flex-1 min-w-0 flex flex-col justify-between">
+            <div className="font-extrabold leading-[1.08]" style={{ fontSize: '3cqw' }}>
+              <p className="truncate">{setYear ? `${setYear} ` : ''}ONE PIECE</p>
+              {setName && <p className="truncate">{setName.toUpperCase()}</p>}
+              <p className="truncate">{cardId ? `${cardNoLabel(cardId)} ` : ''}{cardName.toUpperCase()}</p>
+              {rarity && <p className="truncate">{rarity.toUpperCase()}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-x-[8%] font-bold" style={{ fontSize: '2.9cqw' }}>
+              <Cell label="CENTERING" k="centering" />
+              <Cell label="CORNERS" k="corners" />
+              <Cell label="EDGES" k="edges" />
+              <Cell label="SURFACE" k="surface" />
             </div>
           </div>
-          <div className="relative flex-1 rounded-[2px] overflow-hidden bg-zinc-100 ring-1 ring-black/10">
-            {imageUrl && <Image src={imageUrl} alt={cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />}
+          <div className="flex flex-col items-end justify-between pl-[3%] flex-shrink-0">
+            <span className="font-black leading-[0.8]" style={{ fontSize: '13cqw' }}>{num}</span>
+            <div className="text-right leading-tight">
+              <p className="font-black tracking-[0.02em]" style={{ fontSize: '2.9cqw' }}>{bgsGradeWord(grade)}</p>
+              {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.7cqw' }}>{certNumber}</p>}
+            </div>
           </div>
         </div>
       </div>
