@@ -392,10 +392,10 @@ export function ManageHoldingModal({
               <div className="space-y-2">
                 <p className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold">{regCopies.length} {regCopies.length === 1 ? 'card' : 'cards'} — grade &amp; cert each</p>
                 {regCopies.map((cp, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex items-center gap-2 min-w-0">
                     <span className="text-[11px] text-zinc-400 w-4 flex-shrink-0 tabular-nums">{i + 1}</span>
-                    <select value={cp.grade} onChange={e => updateCopy(i, { grade: e.target.value })} className={`${field} w-24 flex-shrink-0`}>{GRADING_SCALES[regCompany].map(g => <option key={g} value={g}>{g}</option>)}</select>
-                    <input type="text" inputMode="numeric" value={cp.cert} onChange={e => updateCopy(i, { cert: e.target.value })} placeholder="Cert # (optional)" className={`${field} flex-1 tabular-nums`} />
+                    <select value={cp.grade} onChange={e => updateCopy(i, { grade: e.target.value })} className="w-[4.5rem] flex-shrink-0 px-2 py-2 rounded-lg border border-zinc-300 bg-white text-sm text-zinc-900 focus:outline-none focus:border-orange-500">{GRADING_SCALES[regCompany].map(g => <option key={g} value={g}>{g}</option>)}</select>
+                    <input type="text" inputMode="numeric" value={cp.cert} onChange={e => updateCopy(i, { cert: e.target.value })} placeholder="Cert # (optional)" className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-zinc-300 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-orange-500 tabular-nums" />
                   </div>
                 ))}
               </div>
