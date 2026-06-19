@@ -52,10 +52,13 @@ function fmtUSD(n: number) {
 export function HoldingsGrid({
   rows,
   onLogGrading,
+  onAddAnother,
 }: {
   rows: HoldingRow[]
   /** Open the grading-submission builder pre-filled with this raw holding. */
   onLogGrading?: (preset: HoldingRow) => void
+  /** Open the add-card modal pinned to this card to add another copy/grade. */
+  onAddAnother?: (row: HoldingRow) => void
 }) {
   const router = useRouter()
   // Track the managed holding by id (not the row object) so it stays fresh
@@ -278,6 +281,7 @@ export function HoldingsGrid({
           onClose={() => setManagingId(null)}
           onChanged={() => router.refresh()}
           onLogGrading={onLogGrading ? () => { const r = managing; setManagingId(null); onLogGrading(r) } : undefined}
+          onAddAnother={onAddAnother ? () => { const r = managing; setManagingId(null); onAddAnother(r) } : undefined}
         />
       )}
     </div>

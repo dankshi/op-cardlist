@@ -26,12 +26,15 @@ export function ManageHoldingModal({
   onClose,
   onChanged,
   onLogGrading,
+  onAddAnother,
 }: {
   row: HoldingRow
   onClose: () => void
   onChanged: () => void
   /** Open the grading-submission builder pre-filled with this holding. */
   onLogGrading?: () => void
+  /** Open the add-card modal pinned to this card to add another copy/grade. */
+  onAddAnother?: () => void
 }) {
   const isGraded = !!(row.gradingCompany && row.grade)
   const [view, setView] = useState<View>('edit')
@@ -282,7 +285,15 @@ export function ManageHoldingModal({
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold text-zinc-900 leading-tight line-clamp-2">{row.cardName}</h2>
             <p className="text-[11px] text-zinc-400 truncate mt-0.5">{[row.rarity, row.cardId, gradeLabel(row.gradingCompany, row.grade)].filter(Boolean).join(' · ')}</p>
-            <Link href={`/card/${row.cardId.toLowerCase()}`} className="text-[11px] font-semibold text-orange-600 hover:text-orange-700 mt-1 inline-block">View on marketplace →</Link>
+            <div className="flex items-center gap-3 mt-1">
+              <Link href={`/card/${row.cardId.toLowerCase()}`} className="text-[11px] font-semibold text-orange-600 hover:text-orange-700 inline-block">View on marketplace →</Link>
+              {onAddAnother && (
+                <button type="button" onClick={() => { onClose(); onAddAnother() }} className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-0.5 cursor-pointer">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                  Add another
+                </button>
+              )}
+            </div>
           </div>
           <button onClick={onClose} aria-label="Close" className="flex-shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 cursor-pointer">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>

@@ -49,6 +49,9 @@ export function CollectionClient({
   const [series, setSeries] = useState<ValuePoint[]>(initialSeries)
   const [seriesLoading, setSeriesLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  // When set, the add modal opens pinned to this card (add-another flow) with the
+  // grade still selectable, so a second copy can be a different grade/slab.
+  const [addPreset, setAddPreset] = useState<{ id: string; name: string; image: string } | null>(null)
   const [gradingOpen, setGradingOpen] = useState(false)
   const [gradingPreset, setGradingPreset] = useState<HoldingRow | null>(null)
   const [gradingLogOpen, setGradingLogOpen] = useState(false)
@@ -75,7 +78,14 @@ export function CollectionClient({
     loadSeries(range)
   }
 
-  function openAdd() { setModalOpen(true) }
+  function openAdd() { setAddPreset(null); setModalOpen(true) }
+  // "Add another" from a holding: same card, grade chosen fresh → a new line if
+  // the grade differs, or bumps the matching line if it's the same.
+  function openAddAnother(row: HoldingRow) {
+    setAddPreset({ id: row.cardId, name: row.cardName, image: row.imageUrl })
+    setModalOpen(true)
+  }
+  function closeAdd() { setModalOpen(false); setAddPreset(null) }
 
   // Dark canvas for the collection: also flip the (global) site header to
   // transparent for this route so it doesn't clash. The class is removed when
@@ -165,11 +175,11 @@ export function CollectionClient({
             <h2 className="text-lg font-bold text-zinc-100">Holdings</h2>
             <span className="text-xs text-zinc-400 tabular-nums">{rows.length} {rows.length === 1 ? 'line' : 'lines'}</span>
           </div>
-          <HoldingsGrid rows={rows} onLogGrading={openGrading} />
+          <HoldingsGrid rows={rows} onLogGrading={openGrading} onAddAnother={openAddAnother} />
         </>
       )}
 
-      <AddEditCardModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={refreshAll} editItem={null} />
+      <AddEditCardModal open={modalOpen} onClose={closeAdd} onSaved={refreshAll} editItem={null} presetCard={addPreset} />
       <GradingSubmissionModal open={gradingOpen} onClose={() => setGradingOpen(false)} onSaved={refreshAll} rawHoldings={rawHoldings} preset={gradingPreset} />
       <GradingLogModal open={gradingLogOpen} onClose={() => setGradingLogOpen(false)} rows={rows} onChanged={refreshAll} />
     </div>
