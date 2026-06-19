@@ -180,9 +180,9 @@ export function Slab({
           {imageUrl && <Image src={imageUrl} alt={cardName} fill sizes="(max-width:768px) 50vw, 20vw" className="object-cover" unoptimized />}
         </div>
         <Image src="/slabs/bgs-gold.png" alt="" fill sizes="(max-width:768px) 50vw, 20vw" className="object-contain pointer-events-none select-none" />
-        <div className="absolute flex items-stretch text-left text-black" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%` }}>
+        <div className="absolute flex items-stretch text-left text-black font-mono" style={{ left: `${band.left}%`, top: `${band.top}%`, width: `${band.width}%`, height: `${band.height}%` }}>
           <div className="flex-1 min-w-0 flex flex-col justify-between text-left">
-            <div className="font-extrabold leading-[1.1]" style={{ fontSize: '3.1cqw' }}>
+            <div className="font-bold leading-[1.1]" style={{ fontSize: '3cqw' }}>
               {cardId && <p className="truncate">{cardNoLabel(cardId)}</p>}
               <p className="truncate">{cardName.toUpperCase()}</p>
             </div>
@@ -196,11 +196,10 @@ export function Slab({
             </div>
           </div>
           <div className="flex flex-col items-end justify-between pl-[5%] flex-shrink-0">
-            {/* Beckett's grade numeral is a tall serif figure, not a heavy sans black. */}
-            <span className="font-serif font-semibold tracking-tight leading-[0.78]" style={{ fontSize: '13cqw' }}>{num}</span>
-            <div className="text-right leading-[1.05]">
-              <p className="font-black tracking-[0.02em]" style={{ fontSize: '2.6cqw' }}>{bgsGradeWord(grade)}</p>
-              {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.4cqw' }}>{certNumber}</p>}
+            <span className="font-bold tracking-tight leading-[0.78]" style={{ fontSize: '12.5cqw' }}>{num}</span>
+            <div className="text-right leading-[1.1]">
+              <p className="font-bold" style={{ fontSize: '2.5cqw' }}>{bgsGradeWord(grade)}</p>
+              {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.35cqw' }}>{certNumber}</p>}
             </div>
           </div>
         </div>
