@@ -15,7 +15,7 @@ function fmtDate(s: string) {
 }
 
 interface LotDraft { id?: string; quantity: number; price: string; date: string }
-type View = 'edit' | 'history' | 'list' | 'regrade' | 'regradeslab' | 'sold'
+type View = 'edit' | 'grading' | 'history' | 'list' | 'regrade' | 'regradeslab' | 'sold'
 const COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
 
 /** Manage one collection holding from /collection. Everything happens inline in
@@ -45,6 +45,9 @@ export function ManageHoldingModal({
   const [serial, setSerial] = useState(row.serialNumber ?? '')
   const [cert, setCert] = useState(row.certNumber ?? '')
   const [gradingCost, setGradingCost] = useState('')
+  // The graded date — the grade event's own date, editable from the Grading tab.
+  const [gradedDate, setGradedDate] = useState('')
+  const [loadedGradedDate, setLoadedGradedDate] = useState('')
   // Correct a logged grade: the slab's grade + (BGS) subgrades.
   const [editGrade, setEditGrade] = useState(row.grade ?? '')
   const [editSub, setEditSub] = useState<Record<string, string>>(() => {
@@ -126,6 +129,21 @@ export function ManageHoldingModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadLots() }, [row.id])
 
+  // Pull the slab's grade-event date so the Grading tab can edit it.
+  useEffect(() => {
+    if (!isGraded) return
+    let cancel = false
+    ;(async () => {
+      try {
+        const d = await (await fetch(`/api/collection/activity?collection_id=${encodeURIComponent(row.id)}`)).json()
+        const g = (d.activity ?? []).find((a: CollectionActivityRow) => a.kind === 'grade')
+        if (!cancel && g?.happened_at) { const ds = new Date(g.happened_at).toISOString().slice(0, 10); setGradedDate(ds); setLoadedGradedDate(ds) }
+      } catch { /* keep */ }
+    })()
+    return () => { cancel = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id])
+
   async function loadHistory() {
     setLoadingHistory(true)
     try {
@@ -146,7 +164,7 @@ export function ManageHoldingModal({
     if (savingEdit) return
     setSavingEdit(true); setEditError(null)
     try {
-      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}) }) })
+      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}), ...(isGraded && gradedDate && gradedDate !== loadedGradedDate ? { graded_at: gradedDate } : {}) }) })
       if (!v.ok) { setEditError('Couldn’t save.'); return }
       const seen = new Set<string>()
       for (const lot of lots) {
@@ -211,6 +229,7 @@ export function ManageHoldingModal({
   const field = 'w-full px-3 py-2 rounded-lg border border-zinc-300 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-orange-500 disabled:opacity-50'
   const tabs: { v: View; label: string }[] = [
     { v: 'edit', label: 'Acquisitions' },
+    ...(isGraded ? [{ v: 'grading' as View, label: 'Grading' }] : []),
     { v: 'history', label: 'History' },
     { v: 'list', label: 'List' },
     { v: 'sold', label: 'Mark sold' },
@@ -312,47 +331,9 @@ export function ManageHoldingModal({
                   </div>
                 </div>
 
-                {isGraded && (
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grade</label>
-                      <select value={editGrade} onChange={e => setEditGrade(e.target.value)} className={field}>{(GRADING_SCALES[row.gradingCompany as GradingCompany] ?? []).map(g => <option key={g} value={g}>{g}</option>)}</select>
-                    </div>
-                    {row.gradingCompany === 'BGS' && (
-                      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
-                        {SUBGRADE_KEYS.map(k => (
-                          <div key={k} className="flex items-center gap-1.5">
-                            <label className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold w-16 flex-shrink-0">{SUBGRADE_LABEL[k]}</label>
-                            <select value={editSub[k]} onChange={e => setEditSub(prev => ({ ...prev, [k]: e.target.value }))} className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-zinc-300 bg-white text-xs tabular-nums text-zinc-900 focus:outline-none focus:border-orange-500">{SUBGRADE_OPTIONS.map(g => <option key={g} value={g}>{g || '—'}</option>)}</select>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Value override /ea</label>
-                    <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
-                      <input type="number" step="0.01" min="0" value={customValue} onChange={e => setCustomValue(e.target.value)} placeholder="Market" className={`${field} pl-6 tabular-nums`} />
-                    </div>
-                  </div>
-                  {isGraded ? (
-                    <div>
-                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading cost</label>
-                      <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
-                        <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => setGradingCost(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} />
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Serial</label>
-                      <input type="text" value={serial} onChange={e => setSerial(e.target.value)} placeholder="012/100" className={field} />
-                    </div>
-                  )}
-                </div>
-                {isGraded && (
+                {/* For a slab, Acquisitions stays simple — just the slab's IDs.
+                    Grade, subgrades, graded date + cost live on the Grading tab. */}
+                {isGraded ? (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Serial</label>
@@ -363,11 +344,62 @@ export function ManageHoldingModal({
                       <input type="text" inputMode="numeric" value={cert} onChange={e => setCert(e.target.value)} placeholder="0011590232" className={`${field} tabular-nums`} />
                     </div>
                   </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Value override /ea</label>
+                      <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
+                        <input type="number" step="0.01" min="0" value={customValue} onChange={e => setCustomValue(e.target.value)} placeholder="Market" className={`${field} pl-6 tabular-nums`} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Serial</label>
+                      <input type="text" value={serial} onChange={e => setSerial(e.target.value)} placeholder="012/100" className={field} />
+                    </div>
+                  </div>
                 )}
 
                 {editError && <p className="text-xs text-red-600">{editError}</p>}
               </div>
             )
+          )}
+
+          {view === 'grading' && isGraded && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grade</label>
+                <select value={editGrade} onChange={e => setEditGrade(e.target.value)} className={field}>{(GRADING_SCALES[row.gradingCompany as GradingCompany] ?? []).map(g => <option key={g} value={g}>{g}</option>)}</select>
+              </div>
+              {row.gradingCompany === 'BGS' && (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                  {SUBGRADE_KEYS.map(k => (
+                    <div key={k} className="flex items-center gap-1.5">
+                      <label className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold w-16 flex-shrink-0">{SUBGRADE_LABEL[k]}</label>
+                      <select value={editSub[k]} onChange={e => setEditSub(prev => ({ ...prev, [k]: e.target.value }))} className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-zinc-300 bg-white text-xs tabular-nums text-zinc-900 focus:outline-none focus:border-orange-500">{SUBGRADE_OPTIONS.map(g => <option key={g} value={g}>{g || '—'}</option>)}</select>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Graded date</label>
+                  <input type="date" value={gradedDate} onChange={e => setGradedDate(e.target.value)} className={field} />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grading cost</label>
+                  <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
+                    <input type="number" step="0.01" min="0" value={gradingCost} onChange={e => setGradingCost(e.target.value)} placeholder="Fee" className={`${field} pl-6 tabular-nums`} />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Value override /ea <span className="text-zinc-400 normal-case font-normal">(opt)</span></label>
+                <div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span>
+                  <input type="number" step="0.01" min="0" value={customValue} onChange={e => setCustomValue(e.target.value)} placeholder="Market" className={`${field} pl-6 tabular-nums`} />
+                </div>
+              </div>
+              {editError && <p className="text-xs text-red-600">{editError}</p>}
+            </div>
           )}
 
           {view === 'history' && (
@@ -527,7 +559,7 @@ export function ManageHoldingModal({
         <div className="flex items-center px-6 py-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-2xl">
           <button type="button" onClick={() => remove()} disabled={removing} title="Only for cards added by mistake — to record a sale use Mark sold" className="px-3 py-2 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50">{removing ? 'Removing…' : 'Remove'}</button>
           <div className="flex-1" />
-          {view === 'edit' ? (
+          {view === 'edit' || view === 'grading' ? (
             <button type="button" onClick={saveEdit} disabled={savingEdit} className="px-5 py-2 rounded-lg text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white cursor-pointer disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save changes'}</button>
           ) : (
             <button type="button" onClick={onClose} className="px-5 py-2 rounded-lg text-sm font-bold bg-zinc-900 hover:bg-zinc-800 text-white cursor-pointer">Done</button>

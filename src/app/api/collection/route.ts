@@ -109,6 +109,15 @@ export async function PATCH(request: Request) {
       .eq('type', 'grade')
   }
 
+  // graded_at backdates the grade event itself (its date is separate from the
+  // slab row) — edited from the Grading tab so the activity feed + P&L reflect
+  // when the slab actually came back.
+  if ('graded_at' in body) {
+    const ga = typeof body.graded_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.graded_at)
+      ? new Date(body.graded_at + 'T12:00:00Z').toISOString() : null
+    if (ga) await supabase.from('collection_adjustments').update({ happened_at: ga }).eq('collection_id', id).eq('type', 'grade')
+  }
+
   return NextResponse.json({ ok: true, item: data })
 }
 
