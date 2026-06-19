@@ -438,8 +438,12 @@ async function fetchGradedMedian(
     .select('price, grading_company, grade')
     .eq('card_id', cardId)
     .eq('status', 'visible')
+    .eq('sale_kind', 'sold') // real sales only — exclude active listings (GTC/relisted)
     .eq('grading_company', gradingCompany)
     .eq('grade', grade)
+    // English-only benchmark — Japanese prints trade separately (matches the
+    // comp + card-page sales list). Null language = pre-tagging rows ⇒ English.
+    .or('language.is.null,language.eq.english')
     .gte('sold_at', startDate.toISOString())
   if (error || !data) return null
   const prices = data

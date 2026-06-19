@@ -375,6 +375,10 @@ export async function getCardGradedSales(
     .eq('card_id', cardId)
     .eq('status', 'visible')
     .eq('sale_kind', 'sold') // exclude still-active listings (GTC/relisted) — not real sales
+    // Japanese prints trade as a separate market — keep them in slab_sales but
+    // off this (English) card's sales list, matching the English-only headline
+    // comp in recomputeSlabCards. Null language = pre-tagging rows ⇒ English.
+    .or('language.is.null,language.eq.english')
     .gte('sold_at', startDate.toISOString())
     .order('sold_at', { ascending: true });
 

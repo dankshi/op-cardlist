@@ -23,7 +23,7 @@ export async function recomputeSlabCards(
 
   let query = admin
     .from('slab_sales')
-    .select('card_id, grading_company, grade, price, sold_at, listing_format')
+    .select('card_id, grading_company, grade, price, sold_at, listing_format, language')
     .eq('status', 'visible')
     .eq('sale_kind', 'sold')
     .gte('sold_at', since.toISOString())
@@ -42,6 +42,11 @@ export async function recomputeSlabCards(
     // 'best_offer' here means "Best offer accepted" — eBay shows the struck-out
     // ask, not the (hidden, lower) accepted price, so it's not a real price.
     if (r.listing_format === 'best_offer') continue
+    // Japanese prints trade as a separate market — keep them in slab_sales (the
+    // card page can surface them per-language) but never pool them into this
+    // card's headline English comp. Null language = pre-tagging rows, treated as
+    // English. See migration 20260704_slab_sale_language.sql.
+    if (r.language === 'japanese') continue
     const cardId = r.card_id as string
     let bucket = cards.get(cardId)
     if (!bucket) { bucket = { cardId, grades: new Map() }; cards.set(cardId, bucket) }
