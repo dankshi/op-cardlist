@@ -185,7 +185,7 @@ export function Slab({
       : { left: 29, top: 5.3, width: 60.5, height: 11 }
     // Gold label takes black ink; black label takes the OP card-name gold. The
     // grade numeral matches the label ink on both holders.
-    const ink = isBL ? '#d2b450' : '#000000'
+    const ink = isBL ? '#9d8448' : '#000000'
     const numInk = ink
     const num = isBL || /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
     const sg = subgrades ?? {}
