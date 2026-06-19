@@ -1,16 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { GRADING_SCALES, type GradingCompany } from '@/types/database'
+import { GRADING_SCALES, SUBGRADE_KEYS, SUBGRADE_LABEL, SUBGRADE_OPTIONS, type SubgradeKey, type GradingCompany } from '@/types/database'
 import type { HoldingRow } from './HoldingsGrid'
 
 const COMPANIES: GradingCompany[] = ['PSA', 'BGS', 'CGC', 'TAG']
-
-// BGS subgrades (Centering/Corners/Edges/Surface) — numeric, 0.5 steps. '' = unset.
-const SUBGRADE_OPTIONS = ['', '10', '9.5', '9', '8.5', '8', '7.5', '7', '6.5', '6', '5.5', '5', '4.5', '4', '3.5', '3', '2.5', '2', '1.5', '1']
-const SUBGRADE_KEYS = ['centering', 'corners', 'edges', 'surface'] as const
-type SubgradeKey = typeof SUBGRADE_KEYS[number]
-const SUBGRADE_LABEL: Record<SubgradeKey, string> = { centering: 'Cent', corners: 'Corn', edges: 'Edge', surface: 'Surf' }
 
 function fmtUSD(n: number) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -162,11 +156,11 @@ export function GradingSubmissionModal({
                     <div className="relative w-24 flex-shrink-0"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-zinc-400">$</span><input type="number" min="0" step="0.01" value={it.fee} onChange={e => updateItem(i, { fee: e.target.value })} placeholder="Fee" className={`${field} w-full pl-6 tabular-nums`} /></div>
                   </div>
                   {company === 'BGS' && (
-                    <div className="grid grid-cols-4 gap-1.5">
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
                       {SUBGRADE_KEYS.map(k => (
-                        <div key={k}>
-                          <label className="block text-[9px] uppercase tracking-wide text-zinc-400 font-semibold mb-0.5">{SUBGRADE_LABEL[k]}</label>
-                          <select value={it.subgrades[k]} onChange={e => updateSub(i, k, e.target.value)} className="w-full px-1.5 py-1.5 rounded-md border border-zinc-300 bg-white text-xs text-zinc-900 focus:outline-none focus:border-orange-500">{SUBGRADE_OPTIONS.map(g => <option key={g} value={g}>{g || '—'}</option>)}</select>
+                        <div key={k} className="flex items-center gap-1.5">
+                          <label className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold w-16 flex-shrink-0">{SUBGRADE_LABEL[k]}</label>
+                          <select value={it.subgrades[k]} onChange={e => updateSub(i, k, e.target.value)} className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-zinc-300 bg-white text-xs tabular-nums text-zinc-900 focus:outline-none focus:border-orange-500">{SUBGRADE_OPTIONS.map(g => <option key={g} value={g}>{g || '—'}</option>)}</select>
                         </div>
                       ))}
                     </div>

@@ -77,6 +77,14 @@ export async function PATCH(request: Request) {
   }
   if ('cert_number' in body) patch.cert_number = body.cert_number?.trim() || null
   if ('serial_number' in body) patch.serial_number = body.serial_number?.trim() || null
+  // Correcting a logged grade: the grade and BGS subgrades on a slab line.
+  if ('grade' in body && typeof body.grade === 'string' && body.grade) patch.grade = body.grade
+  if ('subgrades' in body) {
+    const sg = body.subgrades && typeof body.subgrades === 'object'
+      ? Object.fromEntries(Object.entries(body.subgrades).filter(([, v]) => v != null && v !== '').map(([k, v]) => [k, Number(v)]))
+      : null
+    patch.subgrades = sg && Object.keys(sg).length ? sg : null
+  }
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   patch.updated_at = new Date().toISOString()
 

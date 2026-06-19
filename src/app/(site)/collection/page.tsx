@@ -152,6 +152,7 @@ export default async function CollectionPage() {
       calculatedPrice,
       serialNumber: i.serial_number,
       certNumber: i.cert_number ?? null,
+      subgrades: (i as { subgrades?: Record<string, number> | null }).subgrades ?? null,
       marketPrice,
       currentValue,
       costBasis,

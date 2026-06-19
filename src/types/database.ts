@@ -49,6 +49,14 @@ export const GRADING_SCALES: Record<GradingCompany, string[]> = {
   TAG: ['Pristine 10', '10', '9', '8.5', '8', '7.5', '7', '6.5', '6', '5.5', '5', '4.5', '4', '3.5', '3', '2.5', '2', '1.5', '1'],
 }
 
+// BGS subgrades — the four sub-scores on a Beckett slab (laid out 2×2 on the
+// label: Centering/Corners over Edges/Surface). Numeric, 0.5 steps; '' = unset.
+export const SUBGRADE_KEYS = ['centering', 'corners', 'edges', 'surface'] as const
+export type SubgradeKey = typeof SUBGRADE_KEYS[number]
+export const SUBGRADE_LABEL: Record<SubgradeKey, string> = { centering: 'Centering', corners: 'Corners', edges: 'Edges', surface: 'Surface' }
+export const SUBGRADE_OPTIONS = ['', '10', '9.5', '9', '8.5', '8', '7.5', '7', '6.5', '6', '5.5', '5', '4.5', '4', '3.5', '3', '2.5', '2', '1.5', '1']
+export type Subgrades = Partial<Record<SubgradeKey, number>>
+
 export type ListingStatus = 'active' | 'sold' | 'reserved' | 'delisted'
 
 /** Seller pricing tier (migration 20260538). Mirrors TierId in src/lib/fees.ts. */

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { type CollectionActivityRow } from '@/types/database'
+import { GRADING_SCALES, SUBGRADE_KEYS, SUBGRADE_LABEL, SUBGRADE_OPTIONS, type GradingCompany, type CollectionActivityRow } from '@/types/database'
 import { gradeLabel } from '@/lib/gradingStyle'
 import { Slab } from './Slab'
 import type { HoldingRow } from './HoldingsGrid'
@@ -44,6 +44,12 @@ export function ManageHoldingModal({
   const [serial, setSerial] = useState(row.serialNumber ?? '')
   const [cert, setCert] = useState(row.certNumber ?? '')
   const [gradingCost, setGradingCost] = useState('')
+  // Correct a logged grade: the slab's grade + (BGS) subgrades.
+  const [editGrade, setEditGrade] = useState(row.grade ?? '')
+  const [editSub, setEditSub] = useState<Record<string, string>>(() => {
+    const sg = row.subgrades ?? {}
+    return Object.fromEntries(SUBGRADE_KEYS.map(k => [k, sg[k] != null ? String(sg[k]) : '']))
+  })
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -105,7 +111,7 @@ export function ManageHoldingModal({
     if (savingEdit) return
     setSavingEdit(true); setEditError(null)
     try {
-      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null }) })
+      const v = await fetch('/api/collection', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: row.id, custom_value: customValue || null, serial_number: serial || null, cert_number: isGraded ? (cert || null) : null, ...(isGraded ? { grade: editGrade } : {}), ...(isGraded && row.gradingCompany === 'BGS' ? { subgrades: editSub } : {}) }) })
       if (!v.ok) { setEditError('Couldn’t save.'); return }
       const seen = new Set<string>()
       for (const lot of lots) {
@@ -261,6 +267,25 @@ export function ManageHoldingModal({
                     </button>
                   </div>
                 </div>
+
+                {isGraded && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wide text-zinc-500 font-semibold mb-1">Grade</label>
+                      <select value={editGrade} onChange={e => setEditGrade(e.target.value)} className={field}>{(GRADING_SCALES[row.gradingCompany as GradingCompany] ?? []).map(g => <option key={g} value={g}>{g}</option>)}</select>
+                    </div>
+                    {row.gradingCompany === 'BGS' && (
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                        {SUBGRADE_KEYS.map(k => (
+                          <div key={k} className="flex items-center gap-1.5">
+                            <label className="text-[10px] uppercase tracking-wide text-zinc-500 font-semibold w-16 flex-shrink-0">{SUBGRADE_LABEL[k]}</label>
+                            <select value={editSub[k]} onChange={e => setEditSub(prev => ({ ...prev, [k]: e.target.value }))} className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-zinc-300 bg-white text-xs tabular-nums text-zinc-900 focus:outline-none focus:border-orange-500">{SUBGRADE_OPTIONS.map(g => <option key={g} value={g}>{g || '—'}</option>)}</select>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>

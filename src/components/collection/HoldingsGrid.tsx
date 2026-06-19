@@ -27,6 +27,7 @@ export interface HoldingRow {
   calculatedPrice: number | null
   serialNumber: string | null
   certNumber: string | null
+  subgrades: Record<string, number> | null
   marketPrice: number | null
   currentValue: number | null
   costBasis: number | null

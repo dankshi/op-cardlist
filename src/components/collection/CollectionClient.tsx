@@ -9,6 +9,7 @@ import { PortfolioChart } from './PortfolioChart'
 import { HoldingsGrid, type HoldingRow } from './HoldingsGrid'
 import { AddEditCardModal } from './AddEditCardModal'
 import { GradingSubmissionModal } from './GradingSubmissionModal'
+import { GradingLogModal } from './GradingLogModal'
 
 interface Summary {
   totalValue: number
@@ -50,7 +51,9 @@ export function CollectionClient({
   const [modalOpen, setModalOpen] = useState(false)
   const [gradingOpen, setGradingOpen] = useState(false)
   const [gradingPreset, setGradingPreset] = useState<HoldingRow | null>(null)
+  const [gradingLogOpen, setGradingLogOpen] = useState(false)
   const rawHoldings = rows.filter(r => !r.gradingCompany)
+  const hasGraded = rows.some(r => r.gradingCompany)
 
   function openGrading(preset: HoldingRow | null) { setGradingPreset(preset); setGradingOpen(true) }
 
@@ -96,6 +99,15 @@ export function CollectionClient({
           >
             Transactions
           </Link>
+          {hasGraded && (
+            <button
+              type="button"
+              onClick={() => setGradingLogOpen(true)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-zinc-200 ring-1 ring-zinc-600 hover:bg-zinc-800 transition-colors cursor-pointer"
+            >
+              Grading log
+            </button>
+          )}
           {rawHoldings.length > 0 && (
             <button
               type="button"
@@ -159,6 +171,7 @@ export function CollectionClient({
 
       <AddEditCardModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={refreshAll} editItem={null} />
       <GradingSubmissionModal open={gradingOpen} onClose={() => setGradingOpen(false)} onSaved={refreshAll} rawHoldings={rawHoldings} preset={gradingPreset} />
+      <GradingLogModal open={gradingLogOpen} onClose={() => setGradingLogOpen(false)} rows={rows} onChanged={refreshAll} />
     </div>
   )
 }
