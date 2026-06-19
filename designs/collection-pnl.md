@@ -72,3 +72,31 @@ one row per sale. Hand it to your accountant.
   sale stays in your history forever.
 - If you sell a card you never logged in your collection, we still record the
   sale; it just won't show a profit until you tell us what you paid.
+
+## Grading plays
+
+Send cards to a grader and track whether it paid off.
+
+**Logging a submission.** Hit **Log grading**, then build the batch the way you
+actually sent it: add any cards from your collection — different cards, or just
+some copies of one — and give each its grade, its cert number (required, since
+every slab has one), and its grading fee. For Beckett (BGS) you can enter the
+four subgrades too (Centering / Corners / Edges / Surface). Enter the
+**shipping once** — outbound to the grader and return back to you — and it's
+split evenly across the cards. Each card becomes its own slab, and the grading
+fees + shipping fold into its cost basis.
+
+**Partial and mixed batches.** Only got some back? Add only those. Different
+cards in one box? They all go in one submission and share the shipping. Your
+three Sanjis sent together show up as **one submission**, not three loose rows.
+
+**Did grading pay off?** The **Grading log** groups everything by submission and
+shows a *grading premium* for each slab:
+
+> what the grade is worth over the raw card today − what you paid to grade it
+
+That's the profit from the grading decision *by itself* — and it stays
+meaningful even as the card keeps rising, because the raw card rises too; what's
+left is purely what the grade added. You see it per card, per submission, and as
+a portfolio total. Made a mistake? Click any slab in the log to fix its grade,
+cert, subgrades, or cost.

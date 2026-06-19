@@ -254,3 +254,72 @@ Each phase is independently shippable and reads the previous phase's tables.
   `collection_sales`). Alternative: keep a zero-qty line for "still tracked."
 - **No-basis sales** (listed outside the collection): recorded as proceeds-only,
   excluded from realized P&L until a basis is attached. Alternative: don't record.
+
+---
+
+## Grading submissions & per-slab P&L (shipped)
+
+The grading flow turns raw holdings into individual graded slabs and tracks the
+profit of the grading decision itself.
+
+### Per-slab model
+
+A graded card is an **individual slab**, not a quantity bucket. Line uniqueness
+includes `cert_number`:
+
+```
+unique (user_id, card_id, condition, grading_company, grade, cert_number) nulls not distinct
+```
+
+So two same-grade slabs with different certs are distinct lines (qty 1 each); raw
+cards still bucket by `(card, condition)`. Migration `20260706`.
+
+### A grading submission
+
+A submission is a batch graded together (different cards, a subset of a holding,
+or repeats). The builder (`GradingSubmissionModal`) collects, per copy: grade,
+**required** cert, per-card grading fee, and — for BGS — the four subgrades
+(`collections.subgrades` jsonb: `{centering,corners,edges,surface}`, migration
+`20260707`). Submission-level: **outbound + return shipping**, summed and split
+evenly across the batch.
+
+`POST /api/collection/adjustments {action:'grade_submission'}` stamps one
+`submission_id` (migration `20260708`) and calls `regrade_one_copy` once per copy:
+
+```
+regrade_one_copy(collection_id, company, grade, cert, grading_cost, shipping_cost, subgrades, submission_id)
+```
+
+which: splits one copy off the oldest raw lot → a new qty-1 graded line (its
+cert + subgrades) with a lot carrying `price_paid + (fee + shipping share)` as
+basis, and logs a `kind='grade'` adjustment carrying `amount` (total capitalized
+cost), `shipping_cost` (the shipping slice), and `submission_id`.
+
+### Cost basis
+
+Grading fee + shipping ride the lot's `grading_cost` slot, so the existing basis
+math (`sync_collection_from_lots`, `close_collection_lots`) folds them in
+unchanged. A slab's basis = raw purchase price + its grading fee + its shipping
+share.
+
+### Grading premium (the scorecard)
+
+The grading log (`GradingLogModal`) groups grade events by `submission_id` and
+shows, per slab, the **grading premium**:
+
+```
+premium = current graded value − current raw value − grading cost
+```
+
+This isolates the value the *grade* adds over the raw card and is robust to the
+card's own appreciation (both graded and raw move together; the spread is the
+grade's contribution). Raw value is the card's TCGplayer market (`/api/cards`);
+graded value is the slab's resolved market price. Surfaced per card, per
+submission, and as a portfolio total (grading cost / grading P&L / # submissions).
+Every held slab is editable from the log (grade / cert / subgrades / cost).
+
+### Migrations
+
+`20260704` shipping on regrade · `20260705` (renumbered) · `20260706` cert in
+line key + `regrade_one_copy` · `20260707` BGS subgrades · `20260708`
+`submission_id`.
