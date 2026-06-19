@@ -169,14 +169,17 @@ export function Slab({
   // the gold label band. Text scales with the slab via container units (cqw).
   if (company.toUpperCase() === 'BGS' && !/black\s*label|\bbl\b/i.test(grade)) {
     const win = { left: 12.72, top: 24.81, width: 73.5, height: 66.17 } // same holder window as bgs-10
-    // Gold label text area, measured from bgs-gold.png: the gold band is ~5–16.5%
-    // tall; content sits right of the baked Beckett logo (~28.5%) to ~91%.
-    const band = { left: 28.5, top: 5.2, width: 62.5, height: 11.6 }
+    // Gold label text area, measured from bgs-gold.png (gold band ~5–16.5% tall,
+    // content right of the baked Beckett logo ~28.5% to ~91%), inset a touch for
+    // padding off the edges.
+    const band = { left: 30, top: 5.9, width: 58, height: 10.2 }
     const num = /pristine/i.test(grade) || grade.trim() === '10' ? '10' : grade
     const sg = subgrades ?? {}
     const sub = (k: string) => (sg[k] != null ? String(sg[k]) : '—')
+    // justify-between right-aligns the value at the cell edge, so the two grid
+    // columns read as an aligned table (like the real Beckett label).
     const Cell = ({ label, k }: { label: string; k: string }) => (
-      <div className="flex items-baseline gap-[5%]"><span>{label}</span><span className="tabular-nums font-black">{sub(k)}</span></div>
+      <div className="flex items-baseline justify-between gap-[10%]"><span>{label}</span><span className="tabular-nums font-black">{sub(k)}</span></div>
     )
     return (
       <div className="relative w-full group-hover:opacity-95 transition-opacity" style={{ aspectRatio: '2004 / 3116', containerType: 'inline-size' }}>
@@ -192,15 +195,16 @@ export function Slab({
               <p className="truncate">{cardId ? `${cardNoLabel(cardId)} ` : ''}{cardName.toUpperCase()}</p>
               {rarity && <p className="truncate">{rarity.toUpperCase()}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-x-[6%] font-bold" style={{ fontSize: '2.55cqw' }}>
+            <div className="grid grid-cols-2 gap-x-[12%] font-bold" style={{ fontSize: '2.55cqw' }}>
               <Cell label="CENTERING" k="centering" />
               <Cell label="CORNERS" k="corners" />
               <Cell label="EDGES" k="edges" />
               <Cell label="SURFACE" k="surface" />
             </div>
           </div>
-          <div className="flex flex-col items-end justify-between pl-[3%] flex-shrink-0">
-            <span className="font-black leading-[0.78]" style={{ fontSize: '12.5cqw' }}>{num}</span>
+          <div className="flex flex-col items-end justify-between pl-[5%] flex-shrink-0">
+            {/* Beckett's grade numeral is a tall, lighter-weight figure — not a heavy black. */}
+            <span className="font-medium tracking-tight leading-[0.78]" style={{ fontSize: '13cqw' }}>{num}</span>
             <div className="text-right leading-[1.05]">
               <p className="font-black tracking-[0.02em]" style={{ fontSize: '2.6cqw' }}>{bgsGradeWord(grade)}</p>
               {certNumber && <p className="font-semibold tabular-nums" style={{ fontSize: '2.4cqw' }}>{certNumber}</p>}
