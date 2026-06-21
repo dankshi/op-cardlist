@@ -9,10 +9,11 @@ import { createClient } from '@/lib/supabase/client'
 // Post-exception inventory management.
 //
 // Two tabs:
-//   - Consignment: consigned_intakes rows (cards Nomi owns post-
-//     exception that need to be relisted). Lets ops set/update the
-//     intended relist price and advance the lifecycle (pending_relist
-//     → listed → sold | written_off).
+//   - Consignment: exception-origin consignment_items (cards consigned
+//     on the seller's behalf after an order exception — still the
+//     seller's property, sold by Nomi for a commission). Lets ops
+//     set/update the relist (ask) price and advance the lifecycle
+//     (confirmed → listed → sold | rejected).
 //   - Buyouts: buyouts rows (Nomi-funded seller payouts for courier/
 //     Nomi-attributable damage). Lets ops record the carrier claim
 //     reference, advance the claim status, and log recovered amounts.
@@ -41,11 +42,11 @@ interface PartyRef {
 interface ConsignmentRow {
   id: string
   exception_type: string
-  intended_relist_price: number | null
-  consignment_listing_id: string | null
-  status: 'pending_relist' | 'listed' | 'sold' | 'written_off'
+  ask_price: number | null
+  listing_id: string | null
+  status: 'confirmed' | 'listed' | 'sold' | 'rejected'
   notes: string | null
-  consigned_at: string
+  created_at: string
   listed_at: string | null
   resolved_at: string | null
   order_item: OrderItemRef | OrderItemRef[] | null
@@ -141,7 +142,7 @@ export default function AdminInventoryPage() {
   }
 
   // Pending counts for the tab labels — show "needs attention" badges.
-  const consignmentPending = consignment.filter(r => r.status === 'pending_relist').length
+  const consignmentPending = consignment.filter(r => r.status === 'confirmed').length
   const buyoutPending = buyouts.filter(r => !r.carrier_claim_status || r.carrier_claim_status === 'pending' || r.carrier_claim_status === 'filed').length
 
   return (
@@ -149,7 +150,7 @@ export default function AdminInventoryPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-zinc-900">Post-Exception Inventory</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Cards Nomi now owns or has paid out on, post-authentication exceptions.
+          Cards Nomi is consigning for the seller, or has paid out on, after authentication exceptions.
         </p>
       </div>
 
@@ -243,7 +244,7 @@ function ConsignmentRowCard({
   const item = unwrap(row.order_item)
   const seller = unwrap(row.seller)
   const [priceInput, setPriceInput] = useState(
-    row.intended_relist_price != null ? String(row.intended_relist_price) : '',
+    row.ask_price != null ? String(row.ask_price) : '',
   )
   const [savingPrice, setSavingPrice] = useState(false)
   const [savingStatus, setSavingStatus] = useState(false)
@@ -261,14 +262,14 @@ function ConsignmentRowCard({
       const res = await fetch(`/api/admin/inventory/consignment/${row.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ intended_relist_price: num }),
+        body: JSON.stringify({ ask_price: num }),
       })
       const data = await res.json()
       if (!res.ok) {
         setRowError(data.error || 'Save failed')
         return
       }
-      onUpdate(row.id, { intended_relist_price: num })
+      onUpdate(row.id, { ask_price: num })
     } finally {
       setSavingPrice(false)
     }
@@ -295,10 +296,18 @@ function ConsignmentRowCard({
   }
 
   const statusTone: Record<ConsignmentRow['status'], string> = {
-    pending_relist: 'bg-amber-100 text-amber-800',
+    confirmed: 'bg-amber-100 text-amber-800',
     listed: 'bg-blue-100 text-blue-700',
     sold: 'bg-emerald-100 text-emerald-700',
-    written_off: 'bg-zinc-100 text-zinc-500',
+    rejected: 'bg-zinc-100 text-zinc-500',
+  }
+  // Ops-facing labels: 'confirmed' = in hand, awaiting relist; 'rejected'
+  // = written off (can't be sold). Keeps the operator's mental model.
+  const statusLabel: Record<ConsignmentRow['status'], string> = {
+    confirmed: 'to list',
+    listed: 'listed',
+    sold: 'sold',
+    rejected: 'written off',
   }
 
   return (
@@ -311,7 +320,7 @@ function ConsignmentRowCard({
               {row.exception_type.replace('_', ' ')}
             </span>
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${statusTone[row.status]}`}>
-              {row.status.replace('_', ' ')}
+              {statusLabel[row.status]}
             </span>
           </div>
           <p className="text-xs text-zinc-500">
@@ -332,7 +341,7 @@ function ConsignmentRowCard({
               </>
             )}
             {' · '}
-            <span>Consigned {timeAgo(row.consigned_at)}</span>
+            <span>Consigned {timeAgo(row.created_at)}</span>
           </p>
         </div>
       </div>
@@ -365,7 +374,7 @@ function ConsignmentRowCard({
         </div>
 
         <div className="flex items-center gap-1.5">
-          {row.status === 'pending_relist' && (
+          {row.status === 'confirmed' && (
             <button
               type="button"
               onClick={() => changeStatus('listed')}
@@ -385,12 +394,12 @@ function ConsignmentRowCard({
               Mark Sold
             </button>
           )}
-          {(row.status === 'pending_relist' || row.status === 'listed') && (
+          {(row.status === 'confirmed' || row.status === 'listed') && (
             <button
               type="button"
               onClick={() => {
                 if (confirm('Write off this consignment? Use for cards that can\'t be sold (e.g. proxy / unusable).')) {
-                  changeStatus('written_off')
+                  changeStatus('rejected')
                 }
               }}
               disabled={savingStatus}

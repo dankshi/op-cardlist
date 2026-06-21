@@ -69,7 +69,7 @@ export async function GET(
     db.from('intake_issues').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
     db.from('intake_activity_log').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
     itemIds.length
-      ? db.from('consigned_intakes').select('*').in('order_item_id', itemIds)
+      ? db.from('consignment_items').select('*').in('origin_order_item_id', itemIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     itemIds.length
       ? db.from('buyouts').select('*').in('order_item_id', itemIds)

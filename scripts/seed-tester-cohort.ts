@@ -319,17 +319,33 @@ async function makeOrder(args: MakeOrderArgs): Promise<{ id: string; created: bo
     throw new Error(`order_item insert failed for ${args.scenarioKey}: ${itemErr?.message}`)
   }
 
-  // For exception_review, also seed the consigned_intakes row that
-  // finalize-auth would have written. Otherwise the resolution UI
-  // shows the order but the per-item consignment-price input has
-  // no row to update.
+  // For exception_review, also seed the consignment submission + item
+  // that finalize-auth would have written (unified consignment model,
+  // channel='exception'). Otherwise the resolution UI shows the order
+  // but the per-item consignment-price input has no row to update.
   if (args.status === 'exception_review') {
-    await supabase.from('consigned_intakes').insert({
-      order_item_id: insertedItem.id,
-      original_seller_id: args.sellerId,
-      exception_type: 'conditional',
-      notes: 'Seeded for tester cohort — Lightly Played downgrade',
-    })
+    const { data: sub } = await supabase
+      .from('consignment_submissions')
+      .insert({
+        seller_id: args.sellerId,
+        channel: 'exception',
+        status: 'processing',
+        origin_order_id: order.id,
+      })
+      .select('id')
+      .single()
+    if (sub) {
+      await supabase.from('consignment_items').insert({
+        submission_id: sub.id,
+        seller_id: args.sellerId,
+        card_id: orderItem.card_id,
+        kind: 'raw',
+        origin_order_item_id: insertedItem.id,
+        exception_type: 'conditional',
+        status: 'confirmed',
+        notes: 'Seeded for tester cohort — Lightly Played downgrade',
+      })
+    }
   }
 
   return { id: order.id, created: true }

@@ -24,10 +24,9 @@ const FROM = process.env.RESEND_FROM_EMAIL || 'orders@nomimarket.com'
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 interface ResolveBody {
-  /** Per-item consignment relist price. Sets
-   *  consigned_intakes.intended_relist_price for the matching row.
-   *  Optional — can be left null and set later from a dedicated
-   *  consignment-management UI (not built yet). */
+  /** Per-item consignment relist price. Sets consignment_items.ask_price
+   *  for the exception item matching this order_item. Optional — can be
+   *  left null and set later from the post-exception inventory UI. */
   consignment_prices?: Record<string, number>
   /** Per-item Shippo / carrier claim reference. Sets buyouts.carrier_claim_id.
    *  Optional — admin may file the claim asynchronously. */
@@ -84,9 +83,9 @@ export async function POST(
     for (const [itemId, price] of Object.entries(body.consignment_prices)) {
       if (!Number.isFinite(price) || price < 0) continue
       const { error: updErr } = await admin
-        .from('consigned_intakes')
-        .update({ intended_relist_price: price })
-        .eq('order_item_id', itemId)
+        .from('consignment_items')
+        .update({ ask_price: price })
+        .eq('origin_order_item_id', itemId)
       if (updErr) {
         return NextResponse.json({
           error: `Failed to update consignment price for item ${itemId.slice(0, 8)}: ${updErr.message}`,

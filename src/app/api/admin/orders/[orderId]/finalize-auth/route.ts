@@ -11,8 +11,9 @@ import { notifyExceptionReview, notifyBuyoutCreated } from '@/lib/slack'
 import { recordOrderRaffleEntries } from '@/lib/raffle'
 
 /** Commits the per-item auth decisions into an order-level status
- *  transition and triggers the data side-effects (consigned_intakes,
- *  buyouts rows). Seller credit math for clean orders still flows
+ *  transition and triggers the data side-effects (a consignment
+ *  submission + items for exception cards, buyouts rows). Seller
+ *  credit math for clean orders still flows
  *  through the existing status route — we set status='authenticated'
  *  there and the existing branch picks it up. For exception_review
  *  orders, seller credit happens later, per-resolution, in the
@@ -106,11 +107,48 @@ export async function POST(
   )
   const nextStatus = isCleanPass ? 'authenticated' : 'exception_review'
 
+  // ── Lazily get-or-create the single exception-origin consignment
+  //    submission for this order. Exception cards consign under the
+  //    unified consignment model (channel='exception') — same economics
+  //    as a seller-initiated consignment, just an involuntary entry
+  //    point. One submission groups all of an order's flagged cards;
+  //    the partial unique index on origin_order_id makes re-finalize
+  //    reuse the same row. Created only if at least one item consigns.
+  let exceptionSubmissionId: string | null = null
+  async function ensureExceptionSubmission(): Promise<string> {
+    if (exceptionSubmissionId) return exceptionSubmissionId
+    const { data: existing } = await adminSupabase
+      .from('consignment_submissions')
+      .select('id')
+      .eq('origin_order_id', orderId)
+      .eq('channel', 'exception')
+      .maybeSingle()
+    if (existing) {
+      exceptionSubmissionId = existing.id
+      return existing.id
+    }
+    const { data: created, error: subErr } = await adminSupabase
+      .from('consignment_submissions')
+      .insert({
+        seller_id: order!.seller_id,
+        channel: 'exception',
+        status: 'processing',
+        origin_order_id: orderId,
+      })
+      .select('id')
+      .single()
+    if (subErr || !created) {
+      throw new Error(`Failed to create consignment submission: ${subErr?.message}`)
+    }
+    exceptionSubmissionId = created.id
+    return created.id
+  }
+
   // ── Record the per-item side-effects. We do this BEFORE flipping
   //    order status so a partial failure leaves the order in
   //    'received' for retry (rather than 'exception_review' with
-  //    missing consignment/buyout rows). Each insert is idempotent on
-  //    order_item_id via the unique-ish lookups below.
+  //    missing consignment/buyout rows). Consignment items are guarded
+  //    against duplicates on re-finalize via origin_order_item_id.
   for (const item of typedItems) {
     // Skip clean items — they have no per-item side-effect to record.
     if (item.auth_decision === 'authentic' && item.auth_condition === 'near_mint') continue
@@ -151,11 +189,26 @@ export async function POST(
 
       // Default exception side-effect: consignment. Covers
       // incorrect_product (any received_type), conditional (any
-      // played grade), physical_damage by seller.
-      await adminSupabase.from('consigned_intakes').insert({
-        order_item_id: item.id,
-        original_seller_id: order.seller_id,
+      // played grade), physical_damage by seller. The card is already
+      // in hand (it arrived on this order), so the item starts at
+      // 'confirmed' under the order's exception submission.
+      const submissionId = await ensureExceptionSubmission()
+      // Idempotent on re-finalize: skip if this exception is already recorded.
+      const { data: existingItem } = await adminSupabase
+        .from('consignment_items')
+        .select('id')
+        .eq('origin_order_item_id', item.id)
+        .eq('exception_type', exType)
+        .maybeSingle()
+      if (existingItem) continue
+      await adminSupabase.from('consignment_items').insert({
+        submission_id: submissionId,
+        seller_id: order.seller_id,
+        card_id: item.card_id,
+        kind: 'raw',
+        origin_order_item_id: item.id,
         exception_type: exType,
+        status: 'confirmed',
         notes: typeof details === 'object' && details !== null ? JSON.stringify(details) : null,
       })
     }

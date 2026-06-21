@@ -2,19 +2,19 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
-/** Admin-only patch for a single consigned_intakes row. Supports
+/** Admin-only patch for a single consignment_item row. Supports
  *  partial updates — pass only the fields you want to change.
  *  Used by the /admin/inventory Consignment tab's inline edits:
- *  setting/updating the relist price, marking listed, writing
- *  it off, etc. */
+ *  setting/updating the relist (ask) price, marking listed, writing
+ *  it off (rejected), etc. */
 interface PatchBody {
-  intended_relist_price?: number
-  status?: 'pending_relist' | 'listed' | 'sold' | 'written_off'
-  consignment_listing_id?: string | null
+  ask_price?: number
+  status?: 'confirmed' | 'listed' | 'sold' | 'rejected'
+  listing_id?: string | null
   notes?: string | null
 }
 
-const VALID_STATUSES = new Set(['pending_relist', 'listed', 'sold', 'written_off'])
+const VALID_STATUSES = new Set(['confirmed', 'listed', 'sold', 'rejected'])
 
 export async function PATCH(
   request: Request,
@@ -41,11 +41,11 @@ export async function PATCH(
   const body = (await request.json().catch(() => ({}))) as PatchBody
   const update: Record<string, unknown> = {}
 
-  if (body.intended_relist_price !== undefined) {
-    if (!Number.isFinite(body.intended_relist_price) || body.intended_relist_price < 0) {
-      return NextResponse.json({ error: 'intended_relist_price must be a non-negative number' }, { status: 400 })
+  if (body.ask_price !== undefined) {
+    if (!Number.isFinite(body.ask_price) || body.ask_price < 0) {
+      return NextResponse.json({ error: 'ask_price must be a non-negative number' }, { status: 400 })
     }
-    update.intended_relist_price = body.intended_relist_price
+    update.ask_price = body.ask_price
   }
 
   if (body.status !== undefined) {
@@ -56,13 +56,13 @@ export async function PATCH(
     // Stamp timestamps as the lifecycle advances. Idempotent — if
     // an admin re-marks listed, we keep the original listed_at.
     if (body.status === 'listed') update.listed_at = new Date().toISOString()
-    if (body.status === 'sold' || body.status === 'written_off') {
+    if (body.status === 'sold' || body.status === 'rejected') {
       update.resolved_at = new Date().toISOString()
     }
   }
 
-  if (body.consignment_listing_id !== undefined) {
-    update.consignment_listing_id = body.consignment_listing_id
+  if (body.listing_id !== undefined) {
+    update.listing_id = body.listing_id
   }
 
   if (body.notes !== undefined) {
@@ -75,7 +75,7 @@ export async function PATCH(
 
   const admin = getSupabaseAdmin()
   const { data, error } = await admin
-    .from('consigned_intakes')
+    .from('consignment_items')
     .update(update)
     .eq('id', id)
     .select()

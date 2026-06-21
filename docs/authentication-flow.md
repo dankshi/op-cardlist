@@ -86,9 +86,19 @@ Discriminated by `exception_type`. Examples:
 
 ### New tables
 
+> **Superseded:** `consigned_intakes` was folded into the unified consignment
+> model in `20260713_consignment_flow.sql` and dropped. Exception cards now
+> create a `consignment_submissions` row (`channel='exception'`) + one
+> `consignment_items` row (`origin_order_item_id`, `exception_type`); the field
+> mapping is `intended_relist_price→ask_price`, `consignment_listing_id→listing_id`,
+> `consigned_at→created_at`, and the status names `pending_relist→confirmed`,
+> `written_off→rejected`. See [docs/consignment-flow.md](consignment-flow.md). The
+> original definition is kept below for historical context.
+
 ```sql
 -- Tracks the consignment listing spawned by an exception resolution.
 -- One per (order_item that turned into consigned inventory).
+-- [SUPERSEDED — see note above; now consignment_items with channel='exception']
 CREATE TABLE consigned_intakes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_item_id UUID NOT NULL REFERENCES order_items(id),
@@ -172,11 +182,11 @@ Side-effects (transactional, all-or-rollback):
 | `authentic + near_mint` | Credit seller balance (same logic as today's `status='authenticated'` branch) |
 | `fake` (disposition=destroy) | Insert `intake_disposition` row marking "destroyed", schedule destruction in physical queue |
 | `fake` (disposition=return) | Generate return label (Shippo, Nomi → seller), email seller with tracking |
-| `incorrect_product` | Insert `consigned_intakes` row, decrement seller listing's inventory (it never arrived) |
-| `conditional` | Insert `consigned_intakes` row |
+| `incorrect_product` | Add a `consignment_items` row (exception submission), decrement seller listing's inventory (it never arrived) |
+| `conditional` | Add a `consignment_items` row (exception submission) |
 | `physical_damage` (courier) | Insert `buyouts` row, credit seller for sale price minus consignment fee, file Shippo insurance claim |
 | `physical_damage` (nomi) | Insert `buyouts` row, credit seller full sale price (no claim) |
-| `physical_damage` (seller) | Insert `consigned_intakes` row (downgraded price, like Conditional) |
+| `physical_damage` (seller) | Add a `consignment_items` row (downgraded price, like Conditional) |
 
 Side-effects (always run, never rolled back if email fails):
 - Email seller (per-item summary of decisions affecting them)
