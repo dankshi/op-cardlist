@@ -26,7 +26,7 @@ const MAINTENANCE_HTML = `<!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
-<title>Something's brewing — nomi</title>
+<title>Something's brewing</title>
 <style>
   :root { color-scheme: dark; }
   * { margin: 0; box-sizing: border-box; }
@@ -55,7 +55,6 @@ const MAINTENANCE_HTML = `<!doctype html>
   }
   h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 14px; }
   p { color: #a1a1aa; font-size: 1.05rem; line-height: 1.6; }
-  .mark { margin-top: 36px; font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; color: #52525b; }
 </style>
 </head>
 <body>
@@ -63,7 +62,6 @@ const MAINTENANCE_HTML = `<!doctype html>
     <span class="dot"></span>
     <h1>Something's brewing.</h1>
     <p>We're building something new. Check back soon.</p>
-    <div class="mark">nomi market</div>
   </div>
 </body>
 </html>`
